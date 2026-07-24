@@ -1,0 +1,14 @@
+# node
+web/node_modules/
+web/dist/
+*.log
+
+# python
+server/__pycache__/
+server/app/__pycache__/
+server/.venv/
+**/__pycache__/
+
+# secrets
+.env
+server/.env
