@@ -23,8 +23,9 @@ def build_scene(p):
         path = os.path.join(GLBDIR, name)
         if not name.endswith(".glb") or not os.path.exists(path):
             continue
+        # 깊이축 뒤집기(blender_y = D - cy): three.js→Blender 손대칭 방지(렌더가 3D의 거울상이 되지 않게).
         items.append({"glb": path, "x": float(it.get("x", W / 2)),
-                      "y": float(it.get("y", D / 2)), "rot": int(it.get("rot", 0))})
+                      "y": D - float(it.get("y", D / 2)), "rot": int(it.get("rot", 0))})
     # 카메라: 앱에서 사용자의 3D 시점을 넘기면 그대로(방 전체가 3D 뷰와 동일하게), 없으면 기본 코너 컷어웨이.
     cam = p.get("camera")
     if cam:

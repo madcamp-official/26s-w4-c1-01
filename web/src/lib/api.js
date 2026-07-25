@@ -51,11 +51,11 @@ export async function renderScene(room, items, cam3d) {
       glb: it.glb, x: it.cx, y: it.cy, rot: it.rotationDeg || 0,
     })),
   };
-  // 사용자의 현재 3D 시점을 렌더에 전달(same viewpoint). three.js(x, y=up, z) → 방좌표(cx=x+W/2, cy=z+D/2, 높이=y)
+  // 사용자의 현재 3D 시점을 렌더에 전달. three.js(x, y=up, z) → Blender(x+W/2, D/2−z, y) 손대칭 없는 변환.
   if (cam3d?.pos && cam3d?.target) {
     payload.camera = {
-      pos: [cam3d.pos[0] + W / 2, cam3d.pos[2] + D / 2, cam3d.pos[1]],
-      target: [cam3d.target[0] + W / 2, cam3d.target[2] + D / 2, cam3d.target[1]],
+      pos: [cam3d.pos[0] + W / 2, D / 2 - cam3d.pos[2], cam3d.pos[1]],
+      target: [cam3d.target[0] + W / 2, D / 2 - cam3d.target[2], cam3d.target[1]],
       lens: 22,
     };
   }
