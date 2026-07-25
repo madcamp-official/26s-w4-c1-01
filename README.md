@@ -15,6 +15,19 @@ docs/    기획서 · 기능 명세서
 
 ## 실행
 
+### 빠른 실행 (권장) — 원클릭
+
+```bash
+./run.sh            # 빌드 + 백엔드(8000) + 프런트(5173) + GPU 터널(8600) 전부 시작
+# → VS Code PORTS 탭에서 5173 열기
+./run.sh stop       # 전부 중지
+```
+
+코드를 고쳤으면: `./run.sh` 다시(리빌드) → 브라우저 하드 새로고침(Ctrl+Shift+R).
+`run.sh`는 멱등이라 이미 떠 있는 건 재시작하지 않아(VS Code 포워딩이 안 끊김). 프런트는 빌드본을 서빙(`serve_build.py`)해 포워딩 터널에서도 안정적이다.
+
+### 개별 실행 (개발용)
+
 ```bash
 # 프런트
 cd web && npm install && npm run dev     # http://localhost:5173
