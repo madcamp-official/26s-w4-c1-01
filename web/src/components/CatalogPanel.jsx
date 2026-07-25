@@ -47,7 +47,11 @@ export default function CatalogPanel({ onAdd }) {
           const dimText = known ? `${c.w}×${c.d}${c.h ? `×${c.h}` : ''}cm` : `≈${rd.w}×${rd.d}cm`;
           return (
             <button key={c.id} className="catitem" onClick={() => onAdd(c)} title="방에 추가">
-              <span className="swatch" style={{ background: c.color || rd.color || '#c9bfa8' }} />
+              {c.image ? (
+                <img className="swatch" src={c.image} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              ) : (
+                <span className="swatch" style={{ background: c.color || rd.color || '#c9bfa8' }} />
+              )}
               <span className="meta">
                 <span className="nm">{c.name}</span>
                 <span className="dm">

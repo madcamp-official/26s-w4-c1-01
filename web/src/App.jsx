@@ -86,6 +86,7 @@ export default function App() {
           <Planner room={room} items={items} setItems={setItems} selectedId={selectedId} setSelectedId={setSelectedId} flags={val.flags} />
           {sel && (
             <div className="selbar" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+              {sel.image && <img className="selthumb" src={sel.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
               <span className="badge est">{sel.name}</span>
               <span className={`badge ${sel.dimAccuracy === '정형' || sel.dimAccuracy === '사용자입력' ? 'ok' : 'warn'}`}>
                 {sel.dimAccuracy}
