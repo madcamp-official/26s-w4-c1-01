@@ -12,16 +12,20 @@ S = json.load(open(scene_path))
 R = S["room"]; W, D, H = R["w"], R["d"], R["h"]
 
 # ---------- 시간대 프리셋 (조명·노출·창 색온도·보조광) ----------
-# win = 창밖 밝기색(하늘), win_s = 창 발광세기, sun = 태양광(색,세기,고도deg,방위deg) 없으면 None,
-# lamp = 실내등 세기(밤에만), hdri = 환경광 세기, exp = 노출.
+# sky = (위 하늘색, 아래 수평선색) 수직 그라데이션, win_s = 창 발광세기, sun = 태양광(색,세기,고도deg,방위deg) 없으면 None,
+# lamp = 실내등 세기(밤에만), hdri = 환경광 세기, exp = 노출.  (win = 폴백 단색)
 PRESETS = {
-    "morning": dict(exp=0.42, hdri=0.55, win=(0.86, 0.91, 1.0), win_s=14,
+    "morning": dict(exp=0.42, hdri=0.55, win=(0.86, 0.91, 1.0), win_s=13,
+                    sky=((0.55, 0.72, 1.0), (0.99, 0.9, 0.78)),
                     sun=((1.0, 0.93, 0.80), 2.2, 18, 60), lamp=0.0),
-    "day":     dict(exp=0.40, hdri=0.80, win=(0.90, 0.95, 1.0), win_s=12,
+    "day":     dict(exp=0.40, hdri=0.80, win=(0.90, 0.95, 1.0), win_s=11,
+                    sky=((0.50, 0.70, 1.0), (0.95, 0.97, 1.0)),
                     sun=((1.0, 0.97, 0.92), 3.0, 55, 35), lamp=0.0),
     "sunset":  dict(exp=0.55, hdri=0.22, win=(1.0, 0.5, 0.22), win_s=9,
+                    sky=((0.85, 0.42, 0.36), (1.0, 0.74, 0.34)),
                     sun=((1.0, 0.52, 0.24), 4.2, 6, 80), lamp=0.4),
     "night":   dict(exp=0.30, hdri=0.05, win=(0.16, 0.22, 0.42), win_s=2.5,
+                    sky=((0.04, 0.07, 0.20), (0.14, 0.19, 0.40)),
                     sun=None, lamp=1.0),
 }
 PRE = PRESETS.get(S.get("preset", "day"), PRESETS["day"])
@@ -86,6 +90,28 @@ def emission(name, color, strength):
     o = nt2.nodes.new("ShaderNodeOutputMaterial")
     e.inputs["Color"].default_value = (*color, 1)
     e.inputs["Strength"].default_value = strength
+    nt2.links.new(e.outputs["Emission"], o.inputs["Surface"])
+    return m
+
+
+def window_sky_mat(top, bot, strength):
+    """창밖 하늘 — 수직 그라데이션(위 하늘색→아래 수평선). 창 평면은 회전이 베이크돼 Generated.Z가 곧 세로축."""
+    m = bpy.data.materials.new("window"); m.use_nodes = True
+    nt2 = m.node_tree
+    for n in list(nt2.nodes): nt2.nodes.remove(n)
+    o = nt2.nodes.new("ShaderNodeOutputMaterial")
+    e = nt2.nodes.new("ShaderNodeEmission")
+    e.inputs["Strength"].default_value = strength
+    tc = nt2.nodes.new("ShaderNodeTexCoord")
+    sep = nt2.nodes.new("ShaderNodeSeparateXYZ")
+    nt2.links.new(tc.outputs["Generated"], sep.inputs["Vector"])
+    ramp = nt2.nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.elements[0].position = 0.0
+    ramp.color_ramp.elements[0].color = (*bot, 1)   # 아래 = 수평선(밝고 웜)
+    ramp.color_ramp.elements[1].position = 1.0
+    ramp.color_ramp.elements[1].color = (*top, 1)   # 위 = 하늘
+    nt2.links.new(sep.outputs["Z"], ramp.inputs["Fac"])
+    nt2.links.new(ramp.outputs["Color"], e.inputs["Color"])
     nt2.links.new(e.outputs["Emission"], o.inputs["Surface"])
     return m
 
@@ -200,7 +226,8 @@ if "right" not in hide:
 
 # ---------- 창문(틀+창살+하늘 발광) : 좌측 벽 or far 벽 ----------
 win = S.get("window", {"wall": "far", "w": min(2.2, W * 0.6), "h": 1.4, "z": 1.25})
-WM = emission("window", PRE["win"], PRE["win_s"])
+_sky = PRE.get("sky")
+WM = window_sky_mat(_sky[0], _sky[1], PRE["win_s"]) if _sky else emission("window", PRE["win"], PRE["win_s"])
 ww, wh, wz = win["w"], win.get("h", 1.4), win.get("z", 1.25)
 fr = 0.05  # 틀 두께
 
