@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Stage, Layer, Rect, Line, Group, Text, Circle } from 'react-konva';
+import { Stage, Layer, Rect, Line, Group, Text, Circle, Image as KImage } from 'react-konva';
 import { effectiveFootprint } from '../lib/geometry.js';
 import { accuracyMeta } from '../lib/catalog.js';
 
@@ -11,6 +11,22 @@ const MAX_H = 470;
 export default function Planner({ room, items, setItems, selectedId, setSelectedId, flags }) {
   const wrapRef = useRef(null);
   const [wrapW, setWrapW] = useState(600);
+  const imgCache = useRef({});
+  const [, setImgTick] = useState(0);
+  // 제품 썸네일 로더(탑다운 타일 위 오버레이). 로드되면 리렌더.
+  function getImg(src) {
+    if (!src) return null;
+    let e = imgCache.current[src];
+    if (!e) {
+      const im = new window.Image();
+      e = { im, ok: false };
+      imgCache.current[src] = e;
+      im.onload = () => { e.ok = true; setImgTick((t) => t + 1); };
+      im.onerror = () => { e.ok = 'err'; };
+      im.src = src;
+    }
+    return e.ok === true ? e.im : null;
+  }
 
   useLayoutEffect(() => {
     const el = wrapRef.current;
@@ -82,6 +98,15 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                   strokeWidth={selectedId === it.id ? 3 : 2}
                   cornerRadius={3}
                 />
+                {(() => {
+                  const im = getImg(it.image);
+                  if (!im) return null;
+                  const asp = im.naturalWidth / im.naturalHeight || 1;
+                  let iw = w * 0.74, ih = iw / asp;
+                  const maxh = h * 0.74;
+                  if (ih > maxh) { ih = maxh; iw = ih * asp; }
+                  return <KImage image={im} width={iw} height={ih} offsetX={iw / 2} offsetY={ih / 2} listening={false} opacity={0.95} />;
+                })()}
                 <Text
                   text={`${it.name}\n${Math.round(it.wM * 100)}×${Math.round(it.dM * 100)} · ${accuracyMeta(it.dimAccuracy).short}`}
                   fontSize={11}

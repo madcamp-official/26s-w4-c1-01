@@ -2,8 +2,10 @@
 // 1차 소스는 IKEA(정형 치수 + 흰배경 스튜디오컷) — 기능명세서 §8 정직 원칙: 치수 보장은 정형 소스에만.
 // lowBox: 낮은 박스형/평면 → 합성(homography) 품질 좋음 / false면 합성엔 부적합(2.5D 판때기 위험).
 // dimAccuracy: '정형'(IKEA 등 보장) | '추정'(네이버·중고 등).
+import { ABO } from './abo.js';
 
-export const CATALOG = [
+// 로컬 카탈로그는 ABO(실제 제품 이미지 누끼 + 정형 치수) 우선, 없으면 색상 시드로 폴백.
+const SEED = [
   // --- 침대 (낮은 박스형: 합성 우수) ---
   { id: 'bed-ss', name: '슈퍼싱글 침대프레임', cat: '침대', w: 123, d: 208, h: 40, lowBox: true, color: '#b8a58a', source: 'IKEA', dimAccuracy: '정형' },
   { id: 'bed-s', name: '싱글 침대프레임', cat: '침대', w: 103, d: 208, h: 40, lowBox: true, color: '#c2b199', source: 'IKEA', dimAccuracy: '정형' },
@@ -23,6 +25,7 @@ export const CATALOG = [
   { id: 'lamp-floor', name: '플로어 스탠드', cat: '조명', w: 30, d: 30, h: 150, lowBox: false, color: '#cfc4ad', source: 'IKEA', dimAccuracy: '정형' },
 ];
 
+export const CATALOG = ABO.length ? ABO : SEED;
 export const CATEGORIES = [...new Set(CATALOG.map((c) => c.cat))];
 
 // 카테고리별 표준 치수(cm) — 실제 치수가 미상인 실상품(네이버 등)의 기본값.

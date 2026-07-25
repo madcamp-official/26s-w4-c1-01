@@ -13,6 +13,8 @@ export default function Composite({ room, items, roomPhoto, onClose, embedded })
   const [relit, setRelit] = useState(null);
   const [showRelit, setShowRelit] = useState(false);
   const [busy, setBusy] = useState(false);
+  const imgCache = useRef({});
+  const [imgTick, setImgTick] = useState(0);
 
   // 배치가 바뀌면 이전 리라이팅 결과는 무효화
   useEffect(() => { setRelit(null); setShowRelit(false); }, [items, room, roomPhoto]);
@@ -46,6 +48,20 @@ export default function Composite({ room, items, roomPhoto, onClose, embedded })
     ];
     const H = computeHomography(src, dst);
 
+    // 제품 이미지(누끼 PNG) 로더 — 로드되면 리렌더로 다시 그림
+    const loadImg = (s) => {
+      let e = imgCache.current[s];
+      if (!e) {
+        const im = new Image();
+        e = { im, ok: false };
+        imgCache.current[s] = e;
+        im.onload = () => { e.ok = true; setImgTick((t) => t + 1); };
+        im.onerror = () => { e.ok = 'err'; };
+        im.src = s;
+      }
+      return e.ok === true ? e.im : null;
+    };
+
     const draw = (bg) => {
       ctx.clearRect(0, 0, CW, CH);
       if (bg) ctx.drawImage(bg, 0, 0, CW, CH);
@@ -64,25 +80,29 @@ export default function Composite({ room, items, roomPhoto, onClose, embedded })
         poly(ctx, fp, 'rgba(0,0,0,0.20)');
         ctx.restore();
 
-        // 빌보드 몸체
         const bb = billboardQuad(H, it);
-        const body = [bb.bottomL, bb.bottomR, bb.topR, bb.topL];
-        poly(ctx, body, it.color || '#b4a789');
-        // 상단 음영으로 입체감
-        const grad = ctx.createLinearGradient(bb.topL[0], bb.topL[1], bb.bottomL[0], bb.bottomL[1]);
-        grad.addColorStop(0, 'rgba(255,255,255,0.18)');
-        grad.addColorStop(1, 'rgba(0,0,0,0.10)');
-        poly(ctx, body, grad);
+        const midX = (bb.bottomL[0] + bb.bottomR[0]) / 2;
+        const baseY = (bb.bottomL[1] + bb.bottomR[1]) / 2;
+        const wpx = Math.hypot(bb.bottomR[0] - bb.bottomL[0], bb.bottomR[1] - bb.bottomL[1]);
+        const im = it.image ? loadImg(it.image) : null;
+        if (im) {
+          // 실제 제품 이미지(누끼): footprint 폭에 맞춰 바닥에 세워 배치
+          const asp = im.naturalHeight / im.naturalWidth || 1;
+          ctx.drawImage(im, midX - wpx / 2, baseY - wpx * asp, wpx, wpx * asp);
+        } else {
+          // 폴백: 색 블록 빌보드
+          const body = [bb.bottomL, bb.bottomR, bb.topR, bb.topL];
+          poly(ctx, body, it.color || '#b4a789');
+          const grad = ctx.createLinearGradient(bb.topL[0], bb.topL[1], bb.bottomL[0], bb.bottomL[1]);
+          grad.addColorStop(0, 'rgba(255,255,255,0.18)');
+          grad.addColorStop(1, 'rgba(0,0,0,0.10)');
+          poly(ctx, body, grad);
+        }
         // 라벨
         ctx.fillStyle = 'rgba(30,26,22,0.85)';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
-        const midX = (bb.bottomL[0] + bb.bottomR[0]) / 2;
         ctx.fillText(`${it.name} · ${accuracyMeta(it.dimAccuracy).short}`, midX, bb.topL[1] - 4);
-        if (!it.lowBox) {
-          ctx.fillStyle = 'rgba(204,91,82,0.9)';
-          ctx.fillText('⚠ 합성 부적합(판때기 위험)', midX, bb.topL[1] - 16);
-        }
       }
     };
 
@@ -94,7 +114,7 @@ export default function Composite({ room, items, roomPhoto, onClose, embedded })
     } else {
       draw(null);
     }
-  }, [room, items, roomPhoto]);
+  }, [room, items, roomPhoto, imgTick]);
 
   const note = (
     <p className="mockup-note">
