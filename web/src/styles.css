@@ -41,6 +41,7 @@ input[type="number"], input[type="text"], select {
 .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .btn.ghost { background: transparent; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.sm { padding: 7px 11px; font-size: 13px; }
 
 .workspace { display: grid; grid-template-columns: 220px 1fr 200px; gap: 12px; }
 @media (max-width: 820px) { .workspace { grid-template-columns: 1fr; } }

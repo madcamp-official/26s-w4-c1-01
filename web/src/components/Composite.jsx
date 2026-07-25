@@ -19,12 +19,12 @@ export default function Composite({ room, items, roomPhoto, onClose, embedded })
   // 배치가 바뀌면 이전 리라이팅 결과는 무효화
   useEffect(() => { setRelit(null); setShowRelit(false); }, [items, room, roomPhoto]);
 
-  async function doRelight() {
+  async function doRelight(st = 0.42) {
     const cv = canvasRef.current;
     if (!cv) return;
     setBusy(true);
     try {
-      const r = await relightImage(cv.toDataURL('image/png'), 0.3);
+      const r = await relightImage(cv.toDataURL('image/png'), st);
       if (r.status === 'OK' && r.image) {
         setRelit(r.image);
         setShowRelit(true);
@@ -125,13 +125,16 @@ export default function Composite({ room, items, roomPhoto, onClose, embedded })
   const canvas = <canvas ref={canvasRef} width={CW} height={CH} className="compose-canvas" style={{ display: showRelit && relit ? 'none' : 'block' }} />;
   const relitImg = showRelit && relit ? <img className="compose-canvas" src={relit} alt="GPU 리라이팅 결과" /> : null;
   const controls = (
-    <div className="row" style={{ marginTop: 8 }}>
-      <button className="btn primary" onClick={doRelight} disabled={busy}>
-        {busy ? '리라이팅 중…(GPU)' : relit ? '✨ 다시 리라이팅' : '✨ GPU 리라이팅 적용'}
-      </button>
+    <div className="row" style={{ marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+      <span style={{ fontSize: 12, color: 'var(--muted)' }}>✨ GPU 리라이팅</span>
+      {[['은은', 0.28], ['보통', 0.42], ['강하게', 0.58]].map(([lbl, s]) => (
+        <button key={s} className="btn sm" onClick={() => doRelight(s)} disabled={busy}>
+          {busy ? '…' : lbl}
+        </button>
+      ))}
       {relit && (
-        <button className="btn ghost" onClick={() => setShowRelit((s) => !s)}>
-          {showRelit ? '원본 목업 보기' : '리라이팅 보기'}
+        <button className="btn ghost sm" onClick={() => setShowRelit((v) => !v)}>
+          {showRelit ? '원본 보기' : '결과 보기'}
         </button>
       )}
     </div>
@@ -164,15 +167,23 @@ function poly(ctx, pts, fill) {
 }
 
 function drawPlaceholderRoom(ctx, floorDst) {
-  // 벽
-  ctx.fillStyle = '#efe9df';
-  ctx.fillRect(0, 0, CW, CH);
-  // 바닥 사다리꼴
-  poly(ctx, floorDst, '#e5dcc9');
-  // 뒷벽 경계
-  ctx.strokeStyle = '#d8cfbd';
+  const farY = floorDst[0][1];
+  // 뒷벽 (은은한 세로 그라데이션)
+  const wall = ctx.createLinearGradient(0, 0, 0, farY);
+  wall.addColorStop(0, '#efe9dd');
+  wall.addColorStop(1, '#e7e0d1');
+  ctx.fillStyle = wall;
+  ctx.fillRect(0, 0, CW, farY);
+  // 바닥 (사다리꼴, 가까울수록 살짝 어둡게 = 원근감)
+  const floor = ctx.createLinearGradient(0, farY, 0, CH);
+  floor.addColorStop(0, '#ddd2bc');
+  floor.addColorStop(1, '#cabfa4');
+  poly(ctx, floorDst, floor);
+  // 걸레받이(뒷벽-바닥 경계)
+  ctx.strokeStyle = '#cbbfa6';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(floorDst[0][0], floorDst[0][1]);
-  ctx.lineTo(floorDst[1][0], floorDst[1][1]);
+  ctx.moveTo(floorDst[3][0], farY);
+  ctx.lineTo(floorDst[2][0], farY);
   ctx.stroke();
 }

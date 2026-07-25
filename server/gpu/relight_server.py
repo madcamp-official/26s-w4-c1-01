@@ -20,7 +20,7 @@ pipe.set_progress_bar_config(disable=True)
 LOCK = threading.Lock()
 print("[relight] model ready", flush=True)
 
-PROMPT = "interior photo of a small furnished room, realistic soft daylight, consistent grounded shadows, cozy, photographic, high detail"
+PROMPT = "cozy sunlit studio apartment interior, real photograph, soft natural window light, realistic materials, grounded soft shadows, warm tones, high detail, interior magazine photo"
 NEG = "cartoon, illustration, distorted, extra furniture, duplicated, text, watermark, blurry, deformed"
 
 
