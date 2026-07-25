@@ -4,7 +4,7 @@ POST /render {room:{w,d,h}, items:[{glb,x,y,rot}], camera?, samples?} -> {status
 GET /health
 stdlib only(토치 불필요). blender를 요청마다 headless로 실행(직렬화). glb는 /root/glb/<name>로 매핑.
 """
-import os, io, json, base64, subprocess, tempfile, threading
+import os, io, json, base64, subprocess, tempfile, threading, math
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 BLENDER = os.getenv("BLENDER", "/root/blender-4.2.3-linux-x64/blender")
@@ -25,9 +25,13 @@ def build_scene(p):
             continue
         items.append({"glb": path, "x": float(it.get("x", W / 2)),
                       "y": float(it.get("y", D / 2)), "rot": int(it.get("rot", 0))})
-    diag = (W * W + D * D) ** 0.5
-    cam = p.get("camera") or {"pos": [W * 0.5, 0.35, 1.5],
-                              "target": [W * 0.55, D * 0.6, 0.5], "lens": 26}
+    # 방 전체가 보이는 각도: 문지방 안쪽에서 방을 정면으로 들여다보는 광각 1점 투시.
+    # 중앙·눈높이에서 초광각(16~18mm)으로 양 옆벽·안쪽벽·바닥을 한 프레임에(모든 벽 가구가 보임).
+    cam = p.get("camera") or {
+        "pos": [W * 0.5, 0.2, 1.6],
+        "target": [W * 0.5, D, 0.8],
+        "lens": 17,
+    }
     win = p.get("window") or {"wall": "far", "w": min(2.4, W * 0.6), "h": 2.0, "z": 1.1, "strength": 16}
     return {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI, "hdri_strength": 0.55,
             "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1600)), "ry": int(p.get("ry", 900)),
