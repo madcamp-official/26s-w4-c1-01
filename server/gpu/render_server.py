@@ -25,15 +25,21 @@ def build_scene(p):
             continue
         items.append({"glb": path, "x": float(it.get("x", W / 2)),
                       "y": float(it.get("y", D / 2)), "rot": int(it.get("rot", 0))})
-    # 방 전체가 보이는 각도: 건축 렌더식 '코너 컷어웨이'. 방 앞-왼쪽 모서리 바깥·위에서 내려다보고,
-    # 카메라 쪽 두 벽(near=y0, left=x0)을 생략 → 어느 벽에 붙은 가구든 프레임 안에서 다 보인다.
-    b = 0.6 + 0.30 * max(W, D)
-    cam = p.get("camera") or {
-        "pos": [-b * 0.62, -b * 0.62, min(1.45 + 0.42 * H, H * 0.92)],
-        "target": [W * 0.5, D * 0.48, 0.35],
-        "lens": 24,
-    }
-    hide = p.get("hide") or ["near", "left"]           # 카메라 쪽 두 벽 생략(far·right는 배경)
+    # 카메라: 앱에서 사용자의 3D 시점을 넘기면 그대로(방 전체가 3D 뷰와 동일하게), 없으면 기본 코너 컷어웨이.
+    cam = p.get("camera")
+    if cam:
+        # 카메라가 있는 쪽 두 벽을 생략(그 벽들이 카메라와 방 사이를 가리므로) → 방 안이 다 보이게.
+        cxc, cyc = float(cam["pos"][0]), float(cam["pos"][1])
+        hide = p.get("hide") or [
+            "far" if cyc > D / 2 else "near",
+            "right" if cxc > W / 2 else "left",
+            "ceil",   # 3D 뷰는 오픈탑 → 위에서 내려다볼 때 천장이 안 가리게
+        ]
+    else:
+        b = 0.6 + 0.30 * max(W, D)
+        cam = {"pos": [-b * 0.62, -b * 0.62, min(1.45 + 0.42 * H, H * 0.92)],
+               "target": [W * 0.5, D * 0.48, 0.35], "lens": 24}
+        hide = p.get("hide") or ["near", "left"]
     win = p.get("window") or {"wall": "far", "w": min(2.4, W * 0.6), "h": 2.0, "z": 1.1, "strength": 16}
     return {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI, "hdri_strength": 0.55,
             "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1600)), "ry": int(p.get("ry", 900)),

@@ -1,7 +1,7 @@
 // 진짜 3D 미리보기 — 원룸(바닥+벽) 안에 ABO 실측 GLB 가구를 실치수로 배치.
 // 브라우저 WebGL(three.js/R3F)만으로 동작(GPU 서버 불필요). 아키스케치식 orbit + 바닥 드래그 + R키 회전.
 import { Suspense, useMemo, useRef, useState, useEffect } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, ContactShadows, Grid, Html } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -132,9 +132,24 @@ function DragController({ dragId, onMove, onEnd, W, D }) {
   return null;
 }
 
-export default function Room3D({ room, items, selectedId, setSelectedId, onMove, onRotate, flags = [] }) {
+// 현재 3D 카메라(위치+타깃)를 매 프레임 부모 ref에 기록 → 렌더가 같은 시점으로 찍게.
+function CamCapture({ camRef, controls }) {
+  const { camera } = useThree();
+  useFrame(() => {
+    if (!camRef) return;
+    const t = controls.current?.target;
+    camRef.current = {
+      pos: [camera.position.x, camera.position.y, camera.position.z],
+      target: t ? [t.x, t.y, t.z] : [0, 0.35, 0],
+    };
+  });
+  return null;
+}
+
+export default function Room3D({ room, items, selectedId, setSelectedId, onMove, onRotate, flags = [], camRef }) {
   const W = room.widthM, D = room.depthM;
   const [dragId, setDragId] = useState(null);
+  const controls = useRef();
   const flagSet = useMemo(() => new Set(flags.map((f) => (typeof f === 'string' ? f : f.id))), [flags]);
   const diag = Math.hypot(W, D);
 
@@ -195,6 +210,7 @@ export default function Room3D({ room, items, selectedId, setSelectedId, onMove,
         </Suspense>
 
         <OrbitControls
+          ref={controls}
           enabled={!dragId}
           enablePan
           target={[0, 0.35, 0]}
@@ -202,6 +218,7 @@ export default function Room3D({ room, items, selectedId, setSelectedId, onMove,
           maxDistance={diag * 2.2}
           maxPolarAngle={Math.PI / 2.05}
         />
+        <CamCapture camRef={camRef} controls={controls} />
         <DragController dragId={dragId} onMove={onMove} onEnd={() => setDragId(null)} W={W} D={D} />
       </Canvas>
       <div className="r3d-hint">드래그로 가구 이동 · 빈 곳 드래그로 시점 회전 · 가구 선택 후 <b>R</b>키 90° 회전</div>
