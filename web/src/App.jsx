@@ -5,6 +5,7 @@ import Planner from './components/Planner.jsx';
 import Room3D from './components/Room3D.jsx';
 import { toPlacedItem, resolveDims } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
+import { autoLayout } from './lib/autolayout.js';
 import { fetchDims } from './lib/api.js';
 
 const TABS = [
@@ -48,6 +49,9 @@ export default function App() {
   }
   function moveItem(id, cx, cy) {
     setItems((p) => p.map((it) => (it.id === id ? { ...it, cx, cy } : it)));
+  }
+  function applyAutoLayout() {
+    if (room) setItems((p) => autoLayout(room, p));
   }
   function rotateItem(id) {
     setItems((p) => p.map((it) => (it.id === id ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
@@ -136,6 +140,10 @@ export default function App() {
         {/* 배치 */}
         {tab === 'plan' && (!room ? needRoom : (
           <div className="pane">
+            <div className="autobar">
+              <button className="btn primary sm" onClick={applyAutoLayout} disabled={!items.length}>✨ 자동 배치</button>
+              <span className="chip">가구를 담고 누르면 원룸에 자동으로 배치돼요</span>
+            </div>
             <Planner room={room} items={items} setItems={setItems} selectedId={selectedId} setSelectedId={setSelectedId} flags={val.flags} />
             {selBar}
             <div className="statrow">
@@ -161,6 +169,10 @@ export default function App() {
               <p className="mockup-note">배치된 가구가 없어요. ‘가구’·‘배치’ 탭에서 먼저 놓아 주세요.</p>
             ) : (
               <>
+                <div className="autobar">
+                  <button className="btn primary sm" onClick={applyAutoLayout} disabled={!items.length}>✨ 자동 배치</button>
+                  <span className="chip">한 번에 원룸에 정리</span>
+                </div>
                 <Room3D
                   room={room}
                   items={items}
