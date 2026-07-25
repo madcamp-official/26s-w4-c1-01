@@ -38,6 +38,7 @@ def load_env():
 ENV = load_env()
 CID = ENV.get("NAVER_CLIENT_ID") or os.getenv("NAVER_CLIENT_ID")
 SEC = ENV.get("NAVER_CLIENT_SECRET") or os.getenv("NAVER_CLIENT_SECRET")
+SD_SERVER_URL = ENV.get("SD_SERVER_URL") or os.getenv("SD_SERVER_URL")
 
 def naver_search(q):
     url = "https://openapi.naver.com/v1/search/shop.json?" + urllib.parse.urlencode(
@@ -80,7 +81,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         if u.path == "/health":
-            return self._json({"status": "ok", "naver": bool(CID and SEC)})
+            return self._json({"status": "ok", "naver": bool(CID and SEC), "sd_server": bool(SD_SERVER_URL)})
         if u.path == "/api/search":
             if not (CID and SEC):
                 return self._json({"status": "FALLBACK", "reason": "no_naver_key", "items": []})
@@ -94,6 +95,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
             d = fetch_dims_from_url(url, ENV)
             return self._json({"status": "OK", "dims": d} if d else {"status": "MISS"})
         self._json({"error": "not found"}, 404)
+
+    def do_POST(self):
+        if urllib.parse.urlparse(self.path).path != "/api/relight":
+            return self._json({"error": "not found"}, 404)
+        try:
+            n = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(n)) if n else {}
+        except Exception as e:  # noqa: BLE001
+            return self._json({"status": "CLIENT", "reason": "bad request"}, 400)
+        if not SD_SERVER_URL:
+            return self._json({"status": "CLIENT", "reason": "no_sd_server"})
+        try:
+            payload = json.dumps({"image": body.get("image"), "strength": body.get("strength", 0.3),
+                                  "prompt": body.get("prompt")}).encode()
+            req = urllib.request.Request(SD_SERVER_URL.rstrip("/") + "/relight", data=payload,
+                                         headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=90) as r:
+                data = json.load(r)
+            if data.get("status") == "OK" and data.get("image"):
+                return self._json({"status": "OK", "image": data["image"]})
+            return self._json({"status": "CLIENT", "reason": str(data.get("reason", "sd error"))[:120]})
+        except Exception as e:  # noqa: BLE001
+            return self._json({"status": "CLIENT", "reason": str(e)[:120]})
 
     def log_message(self, fmt, *args):
         print("[devserver]", fmt % args)

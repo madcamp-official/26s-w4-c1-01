@@ -33,6 +33,24 @@ uvicorn app.main:app --reload             # http://localhost:8000
 > 백엔드는 선택 — 없어도 프런트는 로컬 시드 카탈로그로 동작한다. 네이버 실검색을 원하면 위 둘 중 하나를 켠다.
 > `venv`가 안 되면(`ensurepip`/`python3-venv` 미설치, 몰입 VM에서 흔함) **설치 없이 devserver**를 쓰면 된다.
 
+### GPU 리라이팅 연동 (선택 — camp-3 3090)
+
+합성 목업을 SD img2img로 하모나이즈하려면 camp-3의 리라이팅 서버(`:8600`, `/relight`)에 연결한다.
+camp 내부망은 VM 간 22번만 열려 있으므로 **camp-15에서 camp-3로 SSH 터널**을 문다.
+
+```bash
+# camp-15에서 (백그라운드 터널)
+ssh -i camp3.pem -L 8600:127.0.0.1:8600 -N root@172.10.5.71 &
+
+# server/.env 에 추가:
+#   SD_SERVER_URL=http://127.0.0.1:8600
+# 백엔드 재시작 → curl localhost:8000/health 에서 "sd_server": true 확인
+```
+
+연결되면 앱 **미리보기 탭 → "✨ GPU 리라이팅 적용"** 버튼으로 하모나이즈된 결과를 본다.
+서버가 없으면 `/api/relight`는 `status: CLIENT`를 반환하고 프런트는 목업을 그대로 유지한다(폴백).
+camp-3 서버 기동: `python3 relight_server.py`(SD 1.5 img2img, strength 0.3 저-denoise 밴드).
+
 ## 현재 구현 상태 (MVP 코어)
 
 - ✅ 방 크기 입력: 예측(평수→공용면적 차감→종횡비) / 한변 실측 보정 / 완전 실측

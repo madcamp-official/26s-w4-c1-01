@@ -121,6 +121,33 @@ async def composite(req: ComposeReq):
         return {"status": "CLIENT", "reason": str(e)[:120]}
 
 
+class RelightReq(BaseModel):
+    image: str                       # 클라이언트 합성 목업 (dataURL/base64)
+    strength: float = 0.3            # 저-denoise 밴드(0.28~0.35). 초과 시 형태 드리프트
+    prompt: Optional[str] = None
+
+
+@app.post("/api/relight")
+async def relight(req: RelightReq):
+    """클라이언트 합성 목업 → camp-3 3090 SD img2img 하모나이즈 → 반환.
+    배치·치수는 이미 기하로 확정됨. 여기선 조명·톤만. 서버 없으면 CLIENT(목업 유지)."""
+    if not (SD_SERVER_URL and httpx):
+        return {"status": "CLIENT", "reason": "no_sd_server"}
+    try:
+        async with httpx.AsyncClient(timeout=90) as cx:
+            r = await cx.post(
+                SD_SERVER_URL.rstrip("/") + "/relight",
+                json={"image": req.image, "strength": req.strength, "prompt": req.prompt},
+            )
+            r.raise_for_status()
+            data = r.json()
+        if data.get("status") == "OK" and data.get("image"):
+            return {"status": "OK", "image": data["image"]}
+        return {"status": "CLIENT", "reason": str(data.get("reason", "sd error"))[:120]}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "CLIENT", "reason": str(e)[:120]}
+
+
 @app.post("/api/card")
 async def card(req: ComposeReq):
     """공유 카드 생성(Stretch). 실패 시 TEXT_CARD."""

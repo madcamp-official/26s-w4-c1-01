@@ -23,6 +23,22 @@ export async function searchFurniture(query) {
   }
 }
 
+// 합성 목업 → GPU 리라이팅(camp-3 SD). 반환: {status:'OK',image} | {status:'CLIENT'}(서버 미연동).
+export async function relightImage(dataUrl, strength = 0.3) {
+  try {
+    const res = await fetch(`${API_BASE}/api/relight`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl, strength }),
+      signal: timeout(120000),
+    });
+    if (!res.ok) return { status: 'CLIENT', reason: `http ${res.status}` };
+    return await res.json();
+  } catch (e) {
+    return { status: 'CLIENT', reason: String(e.message || e) };
+  }
+}
+
 // 상품 상세페이지에서 치수 자동 추출. 성공 시 {w,d,h,accuracy}, 실패/미상 시 null.
 export async function fetchDims(url) {
   if (!url) return null;

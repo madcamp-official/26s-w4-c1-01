@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { computeHomography, projectFootprint, billboardQuad } from '../lib/homography.js';
 import { accuracyMeta } from '../lib/catalog.js';
+import { relightImage } from '../lib/api.js';
 
 const CW = 640, CH = 420;
 
@@ -9,6 +10,29 @@ const CW = 640, CH = 420;
 // SAM 매팅 + 저denoise 리라이팅(3090 서버)은 미연동 → 여기서는 색 플레이스홀더 목업.
 export default function Composite({ room, items, roomPhoto, onClose, embedded }) {
   const canvasRef = useRef(null);
+  const [relit, setRelit] = useState(null);
+  const [showRelit, setShowRelit] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  // 배치가 바뀌면 이전 리라이팅 결과는 무효화
+  useEffect(() => { setRelit(null); setShowRelit(false); }, [items, room, roomPhoto]);
+
+  async function doRelight() {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    setBusy(true);
+    try {
+      const r = await relightImage(cv.toDataURL('image/png'), 0.3);
+      if (r.status === 'OK' && r.image) {
+        setRelit(r.image);
+        setShowRelit(true);
+      } else {
+        alert('GPU 리라이팅 서버가 연동돼 있지 않아요.\n백엔드 SD_SERVER_URL(=camp-3 터널)을 확인하세요.\n(' + (r.reason || '') + ')');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -78,10 +102,23 @@ export default function Composite({ room, items, roomPhoto, onClose, embedded })
       실제 제품 이미지 누끼 + 저denoise 리라이팅은 3090 이미지 서버 연동 시 대체됩니다.
     </p>
   );
-  const canvas = <canvas ref={canvasRef} width={CW} height={CH} className="compose-canvas" />;
+  const canvas = <canvas ref={canvasRef} width={CW} height={CH} className="compose-canvas" style={{ display: showRelit && relit ? 'none' : 'block' }} />;
+  const relitImg = showRelit && relit ? <img className="compose-canvas" src={relit} alt="GPU 리라이팅 결과" /> : null;
+  const controls = (
+    <div className="row" style={{ marginTop: 8 }}>
+      <button className="btn primary" onClick={doRelight} disabled={busy}>
+        {busy ? '리라이팅 중…(GPU)' : relit ? '✨ 다시 리라이팅' : '✨ GPU 리라이팅 적용'}
+      </button>
+      {relit && (
+        <button className="btn ghost" onClick={() => setShowRelit((s) => !s)}>
+          {showRelit ? '원본 목업 보기' : '리라이팅 보기'}
+        </button>
+      )}
+    </div>
+  );
 
   if (embedded) {
-    return <div>{canvas}{note}</div>;
+    return <div>{canvas}{relitImg}{controls}{note}</div>;
   }
   return (
     <div className="modal-back" onClick={onClose}>
