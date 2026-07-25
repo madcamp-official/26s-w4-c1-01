@@ -136,6 +136,8 @@ def place(path, x, y, rotdeg):
         bpy.ops.object.join()
     obj = bpy.context.active_object
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+    # glTF 임포터가 rotation_mode='QUATERNION'으로 만들어 rotation_euler가 무시됨 → XYZ로 바꿔야 회전이 먹힘(핵심 버그)
+    obj.rotation_mode = 'XYZ'
     # three.js(Room3D, rot=-θ, Y-up) → Blender(Z-up) 손대칭 없는 변환: 깊이축 뒤집기(D-cy)와 짝 → rot=-θ
     obj.rotation_euler = (0, 0, math.radians(-rotdeg))
     obj.location = (x, y, obj.dimensions.z / 2 + 0.002)
