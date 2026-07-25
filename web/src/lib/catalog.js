@@ -4,6 +4,7 @@
 // dimAccuracy: '정형'(IKEA 등 보장) | '추정'(네이버·중고 등).
 import { ABO } from './abo.js';
 import { ABO3D } from './abo3d.js';
+import { GEN3D } from './gen3d.js';
 
 // 로컬 카탈로그는 ABO(실제 제품 이미지 누끼 + 정형 치수) 우선, 없으면 색상 시드로 폴백.
 const SEED = [
@@ -26,8 +27,9 @@ const SEED = [
   { id: 'lamp-floor', name: '플로어 스탠드', cat: '조명', w: 30, d: 30, h: 150, lowBox: false, color: '#cfc4ad', source: 'IKEA', dimAccuracy: '정형' },
 ];
 
-// 3D 피벗: 실측 GLB 카탈로그(ABO3D) 우선 → 없으면 누끼 이미지(ABO) → 색상 시드(SEED)
-export const CATALOG = ABO3D.length ? ABO3D : (ABO.length ? ABO : SEED);
+// 3D 피벗: AI 생성(네이버 사진→3D) 먼저 노출 + 실측 GLB(ABO3D) → 없으면 누끼(ABO) → 색상 시드(SEED)
+const BASE = ABO3D.length ? ABO3D : (ABO.length ? ABO : SEED);
+export const CATALOG = [...GEN3D, ...BASE];
 export const CATEGORIES = [...new Set(CATALOG.map((c) => c.cat))];
 
 // 카테고리별 표준 치수(cm) — 실제 치수가 미상인 실상품(네이버 등)의 기본값.
