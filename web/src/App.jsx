@@ -58,13 +58,13 @@ export default function App() {
     setLayoutBusy(true);
     try {
       let opts = [];
-      // 1) LLM(Claude) 후보 → 우리 기하엔진으로 겹침 재검증(안전망)
+      // 1) LLM 후보 → 우리 기하엔진으로 겹침 재검증(안전망: 겹치는 후보 폐기)
       const r = await layoutFurniture(room, items);
       if (r?.status === 'OK' && Array.isArray(r.candidates)) {
         opts = validateCandidates(r.candidates, room, items);
       }
-      // 2) LLM 미연동/실패/유효후보 0 → 로컬 규칙 기반 폴백
-      if (!opts.length) opts = generateLayouts(room, items, 3);
+      // 2) 유효 후보가 3개 미만이면 로컬 규칙 배치로 채움(항상 3개 보장)
+      if (opts.length < 3) opts = [...opts, ...generateLayouts(room, items, 3 - opts.length)];
       if (!opts.length) {
         alert('가구가 많아 겹치지 않게 배치할 공간이 부족해요. 방을 키우거나 가구를 줄여 주세요.');
         return;

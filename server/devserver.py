@@ -42,7 +42,7 @@ SD_SERVER_URL = ENV.get("SD_SERVER_URL") or os.getenv("SD_SERVER_URL")
 ANTHROPIC_API_KEY = ENV.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
 LLM_MODEL = ENV.get("LLM_MODEL") or os.getenv("LLM_MODEL") or "claude-sonnet-5"
 GEMINI_API_KEY = ENV.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = ENV.get("GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+GEMINI_MODEL = ENV.get("GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-flash-latest"
 LLM_PROVIDER = "gemini" if GEMINI_API_KEY else ("anthropic" if ANTHROPIC_API_KEY else None)
 _PROMPT_PATH = os.path.join(HERE, "..", "docs", "방꾸요정-배치-LLM-프롬프트.md")
 LAYOUT_PROMPT = (open(_PROMPT_PATH, encoding="utf-8").read()

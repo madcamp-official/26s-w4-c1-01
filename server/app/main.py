@@ -170,7 +170,7 @@ _LAYOUT_PROMPT = (open(_LAYOUT_PROMPT_PATH, encoding="utf-8").read()
                   if os.path.exists(_LAYOUT_PROMPT_PATH)
                   else "원룸 가구를 겹치지 않게 대부분 벽에 붙여 배치. candidates[] JSON으로 3개 이상. cm 정수, (cx,cy)=중심, rotation 0/90/180/270.")
 LLM_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-5")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
 
 def _layout_user_msg(payload: dict) -> str:
