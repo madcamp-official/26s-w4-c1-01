@@ -25,7 +25,9 @@ export default function CatalogPanel({ onAdd }) {
     <div className="palette">
       <h3>가구</h3>
       {source === 'naver' ? (
-        <div className="badge ok" style={{ marginBottom: 8 }}>● 네이버 실검색 {items.length}건</div>
+        <div className="badge ok" style={{ marginBottom: 8 }}>● 네이버 실검색 {items.length}건 · 대표 3D로 미리보기</div>
+      ) : source === 'catalog' ? (
+        <div className="badge mid" style={{ marginBottom: 8 }}>● 실측 3D 가구 {items.length}종 · 검색하면 네이버 실상품</div>
       ) : source === 'local' ? (
         <div className="badge warn" style={{ marginBottom: 8 }}>● 로컬 시드 (백엔드 미연동)</div>
       ) : null}

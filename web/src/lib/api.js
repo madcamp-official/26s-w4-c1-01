@@ -9,6 +9,8 @@ const API_BASE = import.meta.env?.VITE_API_BASE ?? '';
 // source로 "네이버 실검색이 붙었는지"를 UI가 명시할 수 있게 한다(폴백이 조용히 일어나는 문제 방지).
 export async function searchFurniture(query) {
   const q = (query || '').trim();
+  // 기본(빈 검색) = 실측 3D 쇼룸(ABO GLB). 검색어를 넣으면 네이버 실상품으로.
+  if (!q) return { source: 'catalog', items: CATALOG };
   try {
     const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}`, { signal: timeout(4000) });
     if (!res.ok) throw new Error(`http ${res.status}`);

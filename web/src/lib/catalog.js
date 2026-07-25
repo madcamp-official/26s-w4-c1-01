@@ -67,6 +67,29 @@ export function accuracyMeta(a) {
   return { short: a && a.includes('기본') ? '기본' : '추정', tone: 'warn', hex: '#a9691f' };
 }
 
+// 3D 모델 매핑 — 카탈로그 아이템은 자체 glb, 그 외(네이버·시드)는 카테고리 대표 GLB로 채워 3D 렌더.
+const GLB_REP = {};
+for (const it of ABO3D) if (it.glb && !GLB_REP[it.cat]) GLB_REP[it.cat] = it.glb;
+const CAT_ALIAS = {
+  침대: '침대', 매트리스: '침대', 베드: '침대', 프레임: '침대',
+  소파: '소파',
+  테이블: '테이블', 식탁: '테이블', 탁자: '테이블', 협탁: '테이블',
+  책상: '책상', 데스크: '책상',
+  의자: '의자', 체어: '의자', 스툴: '의자', 벤치: '의자',
+  수납: '수납', 수납장: '수납', 서랍: '수납', 서랍장: '수납', 책장: '수납', 선반: '수납', 옷장: '수납', 장롱: '수납', 행거: '수납', 드레서: '수납', 캐비닛: '수납',
+  조명: '조명', 스탠드: '조명', 램프: '조명', 전등: '조명',
+};
+// 아이템에 붙일 GLB 경로를 고른다. 자체 glb > 카테고리 정확매칭 > 이름/카테고리 키워드 매칭 > null(박스 폴백).
+export function glbForItem(item) {
+  if (item?.glb) return item.glb;
+  const cat = item?.cat || '';
+  if (GLB_REP[cat]) return GLB_REP[cat];
+  if (CAT_ALIAS[cat] && GLB_REP[CAT_ALIAS[cat]]) return GLB_REP[CAT_ALIAS[cat]];
+  const hay = `${item?.name || ''} ${cat}`;
+  for (const [kw, c] of Object.entries(CAT_ALIAS)) if (hay.includes(kw) && GLB_REP[c]) return GLB_REP[c];
+  return null;
+}
+
 let _seq = 0;
 // cm → m footprint 아이템으로 변환(배치 엔진 입력). 치수 미상이면 카테고리 표준으로 보정.
 export function toPlacedItem(cat, cx, cy, rotationDeg = 0) {
@@ -85,7 +108,7 @@ export function toPlacedItem(cat, cx, cy, rotationDeg = 0) {
     price: cat.price,
     buyUrl: cat.buyUrl,
     image: cat.image,
-    glb: cat.glb,
+    glb: glbForItem(cat),
     cx,
     cy,
     rotationDeg,
