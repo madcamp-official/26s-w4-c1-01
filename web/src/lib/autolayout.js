@@ -2,7 +2,37 @@
 // 원칙: 배치할 때마다 겹침/방밖을 검증해 "유효한 자리"에만 놓는다. 한 가구라도 못 놓으면 그 배치는 폐기.
 // 가중치: 대부분의 가구는 벽에 밀착(벽 자리를 먼저 시도). 러그는 바닥 레이어(중앙, 충돌 제외).
 // 랜덤 변주로 서로 다른 유효 배치 여러 개를 만들고, 벽밀착률 높은 순 + 다양성으로 상위 N개를 고른다.
-import { effectiveFootprint, aabbOverlap } from './geometry.js';
+import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout } from './geometry.js';
+
+// LLM 후보(cm 좌표) → 우리 아이템으로 매핑 + 겹침/방밖 재검증(안전망). 유효한 배치만 반환.
+// LLM 산술은 틀릴 수 있으므로 여기서 반드시 재검사해 겹치는 후보를 폐기한다.
+export function validateCandidates(candidates, room, items) {
+  const W = room.widthM, D = room.depthM, EDGE = 0.09;
+  const out = [];
+  for (const c of candidates || []) {
+    const list = c.items || [];
+    let complete = true;
+    const mapped = items.map((it) => {
+      const ci = list.find((x) => x && x.id === it.id);
+      if (!ci) { complete = false; return it; }
+      const rot = [0, 90, 180, 270].includes(ci.rotation) ? ci.rotation : 0;
+      return { ...it, cx: (Number(ci.cx) || 0) / 100, cy: (Number(ci.cy) || 0) / 100, rotationDeg: rot };
+    });
+    if (!complete) continue;                      // 일부 가구 누락 → 폐기
+    const nonRug = mapped.filter((it) => it.cat !== '러그');
+    if (!validateLayout(nonRug, W, D).ok) continue; // 겹침/방밖 → 폐기(핵심 안전망)
+    const touch = nonRug.filter((it) => {
+      const b = itemAABB(it);
+      return b.left < EDGE || b.top < EDGE || b.right > W - EDGE || b.bottom > D - EDGE;
+    }).length;
+    out.push({
+      items: mapped,
+      wallRatio: nonRug.length ? touch / nonRug.length : 1,
+      strategy: c.strategy, rationale: c.rationale,
+    });
+  }
+  return out;
+}
 
 const MARGIN = 0.05;   // 벽에서 띄우는 여유(m)
 const STEP = 0.1;      // 벽 슬롯 탐색 간격(m)

@@ -11,6 +11,7 @@
 """
 import os
 import re
+import json
 from typing import Optional
 
 try:
@@ -42,6 +43,7 @@ def health():
         "status": "ok",
         "naver": bool(NAVER_ID and NAVER_SECRET),
         "sd_server": bool(SD_SERVER_URL),
+        "llm": bool(os.getenv("ANTHROPIC_API_KEY")),
     }
 
 
@@ -160,6 +162,58 @@ async def card(req: ComposeReq):
             return {"status": "OK", "image": r.json().get("image")}
     except Exception as e:  # noqa: BLE001
         return {"status": "TEXT_CARD", "text": _text_card(req), "reason": str(e)[:120]}
+
+
+_LAYOUT_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "방꾸요정-배치-LLM-프롬프트.md")
+_LAYOUT_PROMPT = (open(_LAYOUT_PROMPT_PATH, encoding="utf-8").read()
+                  if os.path.exists(_LAYOUT_PROMPT_PATH)
+                  else "원룸 가구를 겹치지 않게 대부분 벽에 붙여 배치. candidates[] JSON으로 3개 이상. cm 정수, (cx,cy)=중심, rotation 0/90/180/270.")
+LLM_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-5")
+
+
+def _parse_candidates(text: str):
+    t = (text or "").strip()
+    m = re.search(r"```(?:json)?\s*(.*?)```", t, re.S)
+    if m:
+        t = m.group(1).strip()
+    try:
+        obj = json.loads(t)
+    except Exception:  # noqa: BLE001
+        s, e = t.find("{"), t.rfind("}")
+        if s < 0 or e <= s:
+            return []
+        obj = json.loads(t[s:e + 1])
+    return obj.get("candidates", []) if isinstance(obj, dict) else []
+
+
+class LayoutReq(BaseModel):
+    room: dict
+    openings: list = []
+    furniture: list = []
+
+
+@app.post("/api/layout")
+async def layout(req: LayoutReq):
+    """원룸 자동 배치 — Claude가 후보 생성(앱이 기하엔진으로 겹침 재검증). 키 없으면 NOKEY→앱 로컬 폴백."""
+    key = os.getenv("ANTHROPIC_API_KEY")
+    if not (key and httpx):
+        return {"status": "NOKEY"}
+    user = ("다음 입력에 대해 §4~§12를 준수하여 겹침 없는 서로 다른 배치 3개 이상을 "
+            "§3 JSON 스키마(candidates[])로만 출력하라. 설명 없이 JSON만.\n\n"
+            + json.dumps(req.model_dump(), ensure_ascii=False))
+    try:
+        async with httpx.AsyncClient(timeout=90) as cx:
+            r = await cx.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": LLM_MODEL, "max_tokens": 4096, "system": _LAYOUT_PROMPT,
+                      "messages": [{"role": "user", "content": user}]},
+            )
+            r.raise_for_status()
+            text = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
+        return {"status": "OK", "candidates": _parse_candidates(text)}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "ERROR", "reason": str(e)[:200]}
 
 
 async def shape_query(q: str) -> Optional[str]:

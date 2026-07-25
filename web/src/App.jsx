@@ -6,8 +6,8 @@ import Room3D from './components/Room3D.jsx';
 import LayoutPicker from './components/LayoutPicker.jsx';
 import { toPlacedItem, resolveDims } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
-import { generateLayouts } from './lib/autolayout.js';
-import { fetchDims } from './lib/api.js';
+import { generateLayouts, validateCandidates } from './lib/autolayout.js';
+import { fetchDims, layoutFurniture } from './lib/api.js';
 
 const TABS = [
   { id: 'room', label: '방', icon: '🏠' },
@@ -26,6 +26,7 @@ export default function App() {
   const [tab, setTab] = useState('room');
   const [dimBusy, setDimBusy] = useState(false);
   const [layoutOpts, setLayoutOpts] = useState(null);
+  const [layoutBusy, setLayoutBusy] = useState(false);
 
   const val = useMemo(
     () => (room ? validateLayout(items, room.widthM, room.depthM) : { flags: [], ok: true, freeRatio: 0 }),
@@ -52,14 +53,26 @@ export default function App() {
   function moveItem(id, cx, cy) {
     setItems((p) => p.map((it) => (it.id === id ? { ...it, cx, cy } : it)));
   }
-  function openAutoLayout() {
-    if (!room || !items.length) return;
-    const opts = generateLayouts(room, items, 3);
-    if (!opts.length) {
-      alert('가구가 많아 겹치지 않게 배치할 공간이 부족해요. 방을 키우거나 가구를 줄여 주세요.');
-      return;
+  async function openAutoLayout() {
+    if (!room || !items.length || layoutBusy) return;
+    setLayoutBusy(true);
+    try {
+      let opts = [];
+      // 1) LLM(Claude) 후보 → 우리 기하엔진으로 겹침 재검증(안전망)
+      const r = await layoutFurniture(room, items);
+      if (r?.status === 'OK' && Array.isArray(r.candidates)) {
+        opts = validateCandidates(r.candidates, room, items);
+      }
+      // 2) LLM 미연동/실패/유효후보 0 → 로컬 규칙 기반 폴백
+      if (!opts.length) opts = generateLayouts(room, items, 3);
+      if (!opts.length) {
+        alert('가구가 많아 겹치지 않게 배치할 공간이 부족해요. 방을 키우거나 가구를 줄여 주세요.');
+        return;
+      }
+      setLayoutOpts(opts);
+    } finally {
+      setLayoutBusy(false);
     }
-    setLayoutOpts(opts);
   }
   function rotateItem(id) {
     setItems((p) => p.map((it) => (it.id === id ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
@@ -149,7 +162,7 @@ export default function App() {
         {tab === 'plan' && (!room ? needRoom : (
           <div className="pane">
             <div className="autobar">
-              <button className="btn primary sm" onClick={openAutoLayout} disabled={!items.length}>✨ 자동 배치</button>
+              <button className="btn primary sm" onClick={openAutoLayout} disabled={!items.length || layoutBusy}>{layoutBusy ? '🤖 AI 배치 중…' : '✨ 자동 배치'}</button>
               <span className="chip">가구를 담고 누르면 원룸에 자동으로 배치돼요</span>
             </div>
             <Planner room={room} items={items} setItems={setItems} selectedId={selectedId} setSelectedId={setSelectedId} flags={val.flags} />
@@ -178,7 +191,7 @@ export default function App() {
             ) : (
               <>
                 <div className="autobar">
-                  <button className="btn primary sm" onClick={openAutoLayout} disabled={!items.length}>✨ 자동 배치</button>
+                  <button className="btn primary sm" onClick={openAutoLayout} disabled={!items.length || layoutBusy}>{layoutBusy ? '🤖 AI 배치 중…' : '✨ 자동 배치'}</button>
                   <span className="chip">한 번에 원룸에 정리</span>
                 </div>
                 <Room3D

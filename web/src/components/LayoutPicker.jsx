@@ -42,9 +42,10 @@ export default function LayoutPicker({ room, options, onSelect, onClose }) {
             <button key={i} className="layoutcard" onClick={() => onSelect(opt.items)}>
               <Mini room={room} items={opt.items} />
               <div className="layoutmeta">
-                <span className="badge ok">배치 {i + 1}</span>
+                <span className="badge ok">{opt.strategy ? `${i + 1}. ${opt.strategy}` : `배치 ${i + 1}`}</span>
                 <span className="chip">벽 밀착 {Math.round(opt.wallRatio * 100)}%</span>
               </div>
+              {opt.rationale && <p className="layoutwhy">{opt.rationale}</p>}
             </button>
           ))}
         </div>
