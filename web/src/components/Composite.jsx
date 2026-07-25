@@ -7,7 +7,7 @@ const CW = 640, CH = 420;
 // 합성 미리보기 — 배치 좌표를 homography로 방 사진에 접합.
 // 순서(기능명세서 §3-(c) 7단계 중 클라이언트에서 되는 부분): 바닥 footprint 확정 → 접지 그림자 자작 → 빌보드 합성.
 // SAM 매팅 + 저denoise 리라이팅(3090 서버)은 미연동 → 여기서는 색 플레이스홀더 목업.
-export default function Composite({ room, items, roomPhoto, onClose }) {
+export default function Composite({ room, items, roomPhoto, onClose, embedded }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -72,15 +72,23 @@ export default function Composite({ room, items, roomPhoto, onClose }) {
     }
   }, [room, items, roomPhoto]);
 
+  const note = (
+    <p className="mockup-note">
+      <b>목업이지 포토리얼이 아닙니다.</b> 배치·치수·원근은 기하로 확정했고, 가구는 색 플레이스홀더입니다 —
+      실제 제품 이미지 누끼 + 저denoise 리라이팅은 3090 이미지 서버 연동 시 대체됩니다.
+    </p>
+  );
+  const canvas = <canvas ref={canvasRef} width={CW} height={CH} className="compose-canvas" />;
+
+  if (embedded) {
+    return <div>{canvas}{note}</div>;
+  }
   return (
     <div className="modal-back" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>합성 미리보기</h2>
-        <p className="mockup-note">
-          <b>목업이지 포토리얼이 아닙니다.</b> 배치·치수·원근은 기하로 확정했고, 가구는 색 플레이스홀더입니다 —
-          실제 제품 이미지 누끼 + 저denoise 리라이팅은 3090 이미지 서버 연동 시 대체됩니다.
-        </p>
-        <canvas ref={canvasRef} width={CW} height={CH} className="compose-canvas" />
+        {note}
+        {canvas}
         <div className="selbar" style={{ justifyContent: 'flex-end' }}>
           <button className="btn" onClick={onClose}>닫기</button>
         </div>

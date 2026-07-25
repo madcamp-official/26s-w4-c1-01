@@ -80,3 +80,47 @@ input[type="number"], input[type="text"], select {
 .modal { background: var(--panel); border-radius: 14px; padding: 16px; max-width: 720px; width: 100%; max-height: 92vh; overflow: auto; }
 .modal h2 { margin: 0 0 4px; font-size: 16px; }
 .compose-canvas { width: 100%; border: 1px solid var(--line); border-radius: 10px; display: block; background: #ddd; }
+
+/* ===== 모바일 폰 프레임 + 하단 탭바 ===== */
+.phone {
+  max-width: 460px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+}
+@media (min-width: 480px) {
+  body { background: #ece7dd; }
+  .phone { border-left: 1px solid var(--line); border-right: 1px solid var(--line); box-shadow: 0 0 40px rgba(0,0,0,.06); }
+}
+.pbar { display: flex; align-items: baseline; gap: 8px; padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+.pbar .logo { font-size: 17px; font-weight: 700; }
+.pbar .sub { font-size: 11px; color: var(--muted); }
+.screen { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.pane { padding: 14px 16px 20px; }
+.pane.center { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 60px; }
+.sec { font-size: 13px; margin: 14px 0 8px; }
+
+.statrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+.chip { font-size: 12px; color: var(--muted); background: var(--chip); padding: 4px 9px; border-radius: 999px; }
+.roomphoto { width: 100%; border-radius: 10px; margin-top: 8px; border: 1px solid var(--line); }
+
+.buylist { display: flex; flex-direction: column; gap: 8px; }
+.buyrow { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; }
+.buyrow .meta { flex: 1; min-width: 0; }
+.buyrow .nm { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.buyrow .dm { font-size: 11px; color: var(--muted); }
+.buybtn { padding: 8px 16px; flex: none; text-decoration: none; }
+
+.tabbar { display: flex; border-top: 1px solid var(--line); background: var(--panel); position: sticky; bottom: 0; }
+.tabbtn { flex: 1; border: 0; background: transparent; padding: 8px 4px calc(8px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--muted); }
+.tabbtn .ti { font-size: 19px; line-height: 1; filter: grayscale(1) opacity(.6); }
+.tabbtn .tl { font-size: 11px; }
+.tabbtn.on { color: var(--accent); }
+.tabbtn.on .ti { filter: none; }
+.tabbtn.on .tl { font-weight: 600; }
+
+/* 폰 안에서는 카탈로그가 탭 전체를 채운다 */
+.pane .catlist { max-height: none; }
