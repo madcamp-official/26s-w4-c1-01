@@ -3,7 +3,7 @@ import RoomForm from './components/RoomForm.jsx';
 import CatalogPanel from './components/CatalogPanel.jsx';
 import Planner from './components/Planner.jsx';
 import Composite from './components/Composite.jsx';
-import { toPlacedItem } from './lib/catalog.js';
+import { toPlacedItem, resolveDims } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
 
 export default function App() {
@@ -19,12 +19,18 @@ export default function App() {
   );
 
   function addFurniture(cat) {
-    // 겹치지 않는 자리를 찾아 배치(없으면 중앙)
-    const probe = { wM: cat.w / 100, dM: cat.d / 100, rotationDeg: 0 };
+    // 치수 미상 상품이면 카테고리 표준으로 보정된 치수로 자리 탐색(0×0 방지)
+    const d = resolveDims(cat);
+    const probe = { wM: d.w / 100, dM: d.d / 100, rotationDeg: 0 };
     const spot = findFreeSpot(probe, items, room.widthM, room.depthM) || { cx: room.widthM / 2, cy: room.depthM / 2 };
     const it = toPlacedItem(cat, spot.cx, spot.cy);
     setItems((p) => [...p, it]);
     setSelectedId(it.id);
+  }
+  // 선택 가구 치수 직접 입력(cm). 사용자가 실측/스펙을 넣으면 '사용자입력'으로 승격.
+  function setSelDim(field, cm) {
+    const m = Math.max(Number(cm) || 0, 1) / 100;
+    setItems((p) => p.map((it) => (it.id === selectedId ? { ...it, [field]: m, dimAccuracy: '사용자입력' } : it)));
   }
   function rotateSel() {
     setItems((p) => p.map((it) => (it.id === selectedId ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
@@ -60,8 +66,16 @@ export default function App() {
         <div className="col">
           <Planner room={room} items={items} setItems={setItems} selectedId={selectedId} setSelectedId={setSelectedId} flags={val.flags} />
           {sel && (
-            <div className="selbar">
-              <span className="badge est">{sel.name} · {Math.round(sel.wM * 100)}×{Math.round(sel.dM * 100)}cm</span>
+            <div className="selbar" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="badge est">{sel.name}</span>
+              <span className={`badge ${sel.dimAccuracy === '정형' || sel.dimAccuracy === '사용자입력' ? 'ok' : 'warn'}`}>
+                {sel.dimAccuracy}
+              </span>
+              <span className="dimedit">
+                가로<input type="number" value={Math.round(sel.wM * 100)} onChange={(e) => setSelDim('wM', e.target.value)} />
+                세로<input type="number" value={Math.round(sel.dM * 100)} onChange={(e) => setSelDim('dM', e.target.value)} />
+                높이<input type="number" value={Math.round(sel.hM * 100)} onChange={(e) => setSelDim('hM', e.target.value)} />cm
+              </span>
               <button className="btn" onClick={rotateSel}>90° 회전</button>
               <button className="btn ghost" onClick={deleteSel}>삭제</button>
             </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { searchFurniture } from '../lib/api.js';
+import { resolveDims } from '../lib/catalog.js';
 
 // 가구 팔레트 — 자연어 검색(백엔드 grounding, 없으면 로컬 시드) + 클릭으로 배치에 추가.
 export default function CatalogPanel({ onAdd }) {
@@ -39,18 +40,26 @@ export default function CatalogPanel({ onAdd }) {
         <button className="btn" onClick={() => run(q)} disabled={loading}>검색</button>
       </div>
       <div className="catlist">
-        {items.map((c) => (
-          <button key={c.id} className="catitem" onClick={() => onAdd(c)} title="방에 추가">
-            <span className="swatch" style={{ background: c.color || '#c9bfa8' }} />
-            <span className="meta">
-              <span className="nm">{c.name}</span>
-              <span className="dm">
-                {c.w}×{c.d}×{c.h}cm · {c.dimAccuracy === '정형' ? '정형치수' : '추정치수'}
-                {c.source ? ` · ${c.source}` : ''}
+        {items.map((c) => {
+          const known = typeof c.w === 'number' && c.w > 0 && typeof c.d === 'number' && c.d > 0;
+          const rd = resolveDims(c);
+          const dimText = known
+            ? `${c.w}×${c.d}${c.h ? `×${c.h}` : ''}cm · ${c.dimAccuracy === '정형' ? '정형치수' : '추정치수'}`
+            : `≈${rd.w}×${rd.d}cm · 치수미상(기본값)`;
+          return (
+            <button key={c.id} className="catitem" onClick={() => onAdd(c)} title="방에 추가">
+              <span className="swatch" style={{ background: c.color || rd.color || '#c9bfa8' }} />
+              <span className="meta">
+                <span className="nm">{c.name}</span>
+                <span className="dm">
+                  {dimText}
+                  {c.source ? ` · ${c.source}` : ''}
+                  {typeof c.price === 'number' && c.price > 0 ? <> · <span className="pr">{c.price.toLocaleString()}원</span></> : null}
+                </span>
               </span>
-            </span>
-          </button>
-        ))}
+            </button>
+          );
+        })}
         {loading && <div className="mockup-note">검색 중…</div>}
       </div>
     </div>

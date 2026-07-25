@@ -68,6 +68,9 @@ input[type="number"], input[type="text"], select {
 .badge.est { background: #efeae0; color: #857c70; }
 
 .selbar { display: flex; gap: 6px; margin-top: 8px; }
+.dimedit { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.dimedit input { width: 52px; padding: 4px 6px; font-size: 13px; }
+.catitem .pr { font-size: 11px; color: var(--accent); font-weight: 600; }
 .mockup-note { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
 
 .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }

@@ -25,19 +25,51 @@ export const CATALOG = [
 
 export const CATEGORIES = [...new Set(CATALOG.map((c) => c.cat))];
 
-// cm → m footprint 아이템으로 변환(배치 엔진 입력).
+// 카테고리별 표준 치수(cm) — 실제 치수가 미상인 실상품(네이버 등)의 기본값.
+// 정형 소스(IKEA)만 치수를 "보장"하고, 여기 기본값은 '추정(기본)'으로 명시한다(정직 원칙).
+export const CATEGORY_DEFAULTS = [
+  { kw: ['침대', '베드', '매트리스'], w: 120, d: 200, h: 40, color: '#b8a58a', lowBox: true },
+  { kw: ['소파'], w: 160, d: 85, h: 80, color: '#8fa3b0', lowBox: true },
+  { kw: ['책상', '데스크'], w: 120, d: 60, h: 74, color: '#c9b79a', lowBox: true },
+  { kw: ['의자', '체어', '스툴', '의자'], w: 50, d: 52, h: 90, color: '#b0a68c', lowBox: false },
+  { kw: ['서랍', '수납', '책장', '선반', '장'], w: 80, d: 45, h: 90, color: '#d0c3a8', lowBox: true },
+  { kw: ['옷장', '행거', '드레스룸'], w: 100, d: 55, h: 180, color: '#bcae95', lowBox: false },
+  { kw: ['러그', '카펫', '매트'], w: 150, d: 200, h: 1, color: '#d8cdbb', lowBox: true },
+  { kw: ['테이블', '식탁', '탁자'], w: 120, d: 70, h: 73, color: '#c9bfa8', lowBox: true },
+  { kw: ['조명', '스탠드', '램프'], w: 35, d: 35, h: 150, color: '#cfc4ad', lowBox: false },
+];
+const GENERIC_DEFAULT = { w: 80, d: 60, h: 70, color: '#c3b79c', lowBox: true };
+
+// 치수 해결: 상품에 정형/추정 치수가 있으면 그대로, 없으면 카테고리 표준으로 채운다.
+// 항상 w·d > 0을 보장한다(0×0 렌더 방지).
+export function resolveDims(item) {
+  const ok = (v) => typeof v === 'number' && v > 0;
+  if (ok(item.w) && ok(item.d)) {
+    return { w: item.w, d: item.d, h: ok(item.h) ? item.h : 40, accuracy: item.dimAccuracy || '추정', color: item.color, lowBox: item.lowBox };
+  }
+  const name = `${item.name || ''} ${item.cat || ''}`;
+  const base = CATEGORY_DEFAULTS.find((c) => c.kw.some((k) => name.includes(k))) || GENERIC_DEFAULT;
+  return { w: base.w, d: base.d, h: base.h, accuracy: '추정(기본)', color: item.color || base.color, lowBox: base.lowBox };
+}
+
+let _seq = 0;
+// cm → m footprint 아이템으로 변환(배치 엔진 입력). 치수 미상이면 카테고리 표준으로 보정.
 export function toPlacedItem(cat, cx, cy, rotationDeg = 0) {
+  const d = resolveDims(cat);
   return {
-    id: `${cat.id}-${Math.round(cx * 1000)}-${Math.round(cy * 1000)}`,
+    id: `${cat.id ?? cat.name ?? 'item'}-${++_seq}`,
     catId: cat.id,
     name: cat.name,
-    wM: cat.w / 100,
-    dM: cat.d / 100,
-    hM: cat.h / 100,
-    lowBox: cat.lowBox,
-    color: cat.color,
-    dimAccuracy: cat.dimAccuracy,
+    wM: d.w / 100,
+    dM: d.d / 100,
+    hM: d.h / 100,
+    lowBox: d.lowBox !== undefined ? d.lowBox : true,
+    color: d.color || '#c3b79c',
+    dimAccuracy: d.accuracy,
     source: cat.source,
+    price: cat.price,
+    buyUrl: cat.buyUrl,
+    image: cat.image,
     cx,
     cy,
     rotationDeg,
