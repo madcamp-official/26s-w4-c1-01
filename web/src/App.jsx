@@ -29,6 +29,7 @@ export default function App() {
   const [layoutBusy, setLayoutBusy] = useState(false);
   const [renderBusy, setRenderBusy] = useState(false);
   const [renderImg, setRenderImg] = useState(null);
+  const [renderPreset, setRenderPreset] = useState('day');   // 시간대 조명
   const cam3d = useRef(null);   // Room3D의 현재 카메라(위치+타깃) — 렌더가 같은 시점으로
 
   const val = useMemo(
@@ -80,13 +81,13 @@ export default function App() {
   function rotateItem(id) {
     setItems((p) => p.map((it) => (it.id === id ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
   }
-  async function doRender() {
+  async function doRender(preset = renderPreset) {
     if (!room || renderBusy) return;
     const placeable = items.filter((it) => it.glb);
     if (!placeable.length) { alert('렌더할 3D 가구가 없어요. 가구를 먼저 담아 주세요.'); return; }
     setRenderBusy(true);
     try {
-      const r = await renderScene(room, items, cam3d.current);
+      const r = await renderScene(room, items, cam3d.current, preset);
       if (r?.status === 'OK' && r.image) setRenderImg(r.image);
       else if (r?.status === 'CLIENT') alert('렌더 서버(camp-3)가 아직 연결 안 됐어요. ./run.sh 로 터널을 켜 주세요.');
       else alert('렌더 실패: ' + (r?.reason || '알 수 없음'));
@@ -209,7 +210,13 @@ export default function App() {
               <>
                 <div className="autobar">
                   <button className="btn primary sm" onClick={openAutoLayout} disabled={!items.length || layoutBusy}>{layoutBusy ? '🤖 AI 배치 중…' : '✨ 자동 배치'}</button>
-                  <button className="btn sm" onClick={doRender} disabled={renderBusy || !items.some((it) => it.glb)}>{renderBusy ? '📸 렌더링 중… (~30초)' : '📸 고품질 렌더'}</button>
+                  <select className="preset-sel" value={renderPreset} onChange={(e) => setRenderPreset(e.target.value)} title="렌더 시간대(조명)">
+                    <option value="morning">🌅 아침</option>
+                    <option value="day">☀️ 한낮</option>
+                    <option value="sunset">🌇 노을</option>
+                    <option value="night">🌙 밤</option>
+                  </select>
+                  <button className="btn sm" onClick={() => doRender()} disabled={renderBusy || !items.some((it) => it.glb)}>{renderBusy ? '📸 렌더링 중… (~30초)' : '📸 고품질 렌더'}</button>
                 </div>
                 <Room3D
                   room={room}
@@ -277,9 +284,18 @@ export default function App() {
             <h2>📸 고품질 렌더</h2>
             <p className="mockup-note">지금 배치 그대로 camp-3에서 렌더한 포토리얼 사진이에요.</p>
             <img className="renderimg" src={renderImg} alt="포토리얼 렌더" />
-            <div className="selbar" style={{ justifyContent: 'flex-end', marginTop: 10 }}>
-              <a className="btn primary" href={renderImg} download="방꾸요정-렌더.png">저장</a>
-              <button className="btn ghost" onClick={() => setRenderImg(null)}>닫기</button>
+            <div className="selbar" style={{ justifyContent: 'space-between', marginTop: 10 }}>
+              <div className="preset-row">
+                {[['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['night', '🌙']].map(([p, ic]) => (
+                  <button key={p} className={'btn ghost sm' + (renderPreset === p ? ' on' : '')}
+                    disabled={renderBusy}
+                    onClick={() => { setRenderPreset(p); doRender(p); }}>{ic}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a className="btn primary" href={renderImg} download="방꾸요정-렌더.png">저장</a>
+                <button className="btn ghost" onClick={() => setRenderImg(null)}>닫기</button>
+              </div>
             </div>
           </div>
         </div>

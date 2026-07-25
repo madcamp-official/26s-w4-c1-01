@@ -105,6 +105,10 @@ input[type="number"], input[type="text"], select {
 .sec { font-size: 13px; margin: 14px 0 8px; }
 
 .autobar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.preset-sel { width: auto; padding: 8px 10px; font-size: 14px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); cursor: pointer; }
+.preset-row { display: inline-flex; gap: 6px; }
+.preset-row .btn.sm { padding: 6px 10px; font-size: 16px; line-height: 1; }
+.btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* 자동 배치 후보 선택 */
 .layoutgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin: 12px 0; }
