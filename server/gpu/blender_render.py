@@ -136,7 +136,8 @@ def place(path, x, y, rotdeg):
         bpy.ops.object.join()
     obj = bpy.context.active_object
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
-    obj.rotation_euler = (0, 0, math.radians(rotdeg))
+    # +180: three.js(Room3D)와 Blender의 상하축·회전 규약 차이 보정(ABO 모델 정면=-Z) → 3D 뷰와 일치
+    obj.rotation_euler = (0, 0, math.radians(rotdeg + 180))
     obj.location = (x, y, obj.dimensions.z / 2 + 0.002)
 
 
