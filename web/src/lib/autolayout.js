@@ -1,13 +1,18 @@
-// 원룸 자동 배치 — 규칙 기반(결정론적, 클라이언트). 배치·판정은 기하가 결정(디퓨전 아님).
-// 전략: 러그는 중앙(바닥), 큰 앵커(침대·소파·수납·책상)는 벽을 따라 패킹(등을 벽으로),
-// 커피테이블은 소파 앞·의자는 책상 앞·협탁은 벽, 조명은 코너. 마지막에 겹침/방밖 검증→재배치.
-import { itemAABB, aabbOverlap, outOfBounds, findFreeSpot } from './geometry.js';
+// 원룸 자동 배치 — 규칙 기반, 겹침 0 보장, 다중 후보 생성.
+// 원칙: 배치할 때마다 겹침/방밖을 검증해 "유효한 자리"에만 놓는다. 한 가구라도 못 놓으면 그 배치는 폐기.
+// 가중치: 대부분의 가구는 벽에 밀착(벽 자리를 먼저 시도). 러그는 바닥 레이어(중앙, 충돌 제외).
+// 랜덤 변주로 서로 다른 유효 배치 여러 개를 만들고, 벽밀착률 높은 순 + 다양성으로 상위 N개를 고른다.
+import { effectiveFootprint, aabbOverlap } from './geometry.js';
 
-const MARGIN = 0.06; // 벽에서 띄우는 여유(m)
-const GAP = 0.14;    // 아이템 사이 간격(m)
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const MARGIN = 0.05;   // 벽에서 띄우는 여유(m)
+const STEP = 0.1;      // 벽 슬롯 탐색 간격(m)
+const rnd = () => Math.random();
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
 
-// 아이템 → 역할. cat 우선, 이름 키워드 보조.
 function roleOf(it) {
   const n = `${it.name || ''} ${it.cat || ''}`;
   if (it.cat === '러그' || /러그|카펫/.test(n)) return 'rug';
@@ -17,93 +22,105 @@ function roleOf(it) {
   if (it.cat === '수납' || /수납|서랍|책장|선반|옷장|장롱|드레서|캐비닛/.test(n)) return 'storage';
   if (it.cat === '조명' || /조명|스탠드|램프/.test(n)) return 'lamp';
   if (it.cat === '의자' || /의자|체어|스툴|오토만/.test(n)) return 'chair';
-  // 테이블/협탁: 작으면 side(협탁), 크면 table(커피/식탁)
   if (it.wM < 0.6 && it.dM < 0.6) return 'side';
   return 'table';
 }
+const ANCHOR = new Set(['bed', 'sofa', 'desk', 'storage']);
 
-const NORMAL = { bottom: [0, -1], top: [0, 1], left: [1, 0], right: [-1, 0] };
+function boxAt(it, cx, cy, rot) {
+  const { w, d } = effectiveFootprint(it.wM, it.dM, rot);
+  return { left: cx - w / 2, right: cx + w / 2, top: cy - d / 2, bottom: cy + d / 2, w, d };
+}
 
-export function autoLayout(room, items) {
-  const W = room.widthM, D = room.depthM;
-  const out = items.map((it) => ({ ...it }));
-  const role = new Map(out.map((it) => [it.id, roleOf(it)]));
-
-  // 1) 러그: 중앙(충돌 제외 — 바닥 레이어)
-  out.filter((it) => role.get(it.id) === 'rug').forEach((it) => {
-    it.rotationDeg = 0; it.cx = W / 2; it.cy = D / 2;
-  });
-
-  // 2) 벽 커서(각 벽을 따라 순차 패킹)
-  const walls = {
-    bottom: { len: W, cur: MARGIN }, right: { len: D, cur: MARGIN },
-    top: { len: W, cur: MARGIN }, left: { len: D, cur: MARGIN },
-  };
-  function wallPlace(name, span, into) {
-    const wl = walls[name];
-    const along = wl.cur + span / 2;
-    let cx, cy, rot;
-    if (name === 'bottom') { cx = along; cy = D - into / 2 - MARGIN; rot = 0; }
-    else if (name === 'top') { cx = along; cy = into / 2 + MARGIN; rot = 0; }
-    else if (name === 'left') { cx = into / 2 + MARGIN; cy = along; rot = 90; }
-    else { cx = W - into / 2 - MARGIN; cy = along; rot = 90; }
-    wl.cur = along + span / 2 + GAP;
-    return { cx, cy, rotationDeg: rot };
-  }
-  function bestWall(span) {
-    let best = null, bestRem = -1;
-    for (const [name, wl] of Object.entries(walls)) {
-      const rem = wl.len - wl.cur - MARGIN;
-      if (rem >= span && rem > bestRem) { best = name; bestRem = rem; }
-    }
-    return best;
-  }
-
-  const anchor = {}; // role → {cx,cy,into,wall}
-  function packWall(it) {
-    const span = it.wM, into = it.dM;
-    const name = bestWall(span) || 'bottom';
-    Object.assign(it, wallPlace(name, span, into));
-    return { wall: name, into, cx: it.cx, cy: it.cy };
-  }
-  function inFrontOf(a, it) {
-    const [nx, ny] = NORMAL[a.wall];
-    const dist = a.into / 2 + GAP + it.dM / 2;
-    it.rotationDeg = 0;
-    it.cx = clamp(a.cx + nx * dist, it.wM / 2, W - it.wM / 2);
-    it.cy = clamp(a.cy + ny * dist, it.dM / 2, D - it.dM / 2);
-  }
-
-  // 3) 배치 순서: 큰 앵커 먼저 → 관계 아이템
-  const ORDER = ['bed', 'sofa', 'storage', 'desk', 'table', 'side', 'chair', 'lamp'];
-  const nonRug = out.filter((it) => role.get(it.id) !== 'rug');
-  nonRug.sort((a, b) =>
-    (ORDER.indexOf(role.get(a.id)) - ORDER.indexOf(role.get(b.id))) || (b.wM * b.dM - a.wM * a.dM));
-
-  let tableDone = false, chairDone = false;
-  for (const it of nonRug) {
-    const r = role.get(it.id);
-    if (r === 'table' && !tableDone) {
-      tableDone = true;
-      if (anchor.sofa) { inFrontOf(anchor.sofa, it); continue; }
-      it.rotationDeg = 0; it.cx = W / 2; it.cy = D / 2; continue; // 소파 없으면 중앙
-    }
-    if (r === 'chair' && !chairDone && anchor.desk) {
-      chairDone = true; inFrontOf(anchor.desk, it); continue;
-    }
-    const info = packWall(it);
-    if (!anchor[r]) anchor[r] = info;
-  }
-
-  // 4) 겹침/방밖 검증 → findFreeSpot로 재배치(러그 제외)
-  const solid = out.filter((it) => role.get(it.id) !== 'rug');
-  for (const it of solid) {
-    const others = solid.filter((o) => o !== it);
-    const box = itemAABB(it);
-    if (others.some((o) => aabbOverlap(box, itemAABB(o))) || outOfBounds(box, W, D)) {
-      const spot = findFreeSpot(it, others, W, D, 0.1);
-      if (spot) { it.cx = spot.cx; it.cy = spot.cy; }
-    }
+// 벽 밀착 후보 위치들 (등을 벽으로). 좌/우 벽은 90도 회전.
+function wallCandidates(it, W, D) {
+  const out = [];
+  for (const wall of ['bottom', 'top', 'left', 'right']) {
+    const rot = (wall === 'left' || wall === 'right') ? 90 : 0;
+    const { w, d } = effectiveFootprint(it.wM, it.dM, rot); // w=x범위, d=y범위
+    if (w > W - 2 * MARGIN || d > D - 2 * MARGIN) continue;
+    if (wall === 'bottom') { const cy = D - d / 2 - MARGIN; for (let cx = w / 2 + MARGIN; cx <= W - w / 2 - MARGIN + 1e-9; cx += STEP) out.push({ cx, cy, rot }); }
+    else if (wall === 'top') { const cy = d / 2 + MARGIN; for (let cx = w / 2 + MARGIN; cx <= W - w / 2 - MARGIN + 1e-9; cx += STEP) out.push({ cx, cy, rot }); }
+    else if (wall === 'left') { const cx = w / 2 + MARGIN; for (let cy = d / 2 + MARGIN; cy <= D - d / 2 - MARGIN + 1e-9; cy += STEP) out.push({ cx, cy, rot }); }
+    else { const cx = W - w / 2 - MARGIN; for (let cy = d / 2 + MARGIN; cy <= D - d / 2 - MARGIN + 1e-9; cy += STEP) out.push({ cx, cy, rot }); }
   }
   return out;
+}
+// 내부(벽 안 됨) 후보
+function interiorCandidates(it, W, D) {
+  const out = [];
+  for (const rot of [0, 90]) {
+    const { w, d } = effectiveFootprint(it.wM, it.dM, rot);
+    if (w > W - 2 * MARGIN || d > D - 2 * MARGIN) continue;
+    for (let cy = d / 2 + MARGIN; cy <= D - d / 2 - MARGIN + 1e-9; cy += STEP * 2)
+      for (let cx = w / 2 + MARGIN; cx <= W - w / 2 - MARGIN + 1e-9; cx += STEP * 2)
+        out.push({ cx, cy, rot });
+  }
+  return out;
+}
+// 겹치지 않는 첫 자리(벽 먼저, 없으면 내부). 없으면 null.
+function placeItem(it, placedBoxes, W, D) {
+  for (const c of shuffle(wallCandidates(it, W, D))) {
+    const b = boxAt(it, c.cx, c.cy, c.rot);
+    if (placedBoxes.every((pb) => !aabbOverlap(b, pb))) return { ...c, box: b, onWall: true };
+  }
+  for (const c of shuffle(interiorCandidates(it, W, D))) {
+    const b = boxAt(it, c.cx, c.cy, c.rot);
+    if (placedBoxes.every((pb) => !aabbOverlap(b, pb))) return { ...c, box: b, onWall: false };
+  }
+  return null;
+}
+
+// 한 번의 배치 시도 → 유효하면 {items, wallRatio}, 한 가구라도 못 놓으면 null(폐기).
+function attempt(room, items) {
+  const W = room.widthM, D = room.depthM;
+  const res = items.map((it) => ({ ...it }));
+  const roles = new Map(res.map((it) => [it.id, roleOf(it)]));
+  res.filter((it) => roles.get(it.id) === 'rug').forEach((it) => { it.rotationDeg = 0; it.cx = W / 2; it.cy = D / 2; });
+  const solids = res.filter((it) => roles.get(it.id) !== 'rug');
+  const anchors = shuffle(solids.filter((it) => ANCHOR.has(roles.get(it.id))));
+  const rest = shuffle(solids.filter((it) => !ANCHOR.has(roles.get(it.id))));
+  const order = [...anchors, ...rest];
+  const placedBoxes = [];
+  let wallCount = 0;
+  for (const it of order) {
+    const p = placeItem(it, placedBoxes, W, D);
+    if (!p) return null;
+    it.cx = p.cx; it.cy = p.cy; it.rotationDeg = p.rot;
+    placedBoxes.push(p.box);
+    if (p.onWall) wallCount++;
+  }
+  return { items: res, wallRatio: order.length ? wallCount / order.length : 1 };
+}
+
+function sig(items) {
+  return items.map((it) => `${Math.round(it.cx * 3)},${Math.round(it.cy * 3)},${it.rotationDeg}`).join('|');
+}
+function dist(a, b) {
+  let s = 0; for (let i = 0; i < a.length; i++) s += Math.hypot(a[i].cx - b[i].cx, a[i].cy - b[i].cy);
+  return a.length ? s / a.length : 0;
+}
+
+// 겹침 없는 서로 다른 배치 후보 최대 count개. 없으면 [].
+export function generateLayouts(room, items, count = 3, tries = 400) {
+  if (!items.length) return [];
+  const valid = [];
+  const seen = new Set();
+  for (let t = 0; t < tries && valid.length < 120; t++) {
+    const r = attempt(room, items);
+    if (!r) continue;
+    const s = sig(r.items);
+    if (seen.has(s)) continue;
+    seen.add(s); valid.push(r);
+  }
+  if (!valid.length) return [];
+  valid.sort((a, b) => b.wallRatio - a.wallRatio);
+  const picked = [valid[0]];
+  for (const cand of valid) {
+    if (picked.length >= count) break;
+    if (picked.includes(cand)) continue;
+    if (picked.every((p) => dist(p.items, cand.items) > 0.5)) picked.push(cand);
+  }
+  for (const cand of valid) { if (picked.length >= count) break; if (!picked.includes(cand)) picked.push(cand); }
+  return picked.slice(0, count).map((p) => ({ items: p.items, wallRatio: p.wallRatio }));
 }

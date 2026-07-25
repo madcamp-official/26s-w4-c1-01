@@ -3,9 +3,10 @@ import RoomForm from './components/RoomForm.jsx';
 import CatalogPanel from './components/CatalogPanel.jsx';
 import Planner from './components/Planner.jsx';
 import Room3D from './components/Room3D.jsx';
+import LayoutPicker from './components/LayoutPicker.jsx';
 import { toPlacedItem, resolveDims } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
-import { autoLayout } from './lib/autolayout.js';
+import { generateLayouts } from './lib/autolayout.js';
 import { fetchDims } from './lib/api.js';
 
 const TABS = [
@@ -24,6 +25,7 @@ export default function App() {
   const [roomPhoto, setRoomPhoto] = useState(null);
   const [tab, setTab] = useState('room');
   const [dimBusy, setDimBusy] = useState(false);
+  const [layoutOpts, setLayoutOpts] = useState(null);
 
   const val = useMemo(
     () => (room ? validateLayout(items, room.widthM, room.depthM) : { flags: [], ok: true, freeRatio: 0 }),
@@ -50,8 +52,14 @@ export default function App() {
   function moveItem(id, cx, cy) {
     setItems((p) => p.map((it) => (it.id === id ? { ...it, cx, cy } : it)));
   }
-  function applyAutoLayout() {
-    if (room) setItems((p) => autoLayout(room, p));
+  function openAutoLayout() {
+    if (!room || !items.length) return;
+    const opts = generateLayouts(room, items, 3);
+    if (!opts.length) {
+      alert('가구가 많아 겹치지 않게 배치할 공간이 부족해요. 방을 키우거나 가구를 줄여 주세요.');
+      return;
+    }
+    setLayoutOpts(opts);
   }
   function rotateItem(id) {
     setItems((p) => p.map((it) => (it.id === id ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
@@ -141,7 +149,7 @@ export default function App() {
         {tab === 'plan' && (!room ? needRoom : (
           <div className="pane">
             <div className="autobar">
-              <button className="btn primary sm" onClick={applyAutoLayout} disabled={!items.length}>✨ 자동 배치</button>
+              <button className="btn primary sm" onClick={openAutoLayout} disabled={!items.length}>✨ 자동 배치</button>
               <span className="chip">가구를 담고 누르면 원룸에 자동으로 배치돼요</span>
             </div>
             <Planner room={room} items={items} setItems={setItems} selectedId={selectedId} setSelectedId={setSelectedId} flags={val.flags} />
@@ -170,7 +178,7 @@ export default function App() {
             ) : (
               <>
                 <div className="autobar">
-                  <button className="btn primary sm" onClick={applyAutoLayout} disabled={!items.length}>✨ 자동 배치</button>
+                  <button className="btn primary sm" onClick={openAutoLayout} disabled={!items.length}>✨ 자동 배치</button>
                   <span className="chip">한 번에 원룸에 정리</span>
                 </div>
                 <Room3D
@@ -222,6 +230,15 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      {layoutOpts && (
+        <LayoutPicker
+          room={room}
+          options={layoutOpts}
+          onSelect={(newItems) => { setItems(newItems); setSelectedId(null); setLayoutOpts(null); }}
+          onClose={() => setLayoutOpts(null)}
+        />
+      )}
     </div>
   );
 }
