@@ -20,12 +20,18 @@ docs/    기획서 · 기능 명세서
 cd web && npm install && npm run dev     # http://localhost:5173
 npm test                                 # 기하·방크기·homography 순수함수 단위 테스트
 
-# 백엔드(선택 — 없어도 프런트는 로컬 시드로 동작)
-cd server && python -m venv .venv && . .venv/bin/activate
+# 백엔드 — 설치 없이(권장, venv/pip 불필요): 네이버 실검색까지 바로
+cp server/.env.example server/.env        # 네이버 키 채우기
+python3 server/devserver.py               # http://localhost:8000  (stdlib only)
+
+# 백엔드 — 실 배포용 FastAPI (pip 필요; venv 안 되면 python3-venv 설치 or 위 devserver 사용)
+cd server && python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env                      # 네이버 키 등 채우기
 uvicorn app.main:app --reload             # http://localhost:8000
 ```
+
+> 백엔드는 선택 — 없어도 프런트는 로컬 시드 카탈로그로 동작한다. 네이버 실검색을 원하면 위 둘 중 하나를 켠다.
+> `venv`가 안 되면(`ensurepip`/`python3-venv` 미설치, 몰입 VM에서 흔함) **설치 없이 devserver**를 쓰면 된다.
 
 ## 현재 구현 상태 (MVP 코어)
 
