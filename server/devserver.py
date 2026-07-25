@@ -41,6 +41,9 @@ SEC = ENV.get("NAVER_CLIENT_SECRET") or os.getenv("NAVER_CLIENT_SECRET")
 SD_SERVER_URL = ENV.get("SD_SERVER_URL") or os.getenv("SD_SERVER_URL")
 ANTHROPIC_API_KEY = ENV.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
 LLM_MODEL = ENV.get("LLM_MODEL") or os.getenv("LLM_MODEL") or "claude-sonnet-5"
+GEMINI_API_KEY = ENV.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = ENV.get("GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+LLM_PROVIDER = "gemini" if GEMINI_API_KEY else ("anthropic" if ANTHROPIC_API_KEY else None)
 _PROMPT_PATH = os.path.join(HERE, "..", "docs", "방꾸요정-배치-LLM-프롬프트.md")
 LAYOUT_PROMPT = (open(_PROMPT_PATH, encoding="utf-8").read()
                  if os.path.exists(_PROMPT_PATH)
@@ -63,11 +66,32 @@ def parse_layout_json(text):
     return obj.get("candidates", []) if isinstance(obj, dict) else []
 
 
-def anthropic_layout(payload):
-    """방/가구 입력 → Claude로 배치 후보 생성(프롬프트 md를 system으로)."""
-    user = ("다음 입력에 대해 §4~§12를 준수하여 겹침 없는 서로 다른 배치 3개 이상을 "
+def _layout_user_msg(payload):
+    return ("다음 입력에 대해 §4~§12를 준수하여 겹침 없는 서로 다른 배치 3개 이상을 "
             "§3 JSON 스키마(candidates[])로만 출력하라. 설명 없이 JSON만.\n\n"
             + json.dumps(payload, ensure_ascii=False))
+
+
+def gemini_layout(payload):
+    """방/가구 입력 → Gemini로 배치 후보 생성(프롬프트 md를 system_instruction으로). JSON 강제."""
+    body = json.dumps({
+        "system_instruction": {"parts": [{"text": LAYOUT_PROMPT}]},
+        "contents": [{"role": "user", "parts": [{"text": _layout_user_msg(payload)}]}],
+        "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.8, "responseMimeType": "application/json"},
+    }).encode()
+    url = ("https://generativelanguage.googleapis.com/v1beta/models/"
+           + GEMINI_MODEL + ":generateContent?key=" + GEMINI_API_KEY)
+    req = urllib.request.Request(url, data=body, headers={"content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=90) as r:
+        data = json.load(r)
+    cand = (data.get("candidates") or [{}])[0]
+    text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
+    return parse_layout_json(text)
+
+
+def anthropic_layout(payload):
+    """방/가구 입력 → Claude로 배치 후보 생성(프롬프트 md를 system으로)."""
+    user = _layout_user_msg(payload)
     body = json.dumps({
         "model": LLM_MODEL,
         "max_tokens": 4096,
@@ -125,7 +149,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path)
         if u.path == "/health":
             return self._json({"status": "ok", "naver": bool(CID and SEC),
-                               "sd_server": bool(SD_SERVER_URL), "llm": bool(ANTHROPIC_API_KEY)})
+                               "sd_server": bool(SD_SERVER_URL), "llm": bool(LLM_PROVIDER),
+                               "llm_provider": LLM_PROVIDER})
         if u.path == "/api/search":
             if not (CID and SEC):
                 return self._json({"status": "FALLBACK", "reason": "no_naver_key", "items": []})
@@ -150,12 +175,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             return self._json({"status": "ERROR", "reason": "bad request"}, 400)
 
-        # 원룸 자동 배치 — Claude가 후보 생성(앱이 겹침 재검증)
+        # 원룸 자동 배치 — LLM(Gemini/Claude)이 후보 생성(앱이 겹침 재검증)
         if path == "/api/layout":
-            if not ANTHROPIC_API_KEY:
+            if not LLM_PROVIDER:
                 return self._json({"status": "NOKEY"})
             try:
-                return self._json({"status": "OK", "candidates": anthropic_layout(body)})
+                cands = gemini_layout(body) if LLM_PROVIDER == "gemini" else anthropic_layout(body)
+                return self._json({"status": "OK", "candidates": cands, "provider": LLM_PROVIDER})
             except Exception as e:  # noqa: BLE001
                 return self._json({"status": "ERROR", "reason": str(e)[:200]})
 

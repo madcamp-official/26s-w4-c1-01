@@ -43,7 +43,8 @@ def health():
         "status": "ok",
         "naver": bool(NAVER_ID and NAVER_SECRET),
         "sd_server": bool(SD_SERVER_URL),
-        "llm": bool(os.getenv("ANTHROPIC_API_KEY")),
+        "llm": bool(os.getenv("GEMINI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")),
+        "llm_provider": "gemini" if os.getenv("GEMINI_API_KEY") else ("anthropic" if os.getenv("ANTHROPIC_API_KEY") else None),
     }
 
 
@@ -169,6 +170,13 @@ _LAYOUT_PROMPT = (open(_LAYOUT_PROMPT_PATH, encoding="utf-8").read()
                   if os.path.exists(_LAYOUT_PROMPT_PATH)
                   else "원룸 가구를 겹치지 않게 대부분 벽에 붙여 배치. candidates[] JSON으로 3개 이상. cm 정수, (cx,cy)=중심, rotation 0/90/180/270.")
 LLM_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-5")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+
+def _layout_user_msg(payload: dict) -> str:
+    return ("다음 입력에 대해 §4~§12를 준수하여 겹침 없는 서로 다른 배치 3개 이상을 "
+            "§3 JSON 스키마(candidates[])로만 출력하라. 설명 없이 JSON만.\n\n"
+            + json.dumps(payload, ensure_ascii=False))
 
 
 def _parse_candidates(text: str):
@@ -194,24 +202,36 @@ class LayoutReq(BaseModel):
 
 @app.post("/api/layout")
 async def layout(req: LayoutReq):
-    """원룸 자동 배치 — Claude가 후보 생성(앱이 기하엔진으로 겹침 재검증). 키 없으면 NOKEY→앱 로컬 폴백."""
-    key = os.getenv("ANTHROPIC_API_KEY")
-    if not (key and httpx):
+    """원룸 자동 배치 — LLM(Gemini/Claude)이 후보 생성(앱이 기하엔진으로 겹침 재검증). 키 없으면 NOKEY→앱 로컬 폴백."""
+    gkey = os.getenv("GEMINI_API_KEY")
+    akey = os.getenv("ANTHROPIC_API_KEY")
+    provider = "gemini" if gkey else ("anthropic" if akey else None)
+    if not (provider and httpx):
         return {"status": "NOKEY"}
-    user = ("다음 입력에 대해 §4~§12를 준수하여 겹침 없는 서로 다른 배치 3개 이상을 "
-            "§3 JSON 스키마(candidates[])로만 출력하라. 설명 없이 JSON만.\n\n"
-            + json.dumps(req.model_dump(), ensure_ascii=False))
+    user = _layout_user_msg(req.model_dump())
     try:
         async with httpx.AsyncClient(timeout=90) as cx:
-            r = await cx.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                json={"model": LLM_MODEL, "max_tokens": 4096, "system": _LAYOUT_PROMPT,
-                      "messages": [{"role": "user", "content": user}]},
-            )
-            r.raise_for_status()
-            text = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
-        return {"status": "OK", "candidates": _parse_candidates(text)}
+            if provider == "gemini":
+                r = await cx.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}",
+                    json={"system_instruction": {"parts": [{"text": _LAYOUT_PROMPT}]},
+                          "contents": [{"role": "user", "parts": [{"text": user}]}],
+                          "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.8,
+                                               "responseMimeType": "application/json"}},
+                )
+                r.raise_for_status()
+                cand = (r.json().get("candidates") or [{}])[0]
+                text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
+            else:
+                r = await cx.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={"x-api-key": akey, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                    json={"model": LLM_MODEL, "max_tokens": 4096, "system": _LAYOUT_PROMPT,
+                          "messages": [{"role": "user", "content": user}]},
+                )
+                r.raise_for_status()
+                text = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
+        return {"status": "OK", "candidates": _parse_candidates(text), "provider": provider}
     except Exception as e:  # noqa: BLE001
         return {"status": "ERROR", "reason": str(e)[:200]}
 
