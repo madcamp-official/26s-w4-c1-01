@@ -19,8 +19,8 @@ PRESETS = {
                     sun=((1.0, 0.93, 0.80), 2.2, 18, 60), lamp=0.0),
     "day":     dict(exp=0.40, hdri=0.80, win=(0.90, 0.95, 1.0), win_s=12,
                     sun=((1.0, 0.97, 0.92), 3.0, 55, 35), lamp=0.0),
-    "sunset":  dict(exp=0.52, hdri=0.28, win=(1.0, 0.72, 0.42), win_s=22,
-                    sun=((1.0, 0.62, 0.32), 2.6, 8, 75), lamp=0.25),
+    "sunset":  dict(exp=0.55, hdri=0.22, win=(1.0, 0.5, 0.22), win_s=9,
+                    sun=((1.0, 0.52, 0.24), 4.2, 6, 80), lamp=0.4),
     "night":   dict(exp=0.30, hdri=0.05, win=(0.16, 0.22, 0.42), win_s=2.5,
                     sun=None, lamp=1.0),
 }
