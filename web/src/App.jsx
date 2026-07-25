@@ -7,7 +7,7 @@ import LayoutPicker from './components/LayoutPicker.jsx';
 import { toPlacedItem, resolveDims } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
-import { fetchDims, layoutFurniture } from './lib/api.js';
+import { fetchDims, layoutFurniture, renderScene } from './lib/api.js';
 
 const TABS = [
   { id: 'room', label: '방', icon: '🏠' },
@@ -27,6 +27,8 @@ export default function App() {
   const [dimBusy, setDimBusy] = useState(false);
   const [layoutOpts, setLayoutOpts] = useState(null);
   const [layoutBusy, setLayoutBusy] = useState(false);
+  const [renderBusy, setRenderBusy] = useState(false);
+  const [renderImg, setRenderImg] = useState(null);
 
   const val = useMemo(
     () => (room ? validateLayout(items, room.widthM, room.depthM) : { flags: [], ok: true, freeRatio: 0 }),
@@ -76,6 +78,20 @@ export default function App() {
   }
   function rotateItem(id) {
     setItems((p) => p.map((it) => (it.id === id ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
+  }
+  async function doRender() {
+    if (!room || renderBusy) return;
+    const placeable = items.filter((it) => it.glb);
+    if (!placeable.length) { alert('렌더할 3D 가구가 없어요. 가구를 먼저 담아 주세요.'); return; }
+    setRenderBusy(true);
+    try {
+      const r = await renderScene(room, items);
+      if (r?.status === 'OK' && r.image) setRenderImg(r.image);
+      else if (r?.status === 'CLIENT') alert('렌더 서버(camp-3)가 아직 연결 안 됐어요. ./run.sh 로 터널을 켜 주세요.');
+      else alert('렌더 실패: ' + (r?.reason || '알 수 없음'));
+    } finally {
+      setRenderBusy(false);
+    }
   }
   function deleteSel() {
     setItems((p) => p.filter((it) => it.id !== selectedId));
@@ -192,7 +208,7 @@ export default function App() {
               <>
                 <div className="autobar">
                   <button className="btn primary sm" onClick={openAutoLayout} disabled={!items.length || layoutBusy}>{layoutBusy ? '🤖 AI 배치 중…' : '✨ 자동 배치'}</button>
-                  <span className="chip">한 번에 원룸에 정리</span>
+                  <button className="btn sm" onClick={doRender} disabled={renderBusy || !items.some((it) => it.glb)}>{renderBusy ? '📸 렌더링 중… (~30초)' : '📸 고품질 렌더'}</button>
                 </div>
                 <Room3D
                   room={room}
@@ -251,6 +267,20 @@ export default function App() {
           onSelect={(newItems) => { setItems(newItems); setSelectedId(null); setLayoutOpts(null); }}
           onClose={() => setLayoutOpts(null)}
         />
+      )}
+
+      {renderImg && (
+        <div className="modal-back" onClick={() => setRenderImg(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>📸 고품질 렌더</h2>
+            <p className="mockup-note">지금 배치 그대로 camp-3에서 렌더한 포토리얼 사진이에요.</p>
+            <img className="renderimg" src={renderImg} alt="포토리얼 렌더" />
+            <div className="selbar" style={{ justifyContent: 'flex-end', marginTop: 10 }}>
+              <a className="btn primary" href={renderImg} download="방꾸요정-렌더.png">저장</a>
+              <button className="btn ghost" onClick={() => setRenderImg(null)}>닫기</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

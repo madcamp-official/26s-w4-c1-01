@@ -41,6 +41,27 @@ export async function relightImage(dataUrl, strength = 0.3) {
   }
 }
 
+// 포토리얼 렌더 — 현재 3D 배치 → camp-3 Blender 사진. 반환: {status:'OK'|'CLIENT'|'ERROR', image}.
+// glb 있는 아이템만 보낸다(치수·위치는 미터·room 좌표 그대로 → 서버가 blender 좌표로 사용).
+export async function renderScene(room, items) {
+  const payload = {
+    room: { w: room.widthM, d: room.depthM, h: 2.6 },
+    items: items.filter((it) => it.glb).map((it) => ({
+      glb: it.glb, x: it.cx, y: it.cy, rot: it.rotationDeg || 0,
+    })),
+  };
+  try {
+    const res = await fetch(`${API_BASE}/api/render`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload), signal: timeout(300000),
+    });
+    if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}` };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', reason: String(e.message || e) };
+  }
+}
+
 // 원룸 자동 배치 — 백엔드(Claude)로 후보 생성. 반환: {status:'OK'|'NOKEY'|'ERROR', candidates}.
 // 치수는 cm 정수로 보낸다(LLM이 정수 좌표를 잘 다룸). 앱이 받은 후보를 기하엔진으로 재검증한다.
 export async function layoutFurniture(room, items) {

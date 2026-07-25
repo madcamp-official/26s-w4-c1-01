@@ -33,6 +33,7 @@ app.add_middleware(
 NAVER_ID = os.getenv("NAVER_CLIENT_ID")
 NAVER_SECRET = os.getenv("NAVER_CLIENT_SECRET")
 SD_SERVER_URL = os.getenv("SD_SERVER_URL")
+RENDER_SERVER_URL = os.getenv("RENDER_SERVER_URL")
 
 # 치수 파싱은 app/dims.py로 이관(FastAPI·devserver 공유, 로직 드리프트 방지).
 
@@ -43,6 +44,7 @@ def health():
         "status": "ok",
         "naver": bool(NAVER_ID and NAVER_SECRET),
         "sd_server": bool(SD_SERVER_URL),
+        "render": bool(RENDER_SERVER_URL),
         "llm": bool(os.getenv("GEMINI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")),
         "llm_provider": "gemini" if os.getenv("GEMINI_API_KEY") else ("anthropic" if os.getenv("ANTHROPIC_API_KEY") else None),
     }
@@ -192,6 +194,30 @@ def _parse_candidates(text: str):
             return []
         obj = json.loads(t[s:e + 1])
     return obj.get("candidates", []) if isinstance(obj, dict) else []
+
+
+class RenderReq(BaseModel):
+    room: dict
+    items: list = []
+    camera: Optional[dict] = None
+    samples: Optional[int] = None
+
+
+@app.post("/api/render")
+async def render(req: RenderReq):
+    """3D 배치 → camp-3 Blender Cycles 포토리얼 사진. 서버 없으면 CLIENT(앱은 3D 뷰 유지)."""
+    if not (RENDER_SERVER_URL and httpx):
+        return {"status": "CLIENT", "reason": "no_render_server"}
+    try:
+        async with httpx.AsyncClient(timeout=300) as cx:
+            r = await cx.post(RENDER_SERVER_URL.rstrip("/") + "/render", json=req.model_dump(exclude_none=True))
+            r.raise_for_status()
+            data = r.json()
+        if data.get("status") == "OK" and data.get("image"):
+            return {"status": "OK", "image": data["image"]}
+        return {"status": "ERROR", "reason": str(data.get("reason", "render error"))[:200]}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "ERROR", "reason": str(e)[:200]}
 
 
 class LayoutReq(BaseModel):

@@ -1,0 +1,18 @@
+# camp-3 포토리얼 렌더 서비스 systemd 유닛(CPU Blender). 재부팅에도 자동 기동.
+# 설치:
+#   scp server/gpu/render_server.py root@172.10.5.71:/root/render_server.py
+#   scp server/gpu/blender_render.py root@172.10.5.71:/root/blender_render.py
+#   scp server/gpu/render.service    root@172.10.5.71:/etc/systemd/system/render.service
+#   ssh root@172.10.5.71 'systemctl daemon-reload && systemctl enable --now render'
+[Unit]
+Description=bangkku photoreal render server (Blender Cycles CPU)
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u /root/render_server.py
+WorkingDirectory=/root
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

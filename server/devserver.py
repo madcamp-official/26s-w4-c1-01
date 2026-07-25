@@ -39,6 +39,7 @@ ENV = load_env()
 CID = ENV.get("NAVER_CLIENT_ID") or os.getenv("NAVER_CLIENT_ID")
 SEC = ENV.get("NAVER_CLIENT_SECRET") or os.getenv("NAVER_CLIENT_SECRET")
 SD_SERVER_URL = ENV.get("SD_SERVER_URL") or os.getenv("SD_SERVER_URL")
+RENDER_SERVER_URL = ENV.get("RENDER_SERVER_URL") or os.getenv("RENDER_SERVER_URL")
 ANTHROPIC_API_KEY = ENV.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
 LLM_MODEL = ENV.get("LLM_MODEL") or os.getenv("LLM_MODEL") or "claude-sonnet-5"
 GEMINI_API_KEY = ENV.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
@@ -149,8 +150,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path)
         if u.path == "/health":
             return self._json({"status": "ok", "naver": bool(CID and SEC),
-                               "sd_server": bool(SD_SERVER_URL), "llm": bool(LLM_PROVIDER),
-                               "llm_provider": LLM_PROVIDER})
+                               "sd_server": bool(SD_SERVER_URL), "render": bool(RENDER_SERVER_URL),
+                               "llm": bool(LLM_PROVIDER), "llm_provider": LLM_PROVIDER})
         if u.path == "/api/search":
             if not (CID and SEC):
                 return self._json({"status": "FALLBACK", "reason": "no_naver_key", "items": []})
@@ -167,13 +168,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
-        if path not in ("/api/relight", "/api/layout"):
+        if path not in ("/api/relight", "/api/layout", "/api/render"):
             return self._json({"error": "not found"}, 404)
         try:
             n = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(n)) if n else {}
         except Exception as e:  # noqa: BLE001
             return self._json({"status": "ERROR", "reason": "bad request"}, 400)
+
+        # 포토리얼 렌더 — camp-3 Blender 서비스로 프록시(배치 3D → 사진)
+        if path == "/api/render":
+            if not RENDER_SERVER_URL:
+                return self._json({"status": "CLIENT", "reason": "no_render_server"})
+            try:
+                payload = json.dumps(body).encode()
+                req = urllib.request.Request(RENDER_SERVER_URL.rstrip("/") + "/render", data=payload,
+                                             headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=300) as r:
+                    data = json.load(r)
+                if data.get("status") == "OK" and data.get("image"):
+                    return self._json({"status": "OK", "image": data["image"]})
+                return self._json({"status": "ERROR", "reason": str(data.get("reason", "render error"))[:200]})
+            except Exception as e:  # noqa: BLE001
+                return self._json({"status": "ERROR", "reason": str(e)[:200]})
 
         # 원룸 자동 배치 — LLM(Gemini/Claude)이 후보 생성(앱이 겹침 재검증)
         if path == "/api/layout":
