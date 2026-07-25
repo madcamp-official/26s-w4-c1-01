@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { computeHomography, projectFootprint, billboardQuad } from '../lib/homography.js';
+import { accuracyMeta } from '../lib/catalog.js';
 
 const CW = 640, CH = 420;
 
@@ -53,7 +54,7 @@ export default function Composite({ room, items, roomPhoto, onClose }) {
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
         const midX = (bb.bottomL[0] + bb.bottomR[0]) / 2;
-        ctx.fillText(it.name, midX, bb.topL[1] - 4);
+        ctx.fillText(`${it.name} · ${accuracyMeta(it.dimAccuracy).short}`, midX, bb.topL[1] - 4);
         if (!it.lowBox) {
           ctx.fillStyle = 'rgba(204,91,82,0.9)';
           ctx.fillText('⚠ 합성 부적합(판때기 위험)', midX, bb.topL[1] - 16);

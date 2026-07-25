@@ -52,6 +52,16 @@ export function resolveDims(item) {
   return { w: base.w, d: base.d, h: base.h, accuracy: '추정(기본)', color: item.color || base.color, lowBox: base.lowBox };
 }
 
+// 치수 신뢰도 → 표시용 {short, tone, hex}. tone: ok(정형·입력) / mid(상세·AI) / warn(추정·미상)
+export function accuracyMeta(a) {
+  if (a === '정형') return { short: '정형', tone: 'ok', hex: '#3f6a3a' };
+  if (a === '사용자입력') return { short: '입력', tone: 'ok', hex: '#3f6a3a' };
+  if (a === '추정(상세)') return { short: '상세', tone: 'mid', hex: '#3a6b8a' };
+  if (a === '추정(AI)') return { short: 'AI', tone: 'mid', hex: '#3a6b8a' };
+  if (a === '미상') return { short: '미상', tone: 'warn', hex: '#a9691f' };
+  return { short: a && a.includes('기본') ? '기본' : '추정', tone: 'warn', hex: '#a9691f' };
+}
+
 let _seq = 0;
 // cm → m footprint 아이템으로 변환(배치 엔진 입력). 치수 미상이면 카테고리 표준으로 보정.
 export function toPlacedItem(cat, cx, cy, rotationDeg = 0) {

@@ -66,6 +66,8 @@ input[type="number"], input[type="text"], select {
 .badge.ok { background: #e7f0e5; color: #3f6a3a; }
 .badge.warn { background: #f7ecd9; color: #a9691f; }
 .badge.est { background: #efeae0; color: #857c70; }
+.badge.mid { background: #e4ecf3; color: #3a6b8a; }
+.badge.sm { font-size: 10px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
 
 .selbar { display: flex; gap: 6px; margin-top: 8px; }
 .dimedit { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }

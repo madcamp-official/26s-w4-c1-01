@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Stage, Layer, Rect, Line, Group, Text } from 'react-konva';
+import { Stage, Layer, Rect, Line, Group, Text, Circle } from 'react-konva';
 import { effectiveFootprint } from '../lib/geometry.js';
+import { accuracyMeta } from '../lib/catalog.js';
 
 const PAD = 16;
 const MAX_H = 470;
@@ -82,7 +83,7 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                   cornerRadius={3}
                 />
                 <Text
-                  text={`${it.name}\n${Math.round(it.wM * 100)}×${Math.round(it.dM * 100)}`}
+                  text={`${it.name}\n${Math.round(it.wM * 100)}×${Math.round(it.dM * 100)} · ${accuracyMeta(it.dimAccuracy).short}`}
                   fontSize={11}
                   fill="#3a352e"
                   align="center"
@@ -91,6 +92,8 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                   offsetY={6}
                   listening={false}
                 />
+                {/* 치수 신뢰도 점 (좌상단) */}
+                <Circle x={-w / 2 + 6} y={-h / 2 + 6} radius={4} fill={accuracyMeta(it.dimAccuracy).hex} listening={false} />
               </Group>
             );
           })}

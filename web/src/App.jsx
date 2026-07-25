@@ -122,6 +122,16 @@ export default function App() {
             <div className="k">남은 바닥</div>
             <div className="v">{Math.round(val.freeRatio * 100)}%</div>
           </div>
+          <div className="stat">
+            <div className="k">치수 신뢰도</div>
+            <div className="v" style={{ fontSize: 13 }}>
+              {(() => {
+                const solid = items.filter((it) => it.dimAccuracy === '정형' || it.dimAccuracy === '사용자입력' || String(it.dimAccuracy).startsWith('추정(상세')).length;
+                const est = items.length - solid;
+                return items.length ? `정형·입력 ${solid} · 추정 ${est}` : '가구 없음';
+              })()}
+            </div>
+          </div>
 
           <label style={{ marginTop: 8 }}>빈 방 사진(선택)</label>
           <input type="file" accept="image/*" onChange={onPhoto} />
