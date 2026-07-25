@@ -41,10 +41,16 @@ def build_scene(p):
         cam = {"pos": [-b * 0.62, -b * 0.62, min(1.45 + 0.42 * H, H * 0.92)],
                "target": [W * 0.5, D * 0.48, 0.35], "lens": 24}
         hide = p.get("hide") or ["near", "left"]
-    win = p.get("window") or {"wall": "far", "w": min(2.4, W * 0.6), "h": 2.0, "z": 1.1, "strength": 16}
-    return {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI, "hdri_strength": 0.55,
-            "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1600)), "ry": int(p.get("ry", 900)),
-            "exposure": 0.5, "window": win, "camera": cam, "hide": hide, "items": items}
+    win = p.get("window") or {"wall": "far", "w": min(2.2, W * 0.6), "h": 1.4, "z": 1.25}
+    out = {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI,
+           "preset": p.get("preset", "day"),           # 시간대 조명 프리셋(blender가 노출·창색·태양광 결정)
+           "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1600)), "ry": int(p.get("ry", 900)),
+           "window": win, "camera": cam, "hide": hide, "items": items}
+    # 앱/하니스가 명시 오버라이드하면 통과(프리셋 기본값을 덮어씀).
+    for k in ("hdri_strength", "exposure", "rug"):
+        if k in p:
+            out[k] = p[k]
+    return out
 
 
 def render(payload):
