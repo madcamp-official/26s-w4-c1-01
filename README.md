@@ -1,17 +1,25 @@
 # 🧚 방꾸요정 — 원룸 실치수 가구배치
 
 원룸 자취방에 **실제 파는 가구를 실치수로** 놓아 보고 그대로 사는 앱.
-빈 방 사진과 방 크기만 넣으면, 가구를 실치수 스케일로 2D 배치하고, 그 가구가 놓인 방 이미지를 합성해 보여준 뒤 구매 링크로 잇는다.
+방 크기만 넣으면 가구를 2D로 배치하고, **진짜 3D(아키스케치식)** 로 방 안에 실측 가구를 놓아 돌려보며 확인한 뒤 구매 링크로 잇는다.
 
 > 기획서: [docs/방꾸요정-기획서.md](docs/방꾸요정-기획서.md) · 기능 명세서: [docs/방꾸요정-기능명세서.md](docs/방꾸요정-기능명세서.md)
 
 ## 구조
 
 ```
-web/     React + Vite + react-konva (2D 축척 플래너 + 합성 접합). Android WebView로 감쌀 예정
-server/  FastAPI — 네이버쇼핑 grounding · (3090) 합성 프록시. 키 없으면 폴백
+web/     React + Vite. 2D 축척 플래너(react-konva) + 3D 미리보기(react-three-fiber).
+         3D 가구는 ABO 실측 GLB(브라우저 WebGL, GPU 서버 불필요). Android WebView로 감쌀 예정
+server/  FastAPI — 네이버쇼핑 grounding. 키 없으면 폴백
 docs/    기획서 · 기능 명세서
 ```
+
+## 3D 미리보기 (아키스케치식)
+
+- **뷰어**: react-three-fiber(three.js) — 전부 브라우저 WebGL, GPU 서버 불필요. orbit 카메라 + 바닥 드래그 이동 + `R`키 90° 회전.
+- **가구**: [Amazon Berkeley Objects](https://amazon-berkeley-objects.s3.amazonaws.com/) 실측 GLB 20종(치수가 모델에 내장, 실척 배치). 원본 4K 텍스처를 1024+webp로 압축해 개당 ~0.3MB. 라이선스 CC BY-NC(비상업) — [web/public/glb/SOURCE.txt](web/public/glb/SOURCE.txt).
+- **판정**: 겹침/방밖은 실치수 발자국으로 계산해 3D에서 빨간 하이라이트.
+- **임의 제품(2단계)**: 네이버/중고 사진 → camp-3 3090에서 image-to-3D(SF3D/Hunyuan3D) 오프라인 생성 후 실치수 후보정 예정.
 
 ## 실행
 
@@ -68,8 +76,10 @@ camp-3 서버 기동: `python3 relight_server.py`(SD 1.5 img2img, strength 0.3 �
 
 - ✅ 방 크기 입력: 예측(평수→공용면적 차감→종횡비) / 한변 실측 보정 / 완전 실측
 - ✅ 축척 2D 플래너: 실치수 드래그 배치, 90° 스냅 회전, **겹침·방밖 실시간 하이라이트**(AABB)
-- ✅ 시드 카탈로그(IKEA 정형치수) + 자연어 검색(백엔드 grounding, 없으면 로컬 폴백)
-- ✅ 합성 접합: 바닥 homography로 배치 좌표 → 사진 투영 + 접지 그림자 자작 + 빌보드
-- ⏳ 미연동(키·서버 필요): 네이버쇼핑 실검색, 3090 저denoise 리라이팅, 제품 누끼, 실구매 딥링크
+- ✅ **3D 미리보기**: ABO 실측 GLB를 방 안에 실치수 배치, orbit·바닥 드래그·R키 회전, 겹침/방밖 하이라이트
+- ✅ 실측 GLB 카탈로그 20종(ABO) + 자연어 검색(백엔드 grounding, 없으면 로컬 폴백)
+- ⏳ 미연동(키·서버 필요): 네이버쇼핑 실검색, 임의 제품 image-to-3D 생성, 실구매 딥링크
 
-**정직 원칙**: 배치·치수는 기하가 결정(디퓨전 아님) · 합성은 목업이지 포토리얼 아님 · 치수 보장은 정형 소스(IKEA)만.
+**정직 원칙**: 배치·치수는 기하가 결정(디퓨전 아님) · 3D 가구는 실측 GLB(실척 보장) · 치수 보장은 정형 소스(ABO/IKEA)만.
+
+> 2.5D 빌보드 합성(구 `Composite.jsx`·`homography.js`)은 3D 피벗으로 대체됨 — 품질 상한이 낮아 미리보기에서 제외.

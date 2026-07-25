@@ -125,3 +125,24 @@ input[type="number"], input[type="text"], select {
 
 /* 폰 안에서는 카탈로그가 탭 전체를 채운다 */
 .pane .catlist { max-height: none; }
+
+/* ===== 3D 미리보기 (react-three-fiber) ===== */
+.room3d {
+  position: relative;
+  height: 440px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ece7dd;
+  touch-action: none;          /* 모바일 orbit/드래그가 페이지 스크롤과 안 싸우게 */
+  user-select: none;
+}
+.room3d canvas { display: block; outline: none; }
+.r3d-hint {
+  position: absolute; left: 8px; right: 8px; bottom: 8px;
+  font-size: 11px; color: #5f584c; line-height: 1.45;
+  background: rgba(255, 255, 255, .74); backdrop-filter: blur(2px);
+  padding: 5px 9px; border-radius: 8px; pointer-events: none;
+}
+.r3d-hint b { color: var(--accent); }
+.r3d-load { font-size: 12px; color: var(--muted); background: rgba(255, 255, 255, .85); padding: 6px 10px; border-radius: 8px; }

@@ -1,0 +1,19 @@
+ABO 3D 가구 모델 (GLB) — 출처/라이선스
+=======================================
+
+출처: Amazon Berkeley Objects (ABO) Dataset
+      https://amazon-berkeley-objects.s3.amazonaws.com/  (AWS Open Data)
+      논문: arXiv:2110.06199
+
+라이선스: Creative Commons Attribution-NonCommercial 4.0 (CC BY-NC 4.0)
+  - 비상업 용도만 허용. 출처 표기 필수.
+  - 본 리포의 3D 모델은 데모/해커톤(비상업) 시연 목적으로만 사용.
+  - 상업 배포 시에는 CC0/CC-BY 자산(Poly Haven, Google Scanned Objects)
+    또는 자체 생성 모델로 교체해야 함.
+
+가공: 원본 glTF 2.0(GLB, 4K PBR 텍스처, 개당 30~50MB)을
+      gltf-transform으로 텍스처 1024px + webp 재인코딩하여 개당 ~0.3MB로 압축.
+      지오메트리(실척)는 원본 그대로 — extent(=실제 치수)는 3dmodels 메타데이터 기준.
+
+파일명: <ASIN>.glb (3D 모델) · <ASIN>.jpg (small 썸네일)
+카탈로그 매핑: web/src/lib/abo3d.js

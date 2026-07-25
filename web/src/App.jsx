@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import RoomForm from './components/RoomForm.jsx';
 import CatalogPanel from './components/CatalogPanel.jsx';
 import Planner from './components/Planner.jsx';
-import Composite from './components/Composite.jsx';
+import Room3D from './components/Room3D.jsx';
 import { toPlacedItem, resolveDims } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
 import { fetchDims } from './lib/api.js';
@@ -11,7 +11,7 @@ const TABS = [
   { id: 'room', label: '방', icon: '🏠' },
   { id: 'plan', label: '배치', icon: '📐' },
   { id: 'shop', label: '가구', icon: '🛋️' },
-  { id: 'preview', label: '미리보기', icon: '🖼️' },
+  { id: 'preview', label: '3D 미리보기', icon: '🧊' },
 ];
 
 const accLabel = (a) => (a === 'MEASURED' ? '(실측)' : a === 'MEASURED_PARTIAL' ? '(한 변 실측)' : '(추정)');
@@ -45,6 +45,12 @@ export default function App() {
   }
   function rotateSel() {
     setItems((p) => p.map((it) => (it.id === selectedId ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
+  }
+  function moveItem(id, cx, cy) {
+    setItems((p) => p.map((it) => (it.id === id ? { ...it, cx, cy } : it)));
+  }
+  function rotateItem(id) {
+    setItems((p) => p.map((it) => (it.id === id ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
   }
   function deleteSel() {
     setItems((p) => p.filter((it) => it.id !== selectedId));
@@ -85,6 +91,22 @@ export default function App() {
     </div>
   );
 
+  const selBar = sel && (
+    <div className="selbar" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+      {sel.image && <img className="selthumb" src={sel.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+      <span className="badge est">{sel.name}</span>
+      <span className={`badge ${sel.dimAccuracy === '정형' || sel.dimAccuracy === '사용자입력' ? 'ok' : 'warn'}`}>{sel.dimAccuracy}</span>
+      <span className="dimedit">
+        가로<input type="number" value={Math.round(sel.wM * 100)} onChange={(e) => setSelDim('wM', e.target.value)} />
+        세로<input type="number" value={Math.round(sel.dM * 100)} onChange={(e) => setSelDim('dM', e.target.value)} />
+        높이<input type="number" value={Math.round(sel.hM * 100)} onChange={(e) => setSelDim('hM', e.target.value)} />cm
+      </span>
+      {sel.buyUrl && <button className="btn" onClick={autoFillDims} disabled={dimBusy}>{dimBusy ? '치수 찾는 중…' : '치수 자동 채우기'}</button>}
+      <button className="btn" onClick={rotateSel}>90° 회전</button>
+      <button className="btn ghost" onClick={deleteSel}>삭제</button>
+    </div>
+  );
+
   return (
     <div className="phone">
       <header className="pbar">
@@ -115,21 +137,7 @@ export default function App() {
         {tab === 'plan' && (!room ? needRoom : (
           <div className="pane">
             <Planner room={room} items={items} setItems={setItems} selectedId={selectedId} setSelectedId={setSelectedId} flags={val.flags} />
-            {sel && (
-              <div className="selbar" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-                {sel.image && <img className="selthumb" src={sel.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
-                <span className="badge est">{sel.name}</span>
-                <span className={`badge ${sel.dimAccuracy === '정형' || sel.dimAccuracy === '사용자입력' ? 'ok' : 'warn'}`}>{sel.dimAccuracy}</span>
-                <span className="dimedit">
-                  가로<input type="number" value={Math.round(sel.wM * 100)} onChange={(e) => setSelDim('wM', e.target.value)} />
-                  세로<input type="number" value={Math.round(sel.dM * 100)} onChange={(e) => setSelDim('dM', e.target.value)} />
-                  높이<input type="number" value={Math.round(sel.hM * 100)} onChange={(e) => setSelDim('hM', e.target.value)} />cm
-                </span>
-                {sel.buyUrl && <button className="btn" onClick={autoFillDims} disabled={dimBusy}>{dimBusy ? '치수 찾는 중…' : '치수 자동 채우기'}</button>}
-                <button className="btn" onClick={rotateSel}>90° 회전</button>
-                <button className="btn ghost" onClick={deleteSel}>삭제</button>
-              </div>
-            )}
+            {selBar}
             <div className="statrow">
               {val.ok ? <span className="badge ok">맞음 문제없음</span> : <span className="badge warn">겹침/방밖 있음</span>}
               <span className="chip">남은 바닥 {Math.round(val.freeRatio * 100)}%</span>
@@ -153,7 +161,20 @@ export default function App() {
               <p className="mockup-note">배치된 가구가 없어요. ‘가구’·‘배치’ 탭에서 먼저 놓아 주세요.</p>
             ) : (
               <>
-                <Composite room={room} items={items} roomPhoto={roomPhoto} embedded />
+                <Room3D
+                  room={room}
+                  items={items}
+                  selectedId={selectedId}
+                  setSelectedId={setSelectedId}
+                  onMove={moveItem}
+                  onRotate={rotateItem}
+                  flags={val.flags}
+                />
+                {selBar}
+                <div className="statrow">
+                  {val.ok ? <span className="badge ok">맞음 문제없음</span> : <span className="badge warn">겹침/방밖 있음</span>}
+                  <span className="chip">실측 GLB {items.filter((i) => i.glb).length} · 실치수 배치</span>
+                </div>
                 <h3 className="sec">구매</h3>
                 <div className="buylist">
                   {items.map((it) => (
