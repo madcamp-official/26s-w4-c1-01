@@ -34,13 +34,22 @@ world = bpy.data.worlds.new("W"); sc.world = world
 world.use_nodes = True
 nt = world.node_tree
 for n in list(nt.nodes): nt.nodes.remove(n)
-bg = nt.nodes.new("ShaderNodeBackground")
+# 조명은 HDRI로, 카메라에 보이는 배경은 깨끗한 화이트(컷어웨이 열린 면이 지저분하지 않게).
 env = nt.nodes.new("ShaderNodeTexEnvironment")
 env.image = bpy.data.images.load(S["hdri"])
+bg_hdri = nt.nodes.new("ShaderNodeBackground")
+bg_hdri.inputs["Strength"].default_value = S.get("hdri_strength", 0.5)
+nt.links.new(env.outputs["Color"], bg_hdri.inputs["Color"])
+bg_white = nt.nodes.new("ShaderNodeBackground")
+bg_white.inputs["Color"].default_value = (1, 1, 1, 1)
+bg_white.inputs["Strength"].default_value = 1.0
+lp = nt.nodes.new("ShaderNodeLightPath")
+mix = nt.nodes.new("ShaderNodeMixShader")
+nt.links.new(lp.outputs["Is Camera Ray"], mix.inputs["Fac"])   # 카메라 광선이면 화이트
+nt.links.new(bg_hdri.outputs["Background"], mix.inputs[1])     # 그 외(조명/반사)는 HDRI
+nt.links.new(bg_white.outputs["Background"], mix.inputs[2])
 wout = nt.nodes.new("ShaderNodeOutputWorld")
-bg.inputs["Strength"].default_value = S.get("hdri_strength", 0.5)
-nt.links.new(env.outputs["Color"], bg.inputs["Color"])
-nt.links.new(bg.outputs["Background"], wout.inputs["Surface"])
+nt.links.new(mix.outputs["Shader"], wout.inputs["Surface"])
 
 
 def mat(name, color, rough=0.85, metal=0.0):
@@ -78,12 +87,19 @@ FLOOR = mat("floor", (0.80, 0.72, 0.58), rough=0.5)
 WALL = mat("wall", (0.90, 0.88, 0.84), rough=0.95)
 CEIL = mat("ceil", (0.95, 0.94, 0.92), rough=1.0)
 
+# hide: 카메라 쪽 벽/천장을 생략(코너 컷어웨이 — 방 안이 다 보이게). 예: ["near","left","ceil"]
+hide = set(S.get("hide", []))
 plane("floor", W, D, (W / 2, D / 2, 0), m=FLOOR)
-plane("ceil", W, D, (W / 2, D / 2, H), rot=(math.pi, 0, 0), m=CEIL)
-# 벽 (안쪽을 향하도록 normal)
-plane("wall_far", W, H, (W / 2, D, H / 2), rot=(math.radians(90), 0, 0), m=WALL)    # y=D
-plane("wall_left", H, D, (0, D / 2, H / 2), rot=(0, math.radians(90), 0), m=WALL)   # x=0
-plane("wall_right", H, D, (W, D / 2, H / 2), rot=(0, math.radians(-90), 0), m=WALL) # x=W
+if "ceil" not in hide:
+    plane("ceil", W, D, (W / 2, D / 2, H), rot=(math.pi, 0, 0), m=CEIL)
+if "far" not in hide:
+    plane("wall_far", W, H, (W / 2, D, H / 2), rot=(math.radians(90), 0, 0), m=WALL)    # y=D
+if "near" not in hide:
+    plane("wall_near", W, H, (W / 2, 0, H / 2), rot=(math.radians(90), 0, 0), m=WALL)   # y=0
+if "left" not in hide:
+    plane("wall_left", H, D, (0, D / 2, H / 2), rot=(0, math.radians(90), 0), m=WALL)   # x=0
+if "right" not in hide:
+    plane("wall_right", H, D, (W, D / 2, H / 2), rot=(0, math.radians(-90), 0), m=WALL) # x=W
 
 # ---------- 창문(밝은 배광) : 좌측 벽 or far 벽 ----------
 win = S.get("window", {"wall": "far", "w": min(2.2, W * 0.6), "h": 1.9, "z": 1.0, "strength": 18})
