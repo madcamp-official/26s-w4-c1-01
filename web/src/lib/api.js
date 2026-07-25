@@ -4,18 +4,22 @@ import { CATALOG } from './catalog.js';
 
 const API_BASE = import.meta.env?.VITE_API_BASE ?? '';
 
-// 자연어 쿼리로 가구 검색. 반환: [{id,name,cat,w,d,h,lowBox,color,source,dimAccuracy,price?,buyUrl?}]
+// 자연어 쿼리로 가구 검색.
+// 반환: { source: 'naver' | 'local', reason?, items: [...] }
+// source로 "네이버 실검색이 붙었는지"를 UI가 명시할 수 있게 한다(폴백이 조용히 일어나는 문제 방지).
 export async function searchFurniture(query) {
   const q = (query || '').trim();
   try {
     const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}`, { signal: timeout(4000) });
-    if (!res.ok) throw new Error(`status ${res.status}`);
+    if (!res.ok) throw new Error(`http ${res.status}`);
     const data = await res.json();
-    if (data?.status === 'FALLBACK' || !Array.isArray(data?.items)) throw new Error('backend fallback');
-    return data.items;
+    if (data?.status === 'OK' && Array.isArray(data.items) && data.items.length) {
+      return { source: 'naver', items: data.items };
+    }
+    throw new Error(data?.reason || data?.status || 'no items');
   } catch (e) {
-    // 로컬 폴백: 이름/카테고리 부분일치. 네이버 grounding 없으므로 dimAccuracy는 시드값 유지.
-    return localSearch(q);
+    // 로컬 폴백: 백엔드 미연동/키 없음/네트워크 실패. 시드 카탈로그로 앱이 계속 동작.
+    return { source: 'local', reason: String(e.message || e), items: localSearch(q) };
   }
 }
 

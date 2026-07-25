@@ -5,12 +5,15 @@ import { searchFurniture } from '../lib/api.js';
 export default function CatalogPanel({ onAdd }) {
   const [q, setQ] = useState('');
   const [items, setItems] = useState([]);
+  const [source, setSource] = useState(null); // 'naver' | 'local'
   const [loading, setLoading] = useState(false);
 
   async function run(query) {
     setLoading(true);
     try {
-      setItems(await searchFurniture(query));
+      const r = await searchFurniture(query);
+      setItems(r.items);
+      setSource(r.source);
     } finally {
       setLoading(false);
     }
@@ -20,6 +23,11 @@ export default function CatalogPanel({ onAdd }) {
   return (
     <div className="palette">
       <h3>가구</h3>
+      {source === 'naver' ? (
+        <div className="badge ok" style={{ marginBottom: 8 }}>● 네이버 실검색 {items.length}건</div>
+      ) : source === 'local' ? (
+        <div className="badge warn" style={{ marginBottom: 8 }}>● 로컬 시드 (백엔드 미연동)</div>
+      ) : null}
       <div className="searchbar">
         <input
           type="text"
