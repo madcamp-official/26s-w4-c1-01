@@ -2,7 +2,7 @@
 // 원칙: 배치할 때마다 겹침/방밖을 검증해 "유효한 자리"에만 놓는다. 한 가구라도 못 놓으면 그 배치는 폐기.
 // 가중치: 대부분의 가구는 벽에 밀착(벽 자리를 먼저 시도). 러그는 바닥 레이어(중앙, 충돌 제외).
 // 랜덤 변주로 서로 다른 유효 배치 여러 개를 만들고, 벽밀착률 높은 순 + 다양성으로 상위 N개를 고른다.
-import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout } from './geometry.js';
+import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore } from './geometry.js';
 
 // LLM 후보(cm 좌표) → 우리 아이템으로 매핑 + 겹침/방밖 재검증(안전망). 유효한 배치만 반환.
 // LLM 산술은 틀릴 수 있으므로 여기서 반드시 재검사해 겹치는 후보를 폐기한다.
@@ -144,7 +144,14 @@ export function generateLayouts(room, items, count = 3, tries = 400) {
     seen.add(s); valid.push(r);
   }
   if (!valid.length) return [];
-  valid.sort((a, b) => b.wallRatio - a.wallRatio);
+  // 동선(빈 바닥 연결성)까지 고려한 종합 점수로 랭킹 — 벽밀착 0.6 + 동선 0.4.
+  const W = room.widthM, D = room.depthM;
+  for (const v of valid) {
+    const solids = v.items.filter((it) => roleOf(it) !== 'rug');
+    v.circulation = circulationScore(solids, W, D).connected;
+    v.score = 0.6 * v.wallRatio + 0.4 * v.circulation;
+  }
+  valid.sort((a, b) => b.score - a.score);
   const picked = [valid[0]];
   for (const cand of valid) {
     if (picked.length >= count) break;
@@ -152,5 +159,5 @@ export function generateLayouts(room, items, count = 3, tries = 400) {
     if (picked.every((p) => dist(p.items, cand.items) > 0.5)) picked.push(cand);
   }
   for (const cand of valid) { if (picked.length >= count) break; if (!picked.includes(cand)) picked.push(cand); }
-  return picked.slice(0, count).map((p) => ({ items: p.items, wallRatio: p.wallRatio }));
+  return picked.slice(0, count).map((p) => ({ items: p.items, wallRatio: p.wallRatio, circulation: p.circulation }));
 }

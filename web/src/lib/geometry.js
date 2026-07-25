@@ -70,6 +70,43 @@ export function validateLayout(items, roomWM, roomDM) {
   };
 }
 
+// 동선 점수 — 바닥을 격자로 보고 '빈 칸'이 하나로 이어지는 정도(connected: 1이면 빈 공간이 통짜, 걷기 좋음).
+// 가구가 바닥을 여러 섬으로 쪼개면 낮아진다. 순수 함수 → 결정론적 테스트 가능.
+export function circulationScore(items, roomWM, roomDM, cell = 0.1) {
+  const nx = Math.max(1, Math.round(roomWM / cell));
+  const ny = Math.max(1, Math.round(roomDM / cell));
+  const boxes = items.map(itemAABB);
+  const occ = new Uint8Array(nx * ny);
+  for (let gy = 0; gy < ny; gy++) {
+    for (let gx = 0; gx < nx; gx++) {
+      const x = (gx + 0.5) * cell, y = (gy + 0.5) * cell;
+      for (const b of boxes) {
+        if (x > b.left + EPS && x < b.right - EPS && y > b.top + EPS && y < b.bottom - EPS) { occ[gy * nx + gx] = 1; break; }
+      }
+    }
+  }
+  const seen = new Uint8Array(nx * ny);
+  let freeTotal = 0, best = 0;
+  for (let i = 0; i < occ.length; i++) if (!occ[i]) freeTotal++;
+  const stack = [];
+  for (let s = 0; s < occ.length; s++) {
+    if (occ[s] || seen[s]) continue;
+    let size = 0; stack.length = 0; stack.push(s); seen[s] = 1;
+    while (stack.length) {
+      const c = stack.pop(); size++;
+      const cx = c % nx, cy = (c - cx) / nx;
+      for (const [ax, ay] of [[cx - 1, cy], [cx + 1, cy], [cx, cy - 1], [cx, cy + 1]]) {
+        if (ax < 0 || ay < 0 || ax >= nx || ay >= ny) continue;
+        const ni = ay * nx + ax;
+        if (occ[ni] || seen[ni]) continue;
+        seen[ni] = 1; stack.push(ni);
+      }
+    }
+    if (size > best) best = size;
+  }
+  return { connected: freeTotal ? best / freeTotal : 1, freeRatio: freeTotal / (nx * ny) };
+}
+
 // 겹치지 않는 초기 배치 지점 찾기(간단 그리드 탐색) — "다중 배치 자동 정리"의 씨앗.
 export function findFreeSpot(newItem, placed, roomWM, roomDM, step = 0.1) {
   const { w, d } = effectiveFootprint(newItem.wM, newItem.dM, newItem.rotationDeg || 0);

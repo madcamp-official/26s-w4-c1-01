@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test src/lib/geometry.test.js src/lib/roomEstimate.test.js src/lib/homography.test.js"
+    "test": "node --test src/lib/geometry.test.js src/lib/autolayout.test.js src/lib/roomEstimate.test.js src/lib/homography.test.js"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.0",
