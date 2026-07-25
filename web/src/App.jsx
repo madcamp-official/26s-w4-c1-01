@@ -5,6 +5,7 @@ import Planner from './components/Planner.jsx';
 import Composite from './components/Composite.jsx';
 import { toPlacedItem, resolveDims } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
+import { fetchDims } from './lib/api.js';
 
 export default function App() {
   const [room, setRoom] = useState(null);
@@ -31,6 +32,24 @@ export default function App() {
   function setSelDim(field, cm) {
     const m = Math.max(Number(cm) || 0, 1) / 100;
     setItems((p) => p.map((it) => (it.id === selectedId ? { ...it, [field]: m, dimAccuracy: '사용자입력' } : it)));
+  }
+  const [dimBusy, setDimBusy] = useState(false);
+  // 상세페이지에서 치수 자동 추출 → 선택 가구에 채움.
+  async function autoFillDims() {
+    if (!sel?.buyUrl) return;
+    setDimBusy(true);
+    try {
+      const d = await fetchDims(sel.buyUrl);
+      if (d && d.w && d.d) {
+        setItems((p) => p.map((it) => (it.id === selectedId
+          ? { ...it, wM: d.w / 100, dM: d.d / 100, hM: (d.h || it.hM * 100) / 100, dimAccuracy: d.accuracy || '추정(상세)' }
+          : it)));
+      } else {
+        alert('상세페이지에서 치수를 찾지 못했어요. 직접 입력해 주세요.');
+      }
+    } finally {
+      setDimBusy(false);
+    }
   }
   function rotateSel() {
     setItems((p) => p.map((it) => (it.id === selectedId ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
@@ -76,6 +95,11 @@ export default function App() {
                 세로<input type="number" value={Math.round(sel.dM * 100)} onChange={(e) => setSelDim('dM', e.target.value)} />
                 높이<input type="number" value={Math.round(sel.hM * 100)} onChange={(e) => setSelDim('hM', e.target.value)} />cm
               </span>
+              {sel.buyUrl && (
+                <button className="btn" onClick={autoFillDims} disabled={dimBusy}>
+                  {dimBusy ? '치수 찾는 중…' : '치수 자동 채우기'}
+                </button>
+              )}
               <button className="btn" onClick={rotateSel}>90° 회전</button>
               <button className="btn ghost" onClick={deleteSel}>삭제</button>
             </div>

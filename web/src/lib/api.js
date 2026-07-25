@@ -23,6 +23,19 @@ export async function searchFurniture(query) {
   }
 }
 
+// 상품 상세페이지에서 치수 자동 추출. 성공 시 {w,d,h,accuracy}, 실패/미상 시 null.
+export async function fetchDims(url) {
+  if (!url) return null;
+  try {
+    const res = await fetch(`${API_BASE}/api/dims?url=${encodeURIComponent(url)}`, { signal: timeout(12000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.status === 'OK' ? data.dims : null;
+  } catch {
+    return null;
+  }
+}
+
 function localSearch(q) {
   if (!q) return CATALOG;
   const low = q.toLowerCase();

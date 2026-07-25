@@ -22,6 +22,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from .dims import parse_dims, fetch_dims_from_url
+
 app = FastAPI(title="bangkku-api", version="0.1.0")
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
@@ -31,28 +33,7 @@ NAVER_ID = os.getenv("NAVER_CLIENT_ID")
 NAVER_SECRET = os.getenv("NAVER_CLIENT_SECRET")
 SD_SERVER_URL = os.getenv("SD_SERVER_URL")
 
-# 치수 파싱: "1400x750x670mm", "폭 120", "120*60" 등 자유텍스트 → cm.
-DIM_RE = re.compile(r"(\d{2,4})\s*[x×*]\s*(\d{2,4})(?:\s*[x×*]\s*(\d{2,4}))?\s*(mm|cm)?", re.I)
-
-
-def parse_dims(text: str):
-    """자유텍스트에서 W/D/H를 추정. 실패 시 None. 정확도는 '추정'."""
-    if not text:
-        return None
-    m = DIM_RE.search(text)
-    if not m:
-        return None
-    vals = [int(g) for g in (m.group(1), m.group(2), m.group(3)) if g]
-    unit = (m.group(4) or "").lower()
-    if unit == "mm":
-        scale = 0.1
-    elif unit == "cm":
-        scale = 1.0
-    else:
-        # 단위 미표기 → 크기로 추정: 300 초과면 mm(가구 mm 표기), 이하면 cm
-        scale = 0.1 if max(vals) > 300 else 1.0
-    to_cm = lambda v: round(int(v) * scale) if v else None
-    return {"w": to_cm(m.group(1)), "d": to_cm(m.group(2)), "h": to_cm(m.group(3)), "accuracy": "추정"}
+# 치수 파싱은 app/dims.py로 이관(FastAPI·devserver 공유, 로직 드리프트 방지).
 
 
 @app.get("/health")
@@ -108,6 +89,13 @@ async def search(q: str = ""):
         return {"status": "OK", "items": items}
     except Exception as e:  # noqa: BLE001 — 어떤 실패든 폴백으로
         return {"status": "FALLBACK", "reason": str(e)[:120], "items": []}
+
+
+@app.get("/api/dims")
+def dims(url: str = ""):
+    """상품 상세페이지에서 치수 자동 추출(정규식→LLM). 동기 fetch라 threadpool에서 실행되도록 def."""
+    d = fetch_dims_from_url(url, dict(os.environ))
+    return {"status": "OK", "dims": d} if d else {"status": "MISS"}
 
 
 class ComposeReq(BaseModel):

@@ -16,8 +16,11 @@ import urllib.parse
 import json
 import re
 import os
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "app"))
+from dims import parse_dims, fetch_dims_from_url  # noqa: E402 (공유 치수 모듈)
 
 
 def load_env():
@@ -35,20 +38,6 @@ def load_env():
 ENV = load_env()
 CID = ENV.get("NAVER_CLIENT_ID") or os.getenv("NAVER_CLIENT_ID")
 SEC = ENV.get("NAVER_CLIENT_SECRET") or os.getenv("NAVER_CLIENT_SECRET")
-
-DIM_RE = re.compile(r"(\d{2,4})\s*[x×*]\s*(\d{2,4})(?:\s*[x×*]\s*(\d{2,4}))?\s*(mm|cm)?", re.I)
-
-
-def parse_dims(text):
-    m = DIM_RE.search(text or "")
-    if not m:
-        return None
-    vals = [int(g) for g in (m.group(1), m.group(2), m.group(3)) if g]
-    unit = (m.group(4) or "").lower()
-    scale = 0.1 if unit == "mm" else 1.0 if unit == "cm" else (0.1 if max(vals) > 300 else 1.0)
-    cm = lambda v: round(int(v) * scale) if v else None
-    return {"w": cm(m.group(1)), "d": cm(m.group(2)), "h": cm(m.group(3)), "accuracy": "추정"}
-
 
 def naver_search(q):
     url = "https://openapi.naver.com/v1/search/shop.json?" + urllib.parse.urlencode(
@@ -100,6 +89,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"status": "OK", "items": naver_search(q)})
             except Exception as e:  # noqa: BLE001 — 어떤 실패든 폴백
                 return self._json({"status": "FALLBACK", "reason": str(e)[:120], "items": []})
+        if u.path == "/api/dims":
+            url = urllib.parse.parse_qs(u.query).get("url", [""])[0]
+            d = fetch_dims_from_url(url, ENV)
+            return self._json({"status": "OK", "dims": d} if d else {"status": "MISS"})
         self._json({"error": "not found"}, 404)
 
     def log_message(self, fmt, *args):
