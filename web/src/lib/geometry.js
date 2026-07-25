@@ -70,6 +70,25 @@ export function validateLayout(items, roomWM, roomDM) {
   };
 }
 
+// 개구부(문/창) 앞에 비워둘 여유공간 → 가구가 침범하면 안 되는 사각존 목록.
+// opening: {wall:'top'|'bottom'|'left'|'right', pos(m, 벽 따라 중심), width(m, 개구부 폭), clearance(m, 앞 여유 깊이)}.
+// 좌표계: x∈[0,W], y∈[0,D]. top=y0벽, bottom=yD벽, left=x0벽, right=xW벽.
+export function openingZones(openings, roomWM, roomDM) {
+  const zones = [];
+  for (const o of openings || []) {
+    if (!o || !o.wall) continue;
+    const ww = o.width ?? 0.9;
+    const c = o.clearance ?? 0.6;
+    const vert = o.wall === 'left' || o.wall === 'right';
+    const p = o.pos ?? (vert ? roomDM / 2 : roomWM / 2);
+    if (o.wall === 'bottom') zones.push({ left: p - ww / 2, right: p + ww / 2, top: roomDM - c, bottom: roomDM });
+    else if (o.wall === 'top') zones.push({ left: p - ww / 2, right: p + ww / 2, top: 0, bottom: c });
+    else if (o.wall === 'left') zones.push({ left: 0, right: c, top: p - ww / 2, bottom: p + ww / 2 });
+    else if (o.wall === 'right') zones.push({ left: roomWM - c, right: roomWM, top: p - ww / 2, bottom: p + ww / 2 });
+  }
+  return zones;
+}
+
 // 동선 점수 — 바닥을 격자로 보고 '빈 칸'이 하나로 이어지는 정도(connected: 1이면 빈 공간이 통짜, 걷기 좋음).
 // 가구가 바닥을 여러 섬으로 쪼개면 낮아진다. 순수 함수 → 결정론적 테스트 가능.
 export function circulationScore(items, roomWM, roomDM, cell = 0.1) {

@@ -2,7 +2,7 @@
 // 핵심: generateLayouts가 내놓는 모든 후보는 '겹침 0 + 방밖 0'이어야 한다(사용자 요구: 겹치면 기각).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLayout, circulationScore, itemAABB } from './geometry.js';
+import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap } from './geometry.js';
 import { generateLayouts, validateCandidates } from './autolayout.js';
 
 // 결정론적 PRNG(가구셋 생성용) — 레이아웃 내부 랜덤과 무관하게 '입력'만 재현 가능하게.
@@ -96,6 +96,44 @@ test('circulationScore: 빈 방=1, 방을 가로지르는 가구는 동선 쪼�
   // 구석 가구는 동선 온전
   const corner = [{ id: 'c', wM: 0.6, dM: 0.6, hM: 1.0, cx: 0.3, cy: 0.3, rotationDeg: 0 }];
   assert.ok(circulationScore(corner, 3, 4).connected > 0.98, '구석 가구는 동선 온전');
+});
+
+test('openingZones: 벽별 존 좌표', () => {
+  const z = openingZones([{ wall: 'bottom', pos: 1.5, width: 0.9, clearance: 0.7 }], 3.0, 4.0);
+  assert.equal(z.length, 1);
+  assert.deepEqual(z[0], { left: 1.05, right: 1.95, top: 3.3, bottom: 4.0 });
+  const zl = openingZones([{ wall: 'left', pos: 2.0, width: 1.0, clearance: 0.6 }], 3.0, 4.0)[0];
+  assert.deepEqual(zl, { left: 0, right: 0.6, top: 1.5, bottom: 2.5 });
+});
+
+test('generateLayouts: 문 앞 여유공간 확보 — 개구부 존에 solid 없음', () => {
+  const room = { widthM: 3.0, depthM: 4.0 };
+  const items = [
+    { id: 'bed', cat: '침대', name: '침대', wM: 1.6, dM: 2.0, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'desk', cat: '책상', name: '책상', wM: 1.2, dM: 0.6, hM: 0.75, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'shelf', cat: '수납', name: '책장', wM: 0.8, dM: 0.3, hM: 1.8, cx: 0, cy: 0, rotationDeg: 0 },
+  ];
+  const openings = [{ wall: 'bottom', pos: 1.5, width: 0.9, clearance: 0.7 }];
+  const cands = generateLayouts(room, items, 3, 500, openings);
+  assert.ok(cands.length >= 1, '개구부가 있어도 배치는 가능해야');
+  const zones = openingZones(openings, 3.0, 4.0);
+  for (const c of cands) {
+    for (const it of c.items.filter((x) => x.cat !== '러그')) {
+      for (const z of zones) assert.ok(!aabbOverlap(itemAABB(it), z), `${it.id}가 문 앞을 막으면 안 됨`);
+    }
+  }
+});
+
+test('validateCandidates: 문 앞을 막는 LLM 후보는 폐기', () => {
+  const room = { widthM: 3.0, depthM: 4.0 };
+  const items = [{ id: 'bed', cat: '침대', name: '침대', wM: 1.6, dM: 2.0, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 }];
+  const openings = [{ wall: 'bottom', pos: 1.5, width: 0.9, clearance: 0.7 }];
+  // 침대를 문 앞(y=D 근처)에 놓은 후보 → 폐기돼야 (cy=300: 방밖 아님, AABB y∈[2.0,4.0]가 문존 y∈[3.3,4.0] 침범)
+  const blocking = [{ strategy: 'x', items: [{ id: 'bed', cx: 150, cy: 300, rotation: 0 }] }];
+  assert.equal(validateCandidates(blocking, room, items, openings).length, 0);
+  // 반대쪽 벽(y=0)에 놓으면 통과
+  const clear = [{ strategy: 'y', items: [{ id: 'bed', cx: 150, cy: 100, rotation: 0 }] }];
+  assert.equal(validateCandidates(clear, room, items, openings).length, 1);
 });
 
 test('validateCandidates: 겹치는 LLM 후보는 폐기', () => {

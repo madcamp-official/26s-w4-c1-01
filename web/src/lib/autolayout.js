@@ -2,12 +2,13 @@
 // 원칙: 배치할 때마다 겹침/방밖을 검증해 "유효한 자리"에만 놓는다. 한 가구라도 못 놓으면 그 배치는 폐기.
 // 가중치: 대부분의 가구는 벽에 밀착(벽 자리를 먼저 시도). 러그는 바닥 레이어(중앙, 충돌 제외).
 // 랜덤 변주로 서로 다른 유효 배치 여러 개를 만들고, 벽밀착률 높은 순 + 다양성으로 상위 N개를 고른다.
-import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore } from './geometry.js';
+import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore, openingZones } from './geometry.js';
 
 // LLM 후보(cm 좌표) → 우리 아이템으로 매핑 + 겹침/방밖 재검증(안전망). 유효한 배치만 반환.
 // LLM 산술은 틀릴 수 있으므로 여기서 반드시 재검사해 겹치는 후보를 폐기한다.
-export function validateCandidates(candidates, room, items) {
+export function validateCandidates(candidates, room, items, openings = []) {
   const W = room.widthM, D = room.depthM, EDGE = 0.09;
+  const zones = openingZones(openings, W, D);
   const out = [];
   for (const c of candidates || []) {
     const list = c.items || [];
@@ -21,6 +22,7 @@ export function validateCandidates(candidates, room, items) {
     if (!complete) continue;                      // 일부 가구 누락 → 폐기
     const nonRug = mapped.filter((it) => it.cat !== '러그');
     if (!validateLayout(nonRug, W, D).ok) continue; // 겹침/방밖 → 폐기(핵심 안전망)
+    if (zones.length && nonRug.some((it) => zones.some((z) => aabbOverlap(itemAABB(it), z)))) continue; // 문/창 앞 막으면 폐기
     const touch = nonRug.filter((it) => {
       const b = itemAABB(it);
       return b.left < EDGE || b.top < EDGE || b.right > W - EDGE || b.bottom > D - EDGE;
@@ -102,7 +104,8 @@ function placeItem(it, placedBoxes, W, D) {
 }
 
 // 한 번의 배치 시도 → 유효하면 {items, wallRatio}, 한 가구라도 못 놓으면 null(폐기).
-function attempt(room, items) {
+// openingBoxes: 문/창 앞 여유존(장애물로 취급해 가구가 그 앞을 막지 않게).
+function attempt(room, items, openingBoxes = []) {
   const W = room.widthM, D = room.depthM;
   const res = items.map((it) => ({ ...it }));
   const roles = new Map(res.map((it) => [it.id, roleOf(it)]));
@@ -111,7 +114,7 @@ function attempt(room, items) {
   const anchors = shuffle(solids.filter((it) => ANCHOR.has(roles.get(it.id))));
   const rest = shuffle(solids.filter((it) => !ANCHOR.has(roles.get(it.id))));
   const order = [...anchors, ...rest];
-  const placedBoxes = [];
+  const placedBoxes = openingBoxes.slice();   // 개구부 존을 미리 장애물로 깔아둠
   let wallCount = 0;
   for (const it of order) {
     const p = placeItem(it, placedBoxes, W, D);
@@ -132,12 +135,14 @@ function dist(a, b) {
 }
 
 // 겹침 없는 서로 다른 배치 후보 최대 count개. 없으면 [].
-export function generateLayouts(room, items, count = 3, tries = 400) {
+// openings: 문/창 배열(있으면 그 앞 여유공간을 비워둠). 없으면 기존과 동일 동작(하위호환).
+export function generateLayouts(room, items, count = 3, tries = 400, openings = []) {
   if (!items.length) return [];
+  const openingBoxes = openingZones(openings, room.widthM, room.depthM);
   const valid = [];
   const seen = new Set();
   for (let t = 0; t < tries && valid.length < 120; t++) {
-    const r = attempt(room, items);
+    const r = attempt(room, items, openingBoxes);
     if (!r) continue;
     const s = sig(r.items);
     if (seen.has(s)) continue;
