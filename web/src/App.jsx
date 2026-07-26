@@ -81,13 +81,13 @@ export default function App() {
   function rotateItem(id) {
     setItems((p) => p.map((it) => (it.id === id ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
   }
-  async function doRender(preset = renderPreset) {
+  async function doRender(preset = renderPreset, view = null) {
     if (!room || renderBusy) return;
     const placeable = items.filter((it) => it.glb);
     if (!placeable.length) { alert('렌더할 3D 가구가 없어요. 가구를 먼저 담아 주세요.'); return; }
     setRenderBusy(true);
     try {
-      const r = await renderScene(room, items, cam3d.current, preset);
+      const r = await renderScene(room, items, cam3d.current, preset, view);
       if (r?.status === 'OK' && r.image) setRenderImg(r.image);
       else if (r?.status === 'CLIENT') alert('렌더 서버(camp-3)가 아직 연결 안 됐어요. ./run.sh 로 터널을 켜 주세요.');
       else alert('렌더 실패: ' + (r?.reason || '알 수 없음'));
@@ -284,13 +284,17 @@ export default function App() {
             <h2>📸 고품질 렌더</h2>
             <p className="mockup-note">지금 배치 그대로 camp-3에서 렌더한 포토리얼 사진이에요.</p>
             <img className="renderimg" src={renderImg} alt="포토리얼 렌더" />
-            <div className="selbar" style={{ justifyContent: 'space-between', marginTop: 10 }}>
+            <div className="selbar" style={{ justifyContent: 'space-between', marginTop: 10, flexWrap: 'wrap', gap: 10 }}>
               <div className="preset-row">
                 {[['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['night', '🌙']].map(([p, ic]) => (
                   <button key={p} className={'btn ghost sm' + (renderPreset === p ? ' on' : '')}
                     disabled={renderBusy}
                     onClick={() => { setRenderPreset(p); doRender(p); }}>{ic}</button>
                 ))}
+                <span className="preset-div" />
+                <button className="btn ghost sm" disabled={renderBusy} title="3D 뷰 각도" onClick={() => doRender(renderPreset)}>🧊 내 시점</button>
+                <button className="btn ghost sm" disabled={renderBusy} title="방 전체 와이드" onClick={() => doRender(renderPreset, 'wide')}>📐 와이드</button>
+                <button className="btn ghost sm" disabled={renderBusy} title="아늑한 클로즈업" onClick={() => doRender(renderPreset, 'cozy')}>🛋️ 아늑</button>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <a className="btn primary" href={renderImg} download="방꾸요정-렌더.png">저장</a>

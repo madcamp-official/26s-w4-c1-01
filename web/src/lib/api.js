@@ -43,7 +43,7 @@ export async function relightImage(dataUrl, strength = 0.3) {
 
 // 포토리얼 렌더 — 현재 3D 배치 → camp-3 Blender 사진. 반환: {status:'OK'|'CLIENT'|'ERROR', image}.
 // glb 있는 아이템만 보낸다(치수·위치는 미터·room 좌표 그대로 → 서버가 blender 좌표로 사용).
-export async function renderScene(room, items, cam3d, preset = 'day') {
+export async function renderScene(room, items, cam3d, preset = 'day', view = null) {
   const W = room.widthM, D = room.depthM;
   const payload = {
     room: { w: W, d: D, h: 2.6 },
@@ -52,8 +52,11 @@ export async function renderScene(room, items, cam3d, preset = 'day') {
       glb: it.glb, x: it.cx, y: it.cy, rot: it.rotationDeg || 0,
     })),
   };
-  // 사용자의 현재 3D 시점을 렌더에 전달. three.js(x, y=up, z) → Blender(x+W/2, D/2−z, y) 손대칭 없는 변환.
-  if (cam3d?.pos && cam3d?.target) {
+  if (view) {
+    // 자동 다각도('wide'|'cozy') — 카메라 대신 서버가 프레이밍을 결정.
+    payload.view = view;
+  } else if (cam3d?.pos && cam3d?.target) {
+    // 사용자의 현재 3D 시점을 렌더에 전달. three.js(x, y=up, z) → Blender(x+W/2, D/2−z, y) 손대칭 없는 변환.
     payload.camera = {
       pos: [cam3d.pos[0] + W / 2, D / 2 - cam3d.pos[2], cam3d.pos[1]],
       target: [cam3d.target[0] + W / 2, D / 2 - cam3d.target[2], cam3d.target[1]],
