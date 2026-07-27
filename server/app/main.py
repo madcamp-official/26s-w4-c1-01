@@ -247,6 +247,9 @@ class RenderReq(BaseModel):
     items: list = []
     camera: Optional[dict] = None
     samples: Optional[int] = None
+    preset: Optional[str] = "day"   # 시간대 조명(morning/day/sunset/night) — 선언 안 하면 Pydantic이 버려 항상 day로 렌더되던 회귀 버그
+    openings: list = []             # 문/창 위치 — 같은 이유로 버려져 렌더에 안 그려지던 것
+    view: Optional[str] = None      # 카메라 앵글(wide/cozy) — 없으면 camera/기본 프레이밍
 
 
 @app.post("/api/render")
