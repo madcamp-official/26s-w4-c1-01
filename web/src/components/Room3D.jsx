@@ -70,7 +70,7 @@ function Piece({ item, W, D, selected, flagged, onSelect, onDragStart }) {
 // 개구부 3D — 2D 평면의 문/창을 3D 미리보기 벽에 표시. 2D(x∈[0,W],y∈[0,D]) → 월드(x−W/2, z=y−D/2).
 // top→뒤벽(z=−D/2) · bottom→앞(z=D/2) · left→좌벽(x=−W/2) · right→우(x=W/2). along='x'(상/하벽) or 'z'(좌/우벽).
 function Window3D({ cx, cz, w, along }) {
-  const h = 1.2, yc = 1.3, fr = 0.04;
+  const h = 1.0, yc = 1.7, fr = 0.04;   // sill 1.2m — 침대 헤드보드 위로(가림 방지)
   return (
     <group position={[cx, 0, cz]} rotation={[0, along === 'z' ? Math.PI / 2 : 0, 0]}>
       <mesh position={[0, yc, 0]}>

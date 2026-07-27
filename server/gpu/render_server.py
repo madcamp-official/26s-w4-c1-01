@@ -70,7 +70,7 @@ def build_scene(p):
         if o.get("kind") == "door":
             openings.append({"kind": "door", "wall": rw, "pos": pos, "width": width})
         else:
-            openings.append({"kind": "window", "wall": rw, "pos": pos, "width": width, "h": 1.4, "z": 1.25})
+            openings.append({"kind": "window", "wall": rw, "pos": pos, "width": width, "h": 1.0, "z": 1.7})
     out = {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI,
            "preset": p.get("preset", "day"),           # 시간대 조명 프리셋(blender가 노출·창색·태양광 결정)
            "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1600)), "ry": int(p.get("ry", 900)),

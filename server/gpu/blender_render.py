@@ -287,9 +287,9 @@ if _openings:
         if o.get("kind") == "door":
             build_door(wl, c, o.get("width", 0.9))
         else:
-            build_window(wl, c, o.get("width", 1.4), o.get("h", 1.4), o.get("z", 1.25))
+            build_window(wl, c, o.get("width", 1.4), o.get("h", 1.0), o.get("z", 1.7))
 elif "far" not in hide:
-    build_window("far", W / 2, min(2.2, W * 0.6), 1.4, 1.25)  # 기본: far 벽 중앙 창(기존 동작)
+    build_window("far", W / 2, min(2.2, W * 0.6), 1.0, 1.7)  # 기본: far 벽 중앙 창(sill 1.2m — 침대 위)
 
 # ---------- 러그(옵션) : 중앙 바닥에 부드러운 패브릭 ----------
 rug = S.get("rug")
