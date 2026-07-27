@@ -57,6 +57,48 @@ export function deskChairComposed(chair, desk) {
   const perp = Math.abs(dx * fd[1] - dy * fd[0]);                 // 앞면과 수직 오프셋(정렬도)
   return perp <= Math.max(desk.wM || 0, chair.wM || 0) / 2 + 0.05; // 중심축 정렬
 }
+// ── 앞면 여유공간(front clearance) hard 정책 ──
+// 기능적 '앞면'이 있는 가구는 그 앞이 비어 있어야 쓸 수 있다(서랍 열기·착석·수납 접근).
+export const FRONT_NEED = { '수납': 0.55, '책상': 0.5, '소파': 0.5, '테이블': 0.35 };
+
+// it 앞면의 빈 깊이(m): 앞 방향으로 벽 또는 (앞면 폭과 겹치는) 가장 가까운 장애물까지의 거리.
+// obstacles: AABB 배열(러그 제외). 아이템 몸통과 이미 겹친 것(구도 틈입 의자 등)은 세지 않는다.
+export function frontClearance(it, obstacles, roomWM, roomDM) {
+  const f = FRONT_DIR[snap4(it.rotationDeg)];
+  const b = itemAABB(it);
+  let free;
+  if (f[1] === 1) free = roomDM - b.bottom;
+  else if (f[1] === -1) free = b.top;
+  else if (f[0] === 1) free = roomWM - b.right;
+  else free = b.left;
+  for (const o of obstacles) {
+    if (f[1] !== 0) {
+      if (o.right <= b.left + EPS || o.left >= b.right - EPS) continue;   // 앞면 폭과 안 겹침
+      if (f[1] === 1 && o.top >= b.bottom - EPS) free = Math.min(free, o.top - b.bottom);
+      if (f[1] === -1 && o.bottom <= b.top + EPS) free = Math.min(free, b.top - o.bottom);
+    } else {
+      if (o.bottom <= b.top + EPS || o.top >= b.bottom - EPS) continue;
+      if (f[0] === 1 && o.left >= b.right - EPS) free = Math.min(free, o.left - b.right);
+      if (f[0] === -1 && o.right <= b.left + EPS) free = Math.min(free, b.left - o.right);
+    }
+  }
+  return Math.max(0, free);
+}
+
+// 배치 전체에서 앞면 여유 위반 개수. 책상의 짝 의자(구도)는 책상 앞을 막은 것으로 치지 않는다.
+export function frontViolations(items, roomWM, roomDM) {
+  const solids = items.filter((i) => i.cat !== '러그');
+  let v = 0;
+  for (const it of solids) {
+    const need = FRONT_NEED[it.cat];
+    if (!need) continue;
+    const others = solids.filter((o) => o !== it
+      && !((it.cat === '책상' || it.cat === '테이블') && o.cat === '의자' && deskChairComposed(o, it)));
+    if (frontClearance(it, others.map(itemAABB), roomWM, roomDM) + EPS < need) v++;
+  }
+  return v;
+}
+
 // 두 가구 겹침이 허용되는가: 러그(바닥 레이어) 또는 자연스러운 의자-책상 구도만.
 export function pairOverlapOK(a, b) {
   if (!a || !b) return false;

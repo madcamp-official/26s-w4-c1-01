@@ -2,7 +2,7 @@
 // 원칙: 배치할 때마다 겹침/방밖을 검증해 "유효한 자리"에만 놓는다. 한 가구라도 못 놓으면 그 배치는 폐기.
 // 가중치: 대부분의 가구는 벽에 밀착(벽 자리를 먼저 시도). 러그는 바닥 레이어(중앙, 충돌 제외).
 // 랜덤 변주로 서로 다른 유효 배치 여러 개를 만들고, 벽밀착률 높은 순 + 다양성으로 상위 N개를 고른다.
-import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore, openingBlocksAABB, pairOverlapOK, EPS } from './geometry.js';
+import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore, openingBlocksAABB, pairOverlapOK, frontClearance, frontViolations, FRONT_NEED, EPS } from './geometry.js';
 
 // LLM 후보(cm 좌표) → 우리 아이템으로 매핑 + 겹침/방밖 재검증(안전망). 유효한 배치만 반환.
 // LLM 산술은 틀릴 수 있으므로 여기서 반드시 재검사해 겹치는 후보를 폐기한다.
@@ -20,6 +20,9 @@ export function validateCandidates(candidates, room, items, openings = []) {
     // LLM 산술 오류(겹침/방밖/개구부 침범)·누락을 '기각' 대신 '보정' — 위반/누락 가구만 유효 자리로 배치.
     const rep = repairCandidate(mapped, room, openings);
     if (!rep) continue;                           // 보정 불가(자리 없음) → 폐기 → 로컬 폴백이 채움
+    // 품질 게이트: 보정 후에도 수납/책상/소파 앞면이 막힌 배치는 '유효하지만 나쁜' 배치 → 폐기.
+    // (LLM 후보를 무조건 살리다 배치 품질이 떨어지는 문제 방지 — 미달이면 로컬 엔진이 채움)
+    if (frontViolations(rep.items, W, D) > 0) continue;
     const nonRug = rep.items.filter((it) => it.cat !== '러그');
     const touch = nonRug.filter((it) => {
       const b = itemAABB(it);
@@ -45,10 +48,16 @@ function repairCandidate(items, room, openings = []) {
   const placed = [];   // {box, it} — 의자-책상 구도 겹침 허용 위해 아이템도 보관
   const overlapsOther = (b, it) => placed.some((p) => aabbOverlap(b, p.box) && !pairOverlapOK(it, p.it));
   let moved = 0;
+  const frontOK = (it) => {
+    const need = FRONT_NEED[it.cat];
+    if (!need) return true;
+    const obs = placed.filter((p) => !pairOverlapOK(it, p.it)).map((p) => p.box);
+    return frontClearance(it, obs, W, D) >= need;
+  };
   for (const it of order) {
     if (!it._place) {                                // Gemini 위치가 있으면 유효한지 확인 후 유지
       const b = boxAt(it, it.cx, it.cy, it.rotationDeg);
-      if (inRoom(b, W, D) && !overlapsOther(b, it)
+      if (inRoom(b, W, D) && !overlapsOther(b, it) && frontOK(it)
           && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))) { placed.push({ box: b, it }); continue; }
     }
     // 누락(_place)이거나 Gemini 위치가 무효 → 원위치(누락은 방 중앙) 근처 유효 자리로 스냅.
@@ -61,15 +70,19 @@ function repairCandidate(items, room, openings = []) {
   return { items: res, moved };
 }
 // 원위치(ox,oy)에 가장 가까운 유효 자리(벽 우선 → 내부). placed=[{box,it}]. 없으면 null.
+// FRONT_NEED 가구는 앞면 여유가 확보되는 자리만(구도 짝꿍은 장애물로 안 침).
 function placeItemNear(it, ox, oy, placed, W, D, openings) {
-  const free = (b) => inRoom(b, W, D)
+  const need = FRONT_NEED[it.cat] || 0;
+  const free = (b, c) => inRoom(b, W, D)
     && !placed.some((p) => aabbOverlap(b, p.box) && !pairOverlapOK(it, p.it))
-    && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM));
+    && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))
+    && (!need || frontClearance({ ...it, cx: c.cx, cy: c.cy, rotationDeg: c.rot },
+      placed.filter((p) => !pairOverlapOK(it, p.it)).map((p) => p.box), W, D) >= need);
   const cands = [...wallCandidates(it, W, D), ...interiorCandidates(it, W, D)]
     .sort((a, b) => Math.hypot(a.cx - ox, a.cy - oy) - Math.hypot(b.cx - ox, b.cy - oy));
   for (const c of cands) {
     const b = boxAt(it, c.cx, c.cy, c.rot);
-    if (free(b)) return { ...c, box: b };
+    if (free(b, c)) return { ...c, box: b };
   }
   return null;
 }
@@ -142,15 +155,20 @@ function interiorCandidates(it, W, D) {
   return out;
 }
 // 겹치지 않고 개구부(문 스윙/창)도 안 가리는 첫 자리(벽 먼저, 없으면 내부). 없으면 null.
-function placeItem(it, placedBoxes, W, D, openings) {
-  const free = (b) => placedBoxes.every((pb) => !aabbOverlap(b, pb)) && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM));
+// FRONT_NEED 가구(수납/책상/소파 등)는 앞면 여유공간까지 확보되는 자리만 허용(hard).
+// relax(0~1): 좁은 방 폴백 — 여유 요구를 비율로 완화(1=전체, 0=검사 안 함).
+function placeItem(it, placedBoxes, W, D, openings, relax = 1) {
+  const need = (FRONT_NEED[it.cat] || 0) * relax;
+  const free = (b, c) => placedBoxes.every((pb) => !aabbOverlap(b, pb))
+    && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))
+    && (!need || frontClearance({ ...it, cx: c.cx, cy: c.cy, rotationDeg: c.rot }, placedBoxes, W, D) >= need);
   for (const c of shuffle(wallCandidates(it, W, D))) {
     const b = boxAt(it, c.cx, c.cy, c.rot);
-    if (free(b)) return { ...c, box: b, onWall: true };
+    if (free(b, c)) return { ...c, box: b, onWall: true };
   }
   for (const c of shuffle(interiorCandidates(it, W, D))) {
     const b = boxAt(it, c.cx, c.cy, c.rot);
-    if (free(b)) return { ...c, box: b, onWall: false };
+    if (free(b, c)) return { ...c, box: b, onWall: false };
   }
   return null;
 }
@@ -188,7 +206,9 @@ function placeDeskChair(desk, chair, placed, W, D, openings) {
       if (!chair) { desk.cx = c.cx; desk.cy = c.cy; desk.rotationDeg = c.rot; placed.push(deskBox); return { wall, chair: false }; }
       const crot = (c.rot + 180) % 360;                 // 의자 앞면이 책상 향함
       const f = FRONT_VEC[c.rot];                        // 책상 앞면 방향
-      const off = Math.max(0.05, desk.dM / 2 + chair.dM / 2 - 0.25);  // 의자를 책상 밑으로 ~25cm 틈입(자연스러운 구도)
+      // 틈입 깊이는 의자 크기에 적응: 얇은 데스크체어(≤62cm)만 ~25cm 틈입, 암체어 등 깊은 의자는 3cm 간격.
+      const gap = chair.dM <= 0.62 ? -0.25 : 0.03;
+      const off = Math.max(0.05, desk.dM / 2 + chair.dM / 2 + gap);
       const chx = c.cx + f[0] * off, chy = c.cy + f[1] * off;
       const chairBox = boxAt(chair, chx, chy, crot);
       // 의자는 '다른' 가구·개구부와만 안 겹치면 OK — 책상과의 겹침(틈입)은 허용.
@@ -221,7 +241,7 @@ function placeLampAtBedHead(lamp, bed, bedWall, placed, W, D, openings) {
 
 // 한 번의 배치 시도 → 유효하면 {items, wallRatio, rel}, 한 가구라도 못 놓으면 null(폐기).
 // 필수 관계 R1(TV↔침대)·R2(의자↔책상 세트)·R3(조명↔침대헤드)를 우선 배치하고, 나머지는 벽/내부에.
-function attempt(room, items, openings = []) {
+function attempt(room, items, openings = [], relax = 1) {
   const W = room.widthM, D = room.depthM;
   const res = items.map((it) => ({ ...it }));
   const roles = new Map(res.map((it) => [it.id, roleOf(it)]));
@@ -260,7 +280,7 @@ function attempt(room, items, openings = []) {
   const anchors = shuffle(remaining.filter((it) => ANCHOR.has(roles.get(it.id))));
   const rest = shuffle(remaining.filter((it) => !ANCHOR.has(roles.get(it.id))));
   for (const it of [...anchors, ...rest]) {
-    const p = placeItem(it, placed, W, D, openings);
+    const p = placeItem(it, placed, W, D, openings, relax);
     if (!p) return null;
     it.cx = p.cx; it.cy = p.cy; it.rotationDeg = p.rot; placed.push(p.box);
   }
@@ -284,12 +304,17 @@ export function generateLayouts(room, items, count = 3, tries = 400, openings = 
   if (!items.length) return [];
   const valid = [];
   const seen = new Set();
-  for (let t = 0; t < tries && valid.length < 120; t++) {
-    const r = attempt(room, items, openings);
-    if (!r) continue;
-    const s = sig(r.items);
-    if (seen.has(s)) continue;
-    seen.add(s); valid.push(r);
+  // 앞면 여유(hard)를 지키며 시도 → 좁은 방이라 하나도 안 나오면 단계적으로 완화(1 → 0.5 → 0).
+  // 완화는 '배치 불가'보다 낫다는 폴백일 뿐, 여유를 지킨 후보가 있으면 그것만 쓴다.
+  for (const relax of [1, 0.5, 0]) {
+    for (let t = 0; t < tries && valid.length < 120; t++) {
+      const r = attempt(room, items, openings, relax);
+      if (!r) continue;
+      const s = sig(r.items);
+      if (seen.has(s)) continue;
+      seen.add(s); valid.push(r);
+    }
+    if (valid.length) break;
   }
   if (!valid.length) return [];
   // 종합 점수 랭킹 — 필수 관계(R1~R3) 만족을 최우선, 그다음 벽밀착·동선.
@@ -297,16 +322,20 @@ export function generateLayouts(room, items, count = 3, tries = 400, openings = 
   for (const v of valid) {
     const solids = v.items.filter((it) => roleOf(it) !== 'rug');
     v.circulation = circulationScore(solids, W, D).connected;
+    v.fv = frontViolations(v.items, W, D);                                     // 앞면 여유 위반(수납/책상/소파)
     const rc = (v.rel.r1 ? 1 : 0) + (v.rel.r2 ? 1 : 0) + (v.rel.r3 ? 1 : 0);   // 만족한 관계 수
-    v.score = 10 * rc + 0.6 * v.wallRatio + 0.4 * v.circulation;               // 관계 만족을 크게 가중
+    v.score = 10 * rc + 0.6 * v.wallRatio + 0.4 * v.circulation - 4 * v.fv;    // 관계 최우선, 앞면 막힘 강한 감점
   }
-  valid.sort((a, b) => b.score - a.score);
-  const picked = [valid[0]];
-  for (const cand of valid) {
+  // 앞면 위반 0인 후보가 하나라도 있으면 위반 배치는 아예 제외(hard 정책).
+  const clean = valid.filter((v) => v.fv === 0);
+  const pool = clean.length ? clean : valid;
+  pool.sort((a, b) => b.score - a.score);
+  const picked = [pool[0]];
+  for (const cand of pool) {
     if (picked.length >= count) break;
     if (picked.includes(cand)) continue;
     if (picked.every((p) => dist(p.items, cand.items) > 0.5)) picked.push(cand);
   }
-  for (const cand of valid) { if (picked.length >= count) break; if (!picked.includes(cand)) picked.push(cand); }
+  for (const cand of pool) { if (picked.length >= count) break; if (!picked.includes(cand)) picked.push(cand); }
   return picked.slice(0, count).map((p) => ({ items: p.items, wallRatio: p.wallRatio, circulation: p.circulation }));
 }

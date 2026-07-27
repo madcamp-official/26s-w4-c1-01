@@ -2,7 +2,7 @@
 // 핵심: generateLayouts가 내놓는 모든 후보는 '겹침 0 + 방밖 0'이어야 한다(사용자 요구: 겹치면 기각).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB, WINDOW_SILL_M, pairOverlapOK, deskChairComposed } from './geometry.js';
+import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB, WINDOW_SILL_M, pairOverlapOK, deskChairComposed, frontClearance, frontViolations } from './geometry.js';
 import { generateLayouts, validateCandidates } from './autolayout.js';
 
 // 결정론적 PRNG(가구셋 생성용) — 레이아웃 내부 랜덤과 무관하게 '입력'만 재현 가능하게.
@@ -276,4 +276,69 @@ test('validateCandidates: 책상 밑 틈입한 Gemini 의자는 보정에서 유
   // 보정이 의자를 끌어내지 않고 틈입 위치 그대로 유지(구도 겹침 허용)
   assert.ok(deskChairComposed(c, d), '보정 후에도 구도 유지');
   assert.ok(Math.abs(c.cx - 1.5) < 1e-6 && Math.abs(c.cy - 0.88) < 1e-6, '의자 원위치 유지');
+});
+
+test('frontClearance: 앞면 빈 깊이 계산(벽·장애물)', () => {
+  // 서랍장(수납)이 rot 270(앞면 +x)으로 좌벽에: 앞이 완전히 비면 W - right
+  const dresser = { cat: '수납', wM: 1.0, dM: 0.5, hM: 1.8, cx: 0.25, cy: 2.0, rotationDeg: 270 };
+  assert.ok(Math.abs(frontClearance(dresser, [], 3.0, 4.0) - 2.5) < 1e-6, '빈 방이면 벽까지');
+  // 앞 30cm에 침대 옆구리 → 여유 0.3
+  const bed = { cat: '침대', wM: 1.5, dM: 2.0, hM: 0.4, cx: 1.55, cy: 2.0, rotationDeg: 0 };
+  const clr = frontClearance(dresser, [itemAABB(bed)], 3.0, 4.0);
+  assert.ok(Math.abs(clr - 0.3) < 0.02, `침대가 앞 30cm를 막음 (got ${clr.toFixed(2)})`);
+});
+
+test('frontViolations: 수납 앞 막힘=위반, 책상 짝 의자는 예외', () => {
+  const dresser = { cat: '수납', wM: 1.0, dM: 0.5, hM: 1.8, cx: 0.25, cy: 2.0, rotationDeg: 270 };
+  const bed = { cat: '침대', wM: 1.5, dM: 2.0, hM: 0.4, cx: 1.55, cy: 2.0, rotationDeg: 0 };
+  assert.equal(frontViolations([dresser, bed], 3.0, 4.0), 1, '수납 앞 30cm 침대 → 위반 1');
+  // 책상 앞의 구도 의자는 위반 아님
+  const desk = { cat: '책상', wM: 1.2, dM: 0.6, hM: 0.75, cx: 1.5, cy: 0.35, rotationDeg: 0 };
+  const chair = { cat: '의자', wM: 0.5, dM: 0.5, hM: 0.9, cx: 1.5, cy: 0.85, rotationDeg: 180 };
+  assert.equal(frontViolations([desk, chair], 3.0, 4.0), 0, '짝 의자는 책상 앞 침범으로 안 침');
+});
+
+test('generateLayouts: 수납/책상 앞면 여유 확보(위반 0 후보만)', () => {
+  const room = { widthM: 3.2, depthM: 4.4 };
+  const items = [
+    { id: 'bed', cat: '침대', name: '퀸 침대', wM: 1.6, dM: 2.0, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'wr', cat: '수납', name: '옷장', wM: 1.0, dM: 0.6, hM: 1.8, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'desk', cat: '책상', name: '책상', wM: 1.2, dM: 0.6, hM: 0.75, cx: 0, cy: 0, rotationDeg: 0 },
+  ];
+  const cands = generateLayouts(room, items, 3, 600);
+  assert.ok(cands.length >= 1, '후보 생성됨');
+  for (const c of cands) assert.equal(frontViolations(c.items, room.widthM, room.depthM), 0, '모든 후보 앞면 위반 0');
+});
+
+test('R2 적응 틈입: 얇은 의자만 틈입, 깊은 암체어는 간격 배치', () => {
+  const room = { widthM: 3.4, depthM: 4.0 };
+  // 암체어(깊이 87cm) — 틈입 금지: 책상과 겹치지 않아야
+  const arm = [mk('desk', '책상', 1.2, 0.6), mk('chair', '의자', 0.84, 0.87)];
+  const c1 = generateLayouts(room, arm, 1, 600)[0];
+  assert.ok(c1, '암체어 세트 배치됨');
+  const d1 = c1.items.find((x) => x.id === 'desk'), ch1 = c1.items.find((x) => x.id === 'chair');
+  assert.ok(!aabbOverlap(itemAABB(d1), itemAABB(ch1)), '암체어는 책상과 겹치지 않음');
+  assert.ok(facing(d1.rotationDeg, ch1.rotationDeg), '그래도 마주봄 유지');
+  // 얇은 데스크체어(깊이 55cm) — 틈입 허용(겹침이 구도로 인정)
+  const slim = [mk('desk', '책상', 1.2, 0.6), mk('chair', '의자', 0.55, 0.55)];
+  const c2 = generateLayouts(room, slim, 1, 600)[0];
+  const d2 = c2.items.find((x) => x.id === 'desk'), ch2 = c2.items.find((x) => x.id === 'chair');
+  assert.ok(aabbOverlap(itemAABB(d2), itemAABB(ch2)), '얇은 의자는 틈입(겹침)');
+  assert.ok(deskChairComposed(ch2, d2), '틈입은 구도로 성립');
+});
+
+test('validateCandidates: 앞면 막힌 Gemini 후보는 품질 게이트로 폐기', () => {
+  const room = { widthM: 3.0, depthM: 4.0 };
+  const items = [
+    { id: 'bed', cat: '침대', name: '침대', wM: 1.5, dM: 2.0, hM: 0.4, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'wr', cat: '수납', name: '옷장', wM: 1.0, dM: 0.5, hM: 1.8, cx: 0, cy: 0, rotationDeg: 0 },
+  ];
+  // 옷장(rot 270, 앞면 +x)이 좌벽, 침대가 바로 앞 30cm — 겹침은 없지만 서랍 못 여는 나쁜 배치
+  const bad = [{ strategy: 'x', items: [
+    { id: 'wr', cx: 25, cy: 200, rotation: 270 },
+    { id: 'bed', cx: 155, cy: 200, rotation: 0 },
+  ] }];
+  const out = validateCandidates(bad, room, items);
+  // 게이트: 그대로 채택되면 안 됨 — 폐기되거나, 보정으로 위반이 해소돼야 함
+  for (const c of out) assert.equal(frontViolations(c.items, 3.0, 4.0), 0, '채택 후보는 앞면 위반 0');
 });
