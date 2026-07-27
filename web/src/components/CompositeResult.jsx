@@ -1,0 +1,63 @@
+// 합성 결과 — camp-3 포토리얼 렌더를 After로, 업로드한 빈 방 사진을 Before로.
+// 렌더 서버 미연동/실패 시 빗금 플레이스홀더로 폴백(과잉약속 금지, 흐름 유지).
+const TIMES = [['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['night', '🌙']];
+
+export default function CompositeResult({
+  renderImg, renderBusy, showBefore, onToggle, photo, estimate,
+  timePreset, onTime, onBack, onRerender, onFindSimilar,
+}) {
+  if (renderBusy && !renderImg) {
+    return (
+      <div className="vscreen loading">
+        <div className="spinner" />
+        <div className="msg">방을 예쁘게 채우는 중이야 🧚</div>
+      </div>
+    );
+  }
+
+  const showingBefore = showBefore && photo;
+  return (
+    <div className="vscreen result">
+      <div className="canvas">
+        {showingBefore ? (
+          <img src={photo} alt="빈 방 (Before)" />
+        ) : renderImg ? (
+          <img src={renderImg} alt="완성된 배치 (After)" />
+        ) : (
+          <div className="hatch-after">완성된 배치 이미지 (After)</div>
+        )}
+      </div>
+
+      <div className="topbar">
+        <button className="rt-circle" onClick={onBack}>←</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {renderImg && photo && (
+            <button className="rt-pill" onClick={onToggle}>{showBefore ? 'After 보기' : 'Before/After'}</button>
+          )}
+          {TIMES.map(([p, ic]) => (
+            <button key={p} className="rt-circle" style={{ opacity: timePreset === p ? 1 : 0.55, fontSize: 15 }}
+              title={p} onClick={() => onTime(p)}>{ic}</button>
+          ))}
+        </div>
+      </div>
+
+      {!showingBefore && renderImg && (
+        <div className="mockup-badge">🪄 목업이야 · 실제 조명·재질은 조금 다를 수 있어</div>
+      )}
+      {!renderImg && (
+        <div className="mockup-badge" style={{ background: 'rgba(0,0,0,.5)' }}>렌더 서버 연결 시 실제 사진이 나와요</div>
+      )}
+
+      <div className="result-sheet">
+        <div className="estimate">
+          <span className="k">예상 견적 💰</span>
+          <span className="v">{estimate > 0 ? `${estimate.toLocaleString()}원` : '가격 정보 없음'}</span>
+        </div>
+        <div className="acts">
+          <button className="sheet-btn sub" onClick={onRerender}>다시 배치</button>
+          <button className="sheet-btn main" onClick={onFindSimilar}>닮은 상품 찾기</button>
+        </div>
+      </div>
+    </div>
+  );
+}

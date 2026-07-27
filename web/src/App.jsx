@@ -1,67 +1,63 @@
 import { useMemo, useState, useRef } from 'react';
-import RoomForm from './components/RoomForm.jsx';
-import RoomPresets from './components/RoomPresets.jsx';
-import { roomFromMeasured } from './lib/roomEstimate.js';
-import CatalogPanel from './components/CatalogPanel.jsx';
-import Planner from './components/Planner.jsx';
-import Room3D from './components/Room3D.jsx';
-import LayoutPicker from './components/LayoutPicker.jsx';
-import OpeningsBar from './components/OpeningsBar.jsx';
-import LayoutChat from './components/LayoutChat.jsx';
 import { toPlacedItem, resolveDims } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
 import { fetchDims, layoutFurniture, renderScene } from './lib/api.js';
 
-const TABS = [
-  { id: 'room', label: '방', icon: '🏠' },
-  { id: 'plan', label: '배치', icon: '📐' },
-  { id: 'shop', label: '가구', icon: '🛋️' },
-  { id: 'preview', label: '3D 미리보기', icon: '🧊' },
-];
+import TabBar from './components/TabBar.jsx';
+import Splash from './components/Splash.jsx';
+import Login from './components/Login.jsx';
+import Onboarding from './components/Onboarding.jsx';
+import HomeTab from './components/HomeTab.jsx';
+import RoomInput from './components/RoomInput.jsx';
+import PlannerScreen from './components/PlannerScreen.jsx';
+import CompositeResult from './components/CompositeResult.jsx';
+import MarketTab from './components/MarketTab.jsx';
+import MyTab from './components/MyTab.jsx';
+import LayoutPicker from './components/LayoutPicker.jsx';
 
 // 자동 배치: Gemini 유효 후보가 LAYOUT_TARGET개 모일 때까지 재시도(최대 LAYOUT_MAX_TRIES회).
-// 현재는 목표 1개(추후 3개로 올리면 3개 다 Gemini로).
 const LAYOUT_TARGET = 1;
 const LAYOUT_MAX_TRIES = 20;
 const layoutSig = (c) => c.items.map((i) => `${Math.round(i.cx * 100)},${Math.round(i.cy * 100)},${i.rotationDeg}`).join('|');
-
-const accLabel = (a) => (a === 'MEASURED' ? '(실측)' : a === 'MEASURED_PARTIAL' ? '(한 변 실측)' : '(추정)');
+const TAB_SCREENS = ['home', 'market', 'mypage'];
 
 export default function App() {
+  const [screen, setScreen] = useState('splash');
+  const [taste, setTaste] = useState(null);           // {moods, budget, pet}
+  const [tasteDone, setTasteDone] = useState(false);
+  const [visitedMarket, setVisitedMarket] = useState(false);
+  const [roomsDone, setRoomsDone] = useState(0);
+  const [roomCounted, setRoomCounted] = useState(false);   // 현재 방을 '완성한 방'에 이미 셌는지(재배치 중복 방지)
+
   const [room, setRoom] = useState(null);
+  const [openings, setOpenings] = useState([]);
+  const [roomPhoto, setRoomPhoto] = useState(null);
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [roomPhoto, setRoomPhoto] = useState(null);
-  const [tab, setTab] = useState('room');
-  const [dimBusy, setDimBusy] = useState(false);
+
   const [layoutOpts, setLayoutOpts] = useState(null);
   const [layoutBusy, setLayoutBusy] = useState(false);
-  const [renderBusy, setRenderBusy] = useState(false);
+  const [dimBusy, setDimBusy] = useState(false);
+
   const [renderImg, setRenderImg] = useState(null);
-  const [renderPreset, setRenderPreset] = useState('day');   // 시간대 조명
-  const [openings, setOpenings] = useState([]);              // 문/창 (문=90° 스윙 접근불가, 창=가림 금지)
-  const cam3d = useRef(null);   // Room3D의 현재 카메라(위치+타깃) — 렌더가 같은 시점으로
+  const [renderBusy, setRenderBusy] = useState(false);
+  const [renderPreset, setRenderPreset] = useState('day');
+  const [showBefore, setShowBefore] = useState(false);
+
+  const [marketRecommend, setMarketRecommend] = useState(null);
+  const cam3d = useRef(null);
 
   const val = useMemo(
     () => (room ? validateLayout(items, room.widthM, room.depthM, openings) : { flags: [], ok: true, freeRatio: 0 }),
     [items, room, openings]
   );
   const sel = items.find((it) => it.id === selectedId);
-  const solid = items.filter((it) => ['정형', '사용자입력'].includes(it.dimAccuracy) || String(it.dimAccuracy).startsWith('추정(상세')).length;
+  const estimate = useMemo(() => items.reduce((s, it) => s + (typeof it.price === 'number' && it.price > 0 ? it.price : 0), 0), [items]);
 
-  function onRoomDone(r) {
-    setRoom(r);
-    setTab('plan');
-  }
-  // 데모 방 프리셋 선택 → 방 + 문/창 즉시 세팅 후 배치 탭으로.
-  function onPresetPick(p) {
-    setRoom(roomFromMeasured({ widthM: p.widthM, depthM: p.depthM }));
-    setOpenings(p.openings.map((o, i) => ({ id: `op-preset-${i}-${Math.round(Math.random() * 1e4)}`, ...o })));
-    setItems([]);
-    setTab('plan');
-  }
+  // ── 가구/배치 조작(기존 오케스트레이션 보존) ──
   function addFurniture(cat) {
+    if (!room) return;
     const d = resolveDims(cat);
     const probe = { wM: d.w / 100, dM: d.d / 100, rotationDeg: 0 };
     const spot = findFreeSpot(probe, items, room.widthM, room.depthM) || { cx: room.widthM / 2, cy: room.depthM / 2 };
@@ -69,63 +65,10 @@ export default function App() {
     setItems((p) => [...p, it]);
     setSelectedId(it.id);
   }
-  function rotateSel() {
-    setItems((p) => p.map((it) => (it.id === selectedId ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
-  }
-  function moveItem(id, cx, cy) {
-    setItems((p) => p.map((it) => (it.id === id ? { ...it, cx, cy } : it)));
-  }
-  async function openAutoLayout() {
-    if (!room || !items.length || layoutBusy) return;
-    setLayoutBusy(true);
-    try {
-      const seen = new Set();
-      let opts = [];
-      // 1) Gemini 후보 → 기하엔진 재검증(겹침/문·창 위반 폐기). 유효 후보 LAYOUT_TARGET개 모일 때까지 재시도.
-      for (let t = 0; t < LAYOUT_MAX_TRIES && opts.length < LAYOUT_TARGET; t++) {
-        const r = await layoutFurniture(room, items, openings);
-        if (r?.status === 'OK' && Array.isArray(r.candidates)) {
-          for (const c of validateCandidates(r.candidates, room, items, openings)) {
-            const s = layoutSig(c);
-            if (!seen.has(s)) { seen.add(s); opts.push(c); }   // 서로 다른 유효 후보만 누적
-          }
-        } else if (r?.status === 'NOKEY' || r?.status === 'CLIENT') {
-          break;   // 키/서버 미연동이면 재시도 무의미 → 로컬로
-        }
-        // OK인데 유효 0개거나 일시적 ERROR면 계속 재시도(최대 LAYOUT_MAX_TRIES)
-      }
-      // 2) 3개 미만이면 로컬 규칙 배치로 채움(로컬도 R1~R3·문/창 회피 준수). 항상 3개 보장.
-      if (opts.length < 3) opts = [...opts, ...generateLayouts(room, items, 3 - opts.length, 400, openings)];
-      if (!opts.length) {
-        alert('가구가 많아 겹치지 않게 배치할 공간이 부족해요. 방을 키우거나 가구를 줄여 주세요.');
-        return;
-      }
-      setLayoutOpts(opts);
-    } finally {
-      setLayoutBusy(false);
-    }
-  }
-  function rotateItem(id) {
-    setItems((p) => p.map((it) => (it.id === id ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it)));
-  }
-  async function doRender(preset = renderPreset, view = null) {
-    if (!room || renderBusy) return;
-    const placeable = items.filter((it) => it.glb);
-    if (!placeable.length) { alert('렌더할 3D 가구가 없어요. 가구를 먼저 담아 주세요.'); return; }
-    setRenderBusy(true);
-    try {
-      const r = await renderScene(room, items, cam3d.current, preset, view, openings);
-      if (r?.status === 'OK' && r.image) setRenderImg(r.image);
-      else if (r?.status === 'CLIENT') alert('렌더 서버(camp-3)가 아직 연결 안 됐어요. ./run.sh 로 터널을 켜 주세요.');
-      else alert('렌더 실패: ' + (r?.reason || '알 수 없음'));
-    } finally {
-      setRenderBusy(false);
-    }
-  }
-  function deleteSel() {
-    setItems((p) => p.filter((it) => it.id !== selectedId));
-    setSelectedId(null);
-  }
+  function moveItem(id, cx, cy) { setItems((p) => p.map((it) => (it.id === id ? { ...it, cx, cy } : it))); }
+  function rotateItem(id) { setItems((p) => p.map((it) => (it.id === id ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it))); }
+  function rotateSel() { if (selectedId) rotateItem(selectedId); }
+  function deleteSel() { setItems((p) => p.filter((it) => it.id !== selectedId)); setSelectedId(null); }
   function setSelDim(field, cm) {
     const m = Math.max(Number(cm) || 0, 1) / 100;
     setItems((p) => p.map((it) => (it.id === selectedId ? { ...it, [field]: m, dimAccuracy: '사용자입력' } : it)));
@@ -137,171 +80,124 @@ export default function App() {
       const d = await fetchDims(sel.buyUrl);
       if (d && d.w && d.d) {
         setItems((p) => p.map((it) => (it.id === selectedId
-          ? { ...it, wM: d.w / 100, dM: d.d / 100, hM: (d.h || it.hM * 100) / 100, dimAccuracy: d.accuracy || '추정(상세)' }
-          : it)));
-      } else {
-        alert('상세페이지에서 치수를 찾지 못했어요. 직접 입력해 주세요.');
+          ? { ...it, wM: d.w / 100, dM: d.d / 100, hM: (d.h || it.hM * 100) / 100, dimAccuracy: d.accuracy || '추정(상세)' } : it)));
+      } else alert('상세페이지에서 치수를 찾지 못했어요. 직접 입력해 주세요.');
+    } finally { setDimBusy(false); }
+  }
+  async function openAutoLayout() {
+    if (!room || !items.length || layoutBusy) return;
+    setLayoutBusy(true);
+    try {
+      const seen = new Set();
+      let opts = [];
+      for (let t = 0; t < LAYOUT_MAX_TRIES && opts.length < LAYOUT_TARGET; t++) {
+        const r = await layoutFurniture(room, items, openings);
+        if (r?.status === 'OK' && Array.isArray(r.candidates)) {
+          for (const c of validateCandidates(r.candidates, room, items, openings)) {
+            const s = layoutSig(c);
+            if (!seen.has(s)) { seen.add(s); opts.push(c); }
+          }
+        } else if (r?.status === 'NOKEY' || r?.status === 'CLIENT') break;
       }
-    } finally {
-      setDimBusy(false);
-    }
+      if (opts.length < 3) opts = [...opts, ...generateLayouts(room, items, 3 - opts.length, 400, openings)];
+      if (!opts.length) { alert('가구가 많아 겹치지 않게 배치할 공간이 부족해요. 방을 키우거나 가구를 줄여 주세요.'); return; }
+      setLayoutOpts(opts);
+    } finally { setLayoutBusy(false); }
   }
-  function onPhoto(e) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = () => setRoomPhoto(r.result);
-    r.readAsDataURL(f);
+  // 포토리얼 렌더(camp-3). 결과 화면 흐름을 막지 않게 실패해도 alert 없이 renderImg만 비움.
+  async function doRender(preset = renderPreset, view = null) {
+    if (!room || renderBusy) return;
+    if (!items.some((it) => it.glb)) return;
+    setRenderBusy(true);
+    try {
+      const r = await renderScene(room, items, cam3d.current, preset, view, openings);
+      if (r?.status === 'OK' && r.image) setRenderImg(r.image);
+      else setRenderImg(null);
+    } catch { setRenderImg(null); } finally { setRenderBusy(false); }
   }
 
-  const needRoom = (
-    <div className="pane center">
-      <p className="mockup-note">먼저 ‘방’ 탭에서 원룸 크기를 만들어 주세요.</p>
-      <button className="btn primary" onClick={() => setTab('room')}>방 만들기</button>
-    </div>
-  );
+  // ── 네비게이션 ──
+  function newRoom() {
+    setRoom(null); setOpenings([]); setItems([]); setSelectedId(null); setRenderImg(null); setRoomPhoto(null);
+    setRoomCounted(false);
+    setScreen('roominput');
+  }
+  function onRoomInputNext(r, ops) {
+    setRoom(r);
+    setOpenings((ops || []).map((o, i) => ({ id: `op-${i}-${Date.now()}`, ...o })));
+    setItems([]); setSelectedId(null); setRenderImg(null); setRoomCounted(false);
+    setScreen('planner');
+  }
+  function finishPlanner() {
+    setShowBefore(false); setRenderImg(null); setRenderPreset('day');
+    setScreen('result');
+    if (!roomCounted) { setRoomsDone((n) => n + 1); setRoomCounted(true); }   // 같은 방 재완성 시 중복 카운트 방지
+    doRender('day');
+  }
+  function findSimilar() {
+    setVisitedMarket(true);
+    setMarketRecommend(items.find((it) => it.glb || it.buyUrl) || items[0] || null);
+    setScreen('market');
+  }
+  function navTab(t) {
+    if (t === 'market') setVisitedMarket(true);
+    setScreen(t);
+  }
 
-  const selBar = sel && (
-    <div className="selbar" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-      {sel.image && <img className="selthumb" src={sel.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
-      <span className="badge est">{sel.name}</span>
-      <span className={`badge ${sel.dimAccuracy === '정형' || sel.dimAccuracy === '사용자입력' ? 'ok' : 'warn'}`}>{sel.dimAccuracy}</span>
-      <span className="dimedit">
-        가로<input type="number" value={Math.round(sel.wM * 100)} onChange={(e) => setSelDim('wM', e.target.value)} />
-        세로<input type="number" value={Math.round(sel.dM * 100)} onChange={(e) => setSelDim('dM', e.target.value)} />
-        높이<input type="number" value={Math.round(sel.hM * 100)} onChange={(e) => setSelDim('hM', e.target.value)} />cm
-      </span>
-      {sel.buyUrl && <button className="btn" onClick={autoFillDims} disabled={dimBusy}>{dimBusy ? '치수 찾는 중…' : '치수 자동 채우기'}</button>}
-      <button className="btn" onClick={rotateSel}>90° 회전</button>
-      <button className="btn ghost" onClick={deleteSel}>삭제</button>
-    </div>
-  );
+  const stamps = { taste: tasteDone, room: !!room, layout: items.length > 0, buy: visitedMarket };
+  const showTab = TAB_SCREENS.includes(screen);
 
   return (
     <div className="phone">
-      <header className="pbar">
-        <span className="logo">🧚 방꾸요정</span>
-        <span className="sub">원룸에 실제 가구를 실치수로</span>
-      </header>
+      {screen === 'splash' && <Splash onNext={() => setScreen('login')} onSkip={() => setScreen('login')} />}
+      {screen === 'login' && <Login onLogin={() => setScreen('onboarding')} onSkip={() => setScreen('home')} />}
+      {screen === 'onboarding' && (
+        <Onboarding initial={taste} onDone={(t) => { setTaste(t); setTasteDone(true); setScreen('home'); }} />
+      )}
 
-      <main className="screen">
-        {/* 방 */}
-        {tab === 'room' && (!room ? (
-          <div className="pane">
-            <RoomPresets onPick={onPresetPick} />
-            <RoomForm onDone={onRoomDone} />
-          </div>
-        ) : (
-          <div className="pane">
-            <div className="stat">
-              <div className="k">방 크기 {accLabel(room.accuracy)}</div>
-              <div className="v">{room.widthM}m × {room.depthM}m</div>
-            </div>
-            <label>빈 방 사진 (합성용, 선택)</label>
-            <input type="file" accept="image/*" onChange={onPhoto} />
-            {roomPhoto && <img className="roomphoto" src={roomPhoto} alt="빈 방" />}
-            <button className="btn ghost" style={{ width: '100%', marginTop: 12 }} onClick={() => { setRoom(null); setItems([]); }}>
-              방 다시 만들기
-            </button>
-          </div>
-        ))}
+      {screen === 'home' && (
+        <HomeTab
+          stamps={stamps}
+          stats={{ rooms: roomsDone, savedItems: items.length }}
+          draft={room ? { roomLabel: `${room.widthM}m × ${room.depthM}m`, count: items.length } : null}
+          onStart={newRoom}
+          onResume={() => setScreen(room ? 'planner' : 'roominput')}
+        />
+      )}
 
-        {/* 배치 */}
-        {tab === 'plan' && (!room ? needRoom : (
-          <div className="pane">
-            <div className="autobar">
-              <button className="btn primary sm" onClick={openAutoLayout} disabled={!items.length || layoutBusy}>{layoutBusy ? '🤖 AI 배치 중…' : '✨ 자동 배치'}</button>
-              <span className="chip">가구를 담고 누르면 원룸에 자동으로 배치돼요</span>
-            </div>
-            <OpeningsBar room={room} openings={openings} setOpenings={setOpenings} />
-            <Planner room={room} items={items} setItems={setItems} selectedId={selectedId} setSelectedId={setSelectedId} flags={val.flags} openings={openings} />
-            {selBar}
-            <div className="statrow">
-              {val.ok ? <span className="badge ok">맞음 문제없음</span> : <span className="badge warn">겹침/방밖 있음</span>}
-              {val.blockOpen && <span className="badge warn">문/창 가림</span>}
-              <span className="chip">남은 바닥 {Math.round(val.freeRatio * 100)}%</span>
-              <span className="chip">치수 정형·입력 {solid} · 추정 {items.length - solid}</span>
-            </div>
-            {items.length === 0 && <p className="mockup-note">‘가구’ 탭에서 가구를 담으면 여기에 실치수로 배치돼요.</p>}
-            <LayoutChat room={room} openings={openings} items={items} setItems={setItems} />
-          </div>
-        ))}
+      {screen === 'roominput' && (
+        <RoomInput onBack={() => setScreen('home')} onNext={onRoomInputNext} photo={roomPhoto} onPhoto={setRoomPhoto} />
+      )}
 
-        {/* 가구 */}
-        {tab === 'shop' && (!room ? needRoom : (
-          <div className="pane">
-            <CatalogPanel onAdd={addFurniture} />
-          </div>
-        ))}
+      {screen === 'planner' && room && (
+        <PlannerScreen
+          room={room} items={items} setItems={setItems} selectedId={selectedId} setSelectedId={setSelectedId}
+          openings={openings} setOpenings={setOpenings} val={val} layoutBusy={layoutBusy}
+          onAutoLayout={openAutoLayout} moveItem={moveItem} rotateItem={rotateItem}
+          onDelete={deleteSel} onRotateSel={rotateSel} onSetDim={setSelDim} onAutoFillDims={autoFillDims}
+          dimBusy={dimBusy} addFurniture={addFurniture} cam3d={cam3d}
+          onBack={() => setScreen('roominput')} onFinish={finishPlanner}
+        />
+      )}
 
-        {/* 미리보기 */}
-        {tab === 'preview' && (!room ? needRoom : (
-          <div className="pane">
-            {items.length === 0 ? (
-              <p className="mockup-note">배치된 가구가 없어요. ‘가구’·‘배치’ 탭에서 먼저 놓아 주세요.</p>
-            ) : (
-              <>
-                <div className="autobar">
-                  <button className="btn primary sm" onClick={openAutoLayout} disabled={!items.length || layoutBusy}>{layoutBusy ? '🤖 AI 배치 중…' : '✨ 자동 배치'}</button>
-                  <select className="preset-sel" value={renderPreset} onChange={(e) => setRenderPreset(e.target.value)} title="렌더 시간대(조명)">
-                    <option value="morning">🌅 아침</option>
-                    <option value="day">☀️ 한낮</option>
-                    <option value="sunset">🌇 노을</option>
-                    <option value="night">🌙 밤</option>
-                  </select>
-                  <button className="btn sm" onClick={() => doRender()} disabled={renderBusy || !items.some((it) => it.glb)}>{renderBusy ? '📸 렌더링 중… (~30초)' : '📸 고품질 렌더'}</button>
-                </div>
-                <Room3D
-                  room={room}
-                  items={items}
-                  selectedId={selectedId}
-                  setSelectedId={setSelectedId}
-                  onMove={moveItem}
-                  onRotate={rotateItem}
-                  flags={val.flags}
-                  camRef={cam3d}
-                  openings={openings}
-                />
-                {selBar}
-                <div className="statrow">
-                  {val.ok ? <span className="badge ok">맞음 문제없음</span> : <span className="badge warn">겹침/방밖 있음</span>}
-                  <span className="chip">실측 GLB {items.filter((i) => i.glb).length} · 실치수 배치</span>
-                </div>
-                <h3 className="sec">구매</h3>
-                <div className="buylist">
-                  {items.map((it) => (
-                    <div key={it.id} className="buyrow">
-                      {it.image ? (
-                        <img className="swatch" src={it.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                      ) : (
-                        <span className="swatch" style={{ background: it.color }} />
-                      )}
-                      <span className="meta">
-                        <span className="nm">{it.name}</span>
-                        <span className="dm">{Math.round(it.wM * 100)}×{Math.round(it.dM * 100)}cm{typeof it.price === 'number' && it.price > 0 ? ` · ${it.price.toLocaleString()}원` : ''}</span>
-                      </span>
-                      {it.buyUrl ? (
-                        <a className="btn primary buybtn" href={it.buyUrl} target="_blank" rel="noreferrer">구매</a>
-                      ) : (
-                        <span className="badge est">링크없음</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-      </main>
+      {screen === 'result' && (
+        <CompositeResult
+          renderImg={renderImg} renderBusy={renderBusy} showBefore={showBefore}
+          onToggle={() => setShowBefore((v) => !v)} photo={roomPhoto} estimate={estimate}
+          timePreset={renderPreset} onTime={(p) => { setRenderPreset(p); doRender(p); }}
+          onBack={() => setScreen('planner')} onRerender={() => setScreen('planner')} onFindSimilar={findSimilar}
+        />
+      )}
 
-      <nav className="tabbar">
-        {TABS.map((t) => (
-          <button key={t.id} className={`tabbtn ${tab === t.id ? 'on' : ''}`} onClick={() => setTab(t.id)}>
-            <span className="ti">{t.icon}</span>
-            <span className="tl">{t.label}{t.id === 'plan' && items.length ? ` ${items.length}` : ''}</span>
-          </button>
-        ))}
-      </nav>
+      {screen === 'market' && (
+        <MarketTab recommendItem={marketRecommend} onConsumeRecommend={() => setMarketRecommend(null)} />
+      )}
+
+      {screen === 'mypage' && (
+        <MyTab taste={taste} savedCount={roomsDone} onEditTaste={() => setScreen('onboarding')} />
+      )}
+
+      {showTab && <TabBar active={screen} onNav={navTab} />}
 
       {layoutOpts && (
         <LayoutPicker
@@ -310,33 +206,6 @@ export default function App() {
           onSelect={(newItems) => { setItems(newItems); setSelectedId(null); setLayoutOpts(null); }}
           onClose={() => setLayoutOpts(null)}
         />
-      )}
-
-      {renderImg && (
-        <div className="modal-back" onClick={() => setRenderImg(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>📸 고품질 렌더</h2>
-            <p className="mockup-note">지금 배치 그대로 camp-3에서 렌더한 포토리얼 사진이에요.</p>
-            <img className="renderimg" src={renderImg} alt="포토리얼 렌더" />
-            <div className="selbar" style={{ justifyContent: 'space-between', marginTop: 10, flexWrap: 'wrap', gap: 10 }}>
-              <div className="preset-row">
-                {[['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['night', '🌙']].map(([p, ic]) => (
-                  <button key={p} className={'btn ghost sm' + (renderPreset === p ? ' on' : '')}
-                    disabled={renderBusy}
-                    onClick={() => { setRenderPreset(p); doRender(p); }}>{ic}</button>
-                ))}
-                <span className="preset-div" />
-                <button className="btn ghost sm" disabled={renderBusy} title="3D 뷰 각도" onClick={() => doRender(renderPreset)}>🧊 내 시점</button>
-                <button className="btn ghost sm" disabled={renderBusy} title="방 전체 와이드" onClick={() => doRender(renderPreset, 'wide')}>📐 와이드</button>
-                <button className="btn ghost sm" disabled={renderBusy} title="아늑한 클로즈업" onClick={() => doRender(renderPreset, 'cozy')}>🛋️ 아늑</button>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <a className="btn primary" href={renderImg} download="방꾸요정-렌더.png">저장</a>
-                <button className="btn ghost" onClick={() => setRenderImg(null)}>닫기</button>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

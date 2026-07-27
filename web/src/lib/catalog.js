@@ -125,6 +125,7 @@ export function toPlacedItem(cat, cx, cy, rotationDeg = 0) {
   return {
     id: `${cat.id ?? cat.name ?? 'item'}-${++_seq}`,
     catId: cat.id,
+    cat: cat.cat,          // 카테고리 문자열 보존 — 러그/의자·책상 겹침정책·역할판정·유사추천이 .cat으로 판정
     name: cat.name,
     wM: d.w / 100,
     dM: d.d / 100,
