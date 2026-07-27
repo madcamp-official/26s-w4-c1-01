@@ -11,28 +11,64 @@ export function validateCandidates(candidates, room, items, openings = []) {
   const out = [];
   for (const c of candidates || []) {
     const list = c.items || [];
-    let complete = true;
     const mapped = items.map((it) => {
       const ci = list.find((x) => x && x.id === it.id);
-      if (!ci) { complete = false; return it; }
+      if (!ci) return { ...it, _place: true };    // LLM이 빠뜨린 가구 → repair가 새로 배치
       const rot = [0, 90, 180, 270].includes(ci.rotation) ? ci.rotation : 0;
       return { ...it, cx: (Number(ci.cx) || 0) / 100, cy: (Number(ci.cy) || 0) / 100, rotationDeg: rot };
     });
-    if (!complete) continue;                      // 일부 가구 누락 → 폐기
-    const nonRug = mapped.filter((it) => it.cat !== '러그');
-    if (!validateLayout(nonRug, W, D).ok) continue; // 겹침/방밖 → 폐기(핵심 안전망)
-    if (openings.length && nonRug.some((it) => openings.some((o) => openingBlocksAABB(itemAABB(it), o, W, D, it.hM)))) continue; // 문 스윙/창 가리면 폐기
+    // LLM 산술 오류(겹침/방밖/개구부 침범)·누락을 '기각' 대신 '보정' — 위반/누락 가구만 유효 자리로 배치.
+    const rep = repairCandidate(mapped, room, openings);
+    if (!rep) continue;                           // 보정 불가(자리 없음) → 폐기 → 로컬 폴백이 채움
+    const nonRug = rep.items.filter((it) => it.cat !== '러그');
     const touch = nonRug.filter((it) => {
       const b = itemAABB(it);
       return b.left < EDGE || b.top < EDGE || b.right > W - EDGE || b.bottom > D - EDGE;
     }).length;
     out.push({
-      items: mapped,
+      items: rep.items,
       wallRatio: nonRug.length ? touch / nonRug.length : 1,
-      strategy: c.strategy, rationale: c.rationale,
+      strategy: c.strategy, rationale: c.rationale, repaired: rep.moved,
     });
   }
   return out;
+}
+
+// LLM 후보 보정 — 유효한 가구는 그 자리 유지, 겹침/방밖/개구부 침범 가구만 가까운 유효 자리로 스냅.
+// 앵커(침대·소파·책상·수납) 먼저 처리해 큰 가구의 Gemini 판단을 최대한 살린다. 전부 못 놓으면 null(폐기).
+function repairCandidate(items, room, openings = []) {
+  const W = room.widthM, D = room.depthM;
+  const roles = new Map(items.map((it) => [it.id, roleOf(it)]));
+  const res = items.map((it) => ({ ...it }));       // rug 포함 전부 복사(rug는 바닥 레이어라 그대로 유지)
+  const solids = res.filter((it) => roles.get(it.id) !== 'rug');
+  const order = [...solids.filter((it) => ANCHOR.has(roles.get(it.id))), ...solids.filter((it) => !ANCHOR.has(roles.get(it.id)))];
+  const placed = [];
+  let moved = 0;
+  for (const it of order) {
+    if (!it._place) {                                // Gemini 위치가 있으면 유효한지 확인 후 유지
+      const b = boxAt(it, it.cx, it.cy, it.rotationDeg);
+      if (inRoom(b, W, D) && placed.every((pb) => !aabbOverlap(b, pb))
+          && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))) { placed.push(b); continue; }
+    }
+    // 누락(_place)이거나 Gemini 위치가 무효 → 재배치. 누락은 벽 우선 새 자리, 무효는 원위치 근처로 스냅.
+    const p = it._place ? placeItem(it, placed, W, D, openings) : placeItemNear(it, it.cx, it.cy, placed, W, D, openings);
+    if (!p) return null;                             // 배치 실패 → 후보 폐기(로컬 폴백으로)
+    it.cx = p.cx; it.cy = p.cy; it.rotationDeg = p.rot; delete it._place; placed.push(p.box); moved++;
+  }
+  res.forEach((it) => delete it._place);           // 내부 플래그 정리(러그 등 미처리분 포함)
+  return { items: res, moved };
+}
+// 원위치(ox,oy)에 가장 가까운 유효 자리(벽 우선 → 내부). 없으면 null.
+function placeItemNear(it, ox, oy, placedBoxes, W, D, openings) {
+  const free = (b) => inRoom(b, W, D) && placedBoxes.every((pb) => !aabbOverlap(b, pb))
+    && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM));
+  const cands = [...wallCandidates(it, W, D), ...interiorCandidates(it, W, D)]
+    .sort((a, b) => Math.hypot(a.cx - ox, a.cy - oy) - Math.hypot(b.cx - ox, b.cy - oy));
+  for (const c of cands) {
+    const b = boxAt(it, c.cx, c.cy, c.rot);
+    if (free(b)) return { ...c, box: b };
+  }
+  return null;
 }
 
 const MARGIN = 0.05;   // 벽에서 띄우는 여유(m)

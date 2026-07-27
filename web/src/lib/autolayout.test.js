@@ -161,10 +161,14 @@ test('generateLayouts/validateCandidates: 문 스윙 부채꼴을 가구가 안 
       for (const o of openings) assert.ok(!aabbHitsDoorSwing(itemAABB(it), o, 3.0, 4.0), `${it.id}가 문 스윙 침범`);
     }
   }
-  // 문 스윙에 걸치는 LLM 후보는 폐기 (침대 cy=300: 방밖 아님, AABB가 힌지(1.05,4.0) 부채꼴 침범)
+  // 문 스윙에 걸치는 LLM 후보 → 폐기 대신 '보정'되어 유효 배치로 채택(침대만 가까운 유효 자리로 스냅).
   const blocking = [{ strategy: 'x', items: [
     { id: 'bed', cx: 130, cy: 300, rotation: 0 }, { id: 'desk', cx: 250, cy: 60, rotation: 0 }] }];
-  assert.equal(validateCandidates(blocking, room, items, openings).length, 0);
+  const rep = validateCandidates(blocking, room, items, openings);
+  assert.equal(rep.length, 1, '보정되어 채택되어야');
+  for (const it of rep[0].items) {
+    for (const o of openings) assert.ok(!aabbHitsDoorSwing(itemAABB(it), o, 3.0, 4.0), `보정 후 ${it.id}가 문 스윙 침범`);
+  }
 });
 
 // 로컬 폴백 엔진의 필수 관계 R1~R3 (Gemini 실패해도 규칙 보장)
@@ -204,16 +208,23 @@ test('로컬 R3: 조명이 침대 헤드 쪽·벽면 0~10cm 밀착', () => {
   assert.ok(wallgap <= 0.1, `벽면 0~10cm (got ${wallgap.toFixed(3)})`);
 });
 
-test('validateCandidates: 겹치는 LLM 후보는 폐기', () => {
+test('validateCandidates: 겹치는 LLM 후보는 폐기 대신 보정', () => {
   const room = { widthM: 3.0, depthM: 4.0 };
   const items = [
     { id: 'a', cat: '침대', name: '침대', wM: 1.6, dM: 2.0, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 },
     { id: 'b', cat: '책상', name: '책상', wM: 1.2, dM: 0.6, hM: 0.75, cx: 0, cy: 0, rotationDeg: 0 },
   ];
-  // 두 가구를 같은 지점에 겹쳐 놓은 LLM 후보 → 폐기돼야 함
+  // 같은 지점에 겹쳐 놓은 LLM 후보 → 보정되어 겹침 없는 배치로 채택
   const bad = [{ strategy: 'x', items: [{ id: 'a', cx: 100, cy: 100, rotation: 0 }, { id: 'b', cx: 100, cy: 100, rotation: 0 }] }];
-  assert.equal(validateCandidates(bad, room, items).length, 0);
-  // 떨어뜨려 놓으면 통과
+  const rb = validateCandidates(bad, room, items);
+  assert.equal(rb.length, 1, '겹쳐도 보정되어 채택');
+  assert.ok(!validateLayout(rb[0].items.filter((x) => x.cat !== '러그'), 3.0, 4.0).flags.some((f) => f.overlap), '보정 후 겹침 없음');
+  // 이미 유효하면 그대로 통과
   const good = [{ strategy: 'y', items: [{ id: 'a', cx: 80, cy: 100, rotation: 0 }, { id: 'b', cx: 220, cy: 300, rotation: 0 }] }];
   assert.equal(validateCandidates(good, room, items).length, 1);
+  // 방보다 큰 가구는 보정 불가 → 폐기(로컬 폴백으로)
+  const tiny = { widthM: 1.0, depthM: 1.0 };
+  const bigItems = [{ id: 'a', cat: '침대', name: '침대', wM: 2.0, dM: 2.2, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 }];
+  const cand = [{ strategy: 'z', items: [{ id: 'a', cx: 50, cy: 50, rotation: 0 }] }];
+  assert.equal(validateCandidates(cand, tiny, bigItems).length, 0);
 });
