@@ -51,20 +51,66 @@ LAYOUT_PROMPT = (open(_PROMPT_PATH, encoding="utf-8").read()
                  else "원룸 가구를 겹치지 않게 대부분 벽에 붙여 배치. §3 JSON(candidates[])으로 3개 이상 출력. cm 정수, (cx,cy)=중심, rotation 0/90/180/270.")
 
 
+def _salvage_candidates(t):
+    """잘린 JSON에서 candidates 배열의 '완결된' {..} 객체만 균형 파싱으로 회수(응답 truncation 대비)."""
+    i = t.find('"candidates"')
+    if i < 0:
+        return []
+    b = t.find('[', i)
+    if b < 0:
+        return []
+    out, depth, start, instr, esc = [], 0, None, False, False
+    for j in range(b + 1, len(t)):
+        ch = t[j]
+        if instr:
+            if esc:
+                esc = False
+            elif ch == '\\':
+                esc = True
+            elif ch == '"':
+                instr = False
+            continue
+        if ch == '"':
+            instr = True
+        elif ch == '{':
+            if depth == 0:
+                start = j
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0 and start is not None:
+                try:
+                    out.append(json.loads(t[start:j + 1]))
+                except Exception:
+                    pass
+                start = None
+        elif ch == ']' and depth == 0:
+            break
+    return out
+
+
 def parse_layout_json(text):
-    """LLM 텍스트 → candidates 리스트. 코드펜스/잡텍스트를 견고하게 벗겨낸다."""
+    """LLM 텍스트 → candidates 리스트. 코드펜스/잡텍스트를 벗기고, 잘린 응답도 최대한 복구한다."""
     t = (text or "").strip()
     m = re.search(r"```(?:json)?\s*(.*?)```", t, re.S)
     if m:
         t = m.group(1).strip()
     try:
         obj = json.loads(t)
+        return obj.get("candidates", []) if isinstance(obj, dict) else (obj if isinstance(obj, list) else [])
     except Exception:
-        s, e = t.find("{"), t.rfind("}")
-        if s < 0 or e <= s:
-            raise
-        obj = json.loads(t[s:e + 1])
-    return obj.get("candidates", []) if isinstance(obj, dict) else []
+        pass
+    cands = _salvage_candidates(t)                       # 잘린 배열에서 완결 후보만 회수
+    if cands:
+        return cands
+    s, e = t.find("{"), t.rfind("}")                     # 최후: 첫{~마지막}
+    if 0 <= s < e:
+        try:
+            obj = json.loads(t[s:e + 1])
+            return obj.get("candidates", []) if isinstance(obj, dict) else []
+        except Exception:
+            pass
+    return []
 
 
 def _layout_user_msg(payload):
@@ -78,7 +124,7 @@ def gemini_layout(payload):
     body = json.dumps({
         "system_instruction": {"parts": [{"text": LAYOUT_PROMPT}]},
         "contents": [{"role": "user", "parts": [{"text": _layout_user_msg(payload)}]}],
-        "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.8, "responseMimeType": "application/json"},
+        "generationConfig": {"maxOutputTokens": 24576, "temperature": 0.7, "responseMimeType": "application/json"},
     }).encode()
     url = ("https://generativelanguage.googleapis.com/v1beta/models/"
            + GEMINI_MODEL + ":generateContent?key=" + GEMINI_API_KEY)

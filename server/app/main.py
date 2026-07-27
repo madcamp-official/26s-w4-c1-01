@@ -181,6 +181,44 @@ def _layout_user_msg(payload: dict) -> str:
             + json.dumps(payload, ensure_ascii=False))
 
 
+def _salvage_candidates(t: str):
+    """잘린 JSON에서 candidates 배열의 완결된 {..} 객체만 균형 파싱으로 회수(응답 truncation 대비)."""
+    i = t.find('"candidates"')
+    if i < 0:
+        return []
+    b = t.find('[', i)
+    if b < 0:
+        return []
+    out, depth, start, instr, esc = [], 0, None, False, False
+    for j in range(b + 1, len(t)):
+        ch = t[j]
+        if instr:
+            if esc:
+                esc = False
+            elif ch == '\\':
+                esc = True
+            elif ch == '"':
+                instr = False
+            continue
+        if ch == '"':
+            instr = True
+        elif ch == '{':
+            if depth == 0:
+                start = j
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0 and start is not None:
+                try:
+                    out.append(json.loads(t[start:j + 1]))
+                except Exception:  # noqa: BLE001
+                    pass
+                start = None
+        elif ch == ']' and depth == 0:
+            break
+    return out
+
+
 def _parse_candidates(text: str):
     t = (text or "").strip()
     m = re.search(r"```(?:json)?\s*(.*?)```", t, re.S)
@@ -188,12 +226,20 @@ def _parse_candidates(text: str):
         t = m.group(1).strip()
     try:
         obj = json.loads(t)
+        return obj.get("candidates", []) if isinstance(obj, dict) else (obj if isinstance(obj, list) else [])
     except Exception:  # noqa: BLE001
-        s, e = t.find("{"), t.rfind("}")
-        if s < 0 or e <= s:
-            return []
-        obj = json.loads(t[s:e + 1])
-    return obj.get("candidates", []) if isinstance(obj, dict) else []
+        pass
+    cands = _salvage_candidates(t)                       # 잘린 배열에서 완결 후보만 회수
+    if cands:
+        return cands
+    s, e = t.find("{"), t.rfind("}")
+    if 0 <= s < e:
+        try:
+            obj = json.loads(t[s:e + 1])
+            return obj.get("candidates", []) if isinstance(obj, dict) else []
+        except Exception:  # noqa: BLE001
+            pass
+    return []
 
 
 class RenderReq(BaseModel):
@@ -242,7 +288,7 @@ async def layout(req: LayoutReq):
                     f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}",
                     json={"system_instruction": {"parts": [{"text": _LAYOUT_PROMPT}]},
                           "contents": [{"role": "user", "parts": [{"text": user}]}],
-                          "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.8,
+                          "generationConfig": {"maxOutputTokens": 24576, "temperature": 0.7,
                                                "responseMimeType": "application/json"}},
                 )
                 r.raise_for_status()
