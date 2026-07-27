@@ -88,7 +88,7 @@ export async function layoutFurniture(room, items, openings = []) {
       width: Math.round((o.width || 0.9) * 100), ...(o.kind === 'door' ? { hinge: o.hinge || 'a' } : {}),
     })),
     furniture: items.map((it) => ({
-      id: it.id, category: it.cat,
+      id: it.id, name: it.name, category: it.cat,   // name: TV장 등 종류 식별에 활용
       w: Math.round(it.wM * 100), d: Math.round(it.dM * 100), h: Math.round((it.hM || 0.5) * 100),
     })),
   };
