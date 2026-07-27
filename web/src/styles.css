@@ -141,6 +141,16 @@ input[type="number"], input[type="text"], select {
 .moodtag { font-size: 10px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); padding: 1px 6px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
 .sizetag { font-size: 10px; color: var(--muted); border: 1px solid var(--line); padding: 0 5px; border-radius: 4px; margin-left: 5px; }
 
+/* 유사추천 버튼/행 */
+.catrow { display: flex; align-items: stretch; gap: 6px; }
+.catrow .catitem { flex: 1; min-width: 0; }
+.recbtn { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  width: 46px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--muted);
+  font-size: 15px; cursor: pointer; text-decoration: none; }
+.recbtn span { font-size: 9px; }
+.recbtn:hover { border-color: var(--accent); color: var(--accent); }
+.catlist.rec { max-height: 60vh; overflow-y: auto; }
+
 /* 자동 배치 후보 선택 */
 .layoutgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin: 12px 0; }
 .layoutcard { border: 1px solid var(--line); border-radius: 10px; padding: 8px; cursor: pointer; background: #fff; display: flex; flex-direction: column; gap: 8px; align-items: center; transition: border-color .12s, box-shadow .12s; }

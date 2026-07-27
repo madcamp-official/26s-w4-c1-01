@@ -25,6 +25,21 @@ export async function searchFurniture(query) {
   }
 }
 
+// 유사 가구 추천 — LLM이 네이버 검색어를 만들어 비슷한 상품을 찾아준다.
+// item: {name, cat, w, d, h, style}. 반환: {status, queries?, items:[네이버상품]}.
+export async function recommendSimilar(item) {
+  try {
+    const res = await fetch(`${API_BASE}/api/recommend`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item }), signal: timeout(30000),
+    });
+    if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}`, items: [] };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', reason: String(e.message || e), items: [] };
+  }
+}
+
 // 합성 목업 → GPU 리라이팅(camp-3 SD). 반환: {status:'OK',image} | {status:'CLIENT'}(서버 미연동).
 export async function relightImage(dataUrl, strength = 0.3) {
   try {

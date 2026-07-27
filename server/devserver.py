@@ -183,6 +183,52 @@ def naver_search(q):
     return items
 
 
+def gemini_recommend_queries(item):
+    """참조 가구 → 비슷한 상품을 찾을 한국어 네이버 검색어 3개(LLM). 실패 시 예외."""
+    sysmsg = ("너는 가구 쇼핑 추천 엔진이다. 참조 가구와 '비슷한'(같은 종류 + 비슷한 분위기/스타일 + 비슷한 크기) 상품을 "
+              "네이버 쇼핑에서 찾기 위한 한국어 검색어를 만든다. 서로 조금씩 다른 검색어 3개를 JSON 문자열 배열로만 출력한다. "
+              "브랜드명 대신 '종류+분위기+소재+크기(1인/2인/3인 등)' 위주로. 예: [\"미드센추리 3인 패브릭 소파\",\"북유럽 원목 3인 소파\",\"모던 로우 소파 200\"]")
+    user = (f"참조 가구 - 이름:'{item.get('name', '')}', 종류:'{item.get('cat', '')}', "
+            f"분위기:'{item.get('style', '')}', 크기:{item.get('w')}x{item.get('d')}cm")
+    body = json.dumps({
+        "system_instruction": {"parts": [{"text": sysmsg}]},
+        "contents": [{"role": "user", "parts": [{"text": user}]}],
+        "generationConfig": {"maxOutputTokens": 512, "temperature": 0.6, "responseMimeType": "application/json"},
+    }).encode()
+    url = ("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + GEMINI_API_KEY)
+    req = urllib.request.Request(url, data=body, headers={"content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        data = json.load(r)
+    txt = "".join(p.get("text", "") for p in (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
+    m = re.search(r"\[.*\]", txt, re.S)
+    arr = json.loads(m.group(0) if m else txt)
+    return [str(q).strip() for q in arr if str(q).strip()][:3]
+
+
+def recommend_similar(item):
+    """LLM 검색어 생성 → 네이버 검색 병합/중복제거. LLM 없으면 분위기+종류로 폴백."""
+    queries = []
+    if LLM_PROVIDER == "gemini" and GEMINI_API_KEY:
+        try:
+            queries = gemini_recommend_queries(item)
+        except Exception:  # noqa: BLE001 — LLM 실패 시 폴백 검색어
+            queries = []
+    if not queries:
+        base = f"{item.get('style', '')} {item.get('cat', '가구')}".strip()
+        queries = [base or "가구"]
+    seen, out = set(), []
+    for q in queries[:3]:
+        try:
+            for r in naver_search(q):
+                key = r.get("id") or r.get("name")
+                if key and key not in seen:
+                    seen.add(key)
+                    out.append(r)
+        except Exception:  # noqa: BLE001 — 개별 쿼리 실패는 건너뜀
+            pass
+    return {"queries": queries, "items": out[:18]}
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def _json(self, obj, code=200):
         body = json.dumps(obj, ensure_ascii=False).encode()
@@ -214,7 +260,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
-        if path not in ("/api/relight", "/api/layout", "/api/render"):
+        if path not in ("/api/relight", "/api/layout", "/api/render", "/api/recommend"):
             return self._json({"error": "not found"}, 404)
         try:
             n = int(self.headers.get("Content-Length", 0))
@@ -237,6 +283,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"status": "ERROR", "reason": str(data.get("reason", "render error"))[:200]})
             except Exception as e:  # noqa: BLE001
                 return self._json({"status": "ERROR", "reason": str(e)[:200]})
+
+        # 유사 가구 추천 — LLM이 네이버 검색어 생성 → 네이버 검색 병합
+        if path == "/api/recommend":
+            if not (CID and SEC):
+                return self._json({"status": "FALLBACK", "reason": "no_naver_key", "items": []})
+            try:
+                rec = recommend_similar(body.get("item") or {})
+                return self._json({"status": "OK", **rec})
+            except Exception as e:  # noqa: BLE001
+                return self._json({"status": "ERROR", "reason": str(e)[:200], "items": []})
 
         # 원룸 자동 배치 — LLM(Gemini/Claude)이 후보 생성(앱이 겹침 재검증)
         if path == "/api/layout":

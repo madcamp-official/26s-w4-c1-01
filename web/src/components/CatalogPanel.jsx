@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { searchFurniture } from '../lib/api.js';
+import { searchFurniture, recommendSimilar } from '../lib/api.js';
 import { resolveDims, accuracyMeta, CATEGORIES, STYLE_OPTIONS, SIZE_OPTIONS, deriveStyle, deriveSize } from '../lib/catalog.js';
 
-// 가구 팔레트 — 자연어 검색 + 분위기/사이즈/종류 필터 + 클릭으로 배치에 추가.
+// 가구 팔레트 — 자연어 검색 + 분위기/사이즈/종류 필터 + 네이버 유사추천 + 클릭으로 배치에 추가.
 export default function CatalogPanel({ onAdd }) {
   const [q, setQ] = useState('');
   const [items, setItems] = useState([]);
@@ -11,6 +11,19 @@ export default function CatalogPanel({ onAdd }) {
   const [catF, setCatF] = useState('');   // '' = 전체
   const [moodF, setMoodF] = useState('');
   const [sizeF, setSizeF] = useState('');
+  const [recFor, setRecFor] = useState(null);   // 추천 기준 아이템
+  const [recItems, setRecItems] = useState([]);
+  const [recLoading, setRecLoading] = useState(false);
+
+  async function openRec(c) {
+    setRecFor(c); setRecItems([]); setRecLoading(true);
+    try {
+      const r = await recommendSimilar({ name: c.name, cat: c.cat, w: c.w, d: c.d, h: c.h, style: deriveStyle(c) });
+      setRecItems(Array.isArray(r.items) ? r.items : []);
+    } finally {
+      setRecLoading(false);
+    }
+  }
 
   async function run(query) {
     setLoading(true);
@@ -77,31 +90,69 @@ export default function CatalogPanel({ onAdd }) {
           const dimText = known ? `${c.w}×${c.d}${c.h ? `×${c.h}` : ''}cm` : `≈${rd.w}×${rd.d}cm`;
           const mood = deriveStyle(c);
           return (
-            <button key={c.id} className="catitem" onClick={() => onAdd(c)} title="방에 추가">
-              {c.image ? (
-                <img className="swatch" src={c.image} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-              ) : (
-                <span className="swatch" style={{ background: c.color || rd.color || '#c9bfa8' }} />
-              )}
-              <span className="meta">
-                <span className="nm">
-                  {c.name}
-                  {mood && <span className="moodtag">{mood}</span>}
+            <div key={c.id} className="catrow">
+              <button className="catitem" onClick={() => onAdd(c)} title="방에 추가">
+                {c.image ? (
+                  <img className="swatch" src={c.image} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                ) : (
+                  <span className="swatch" style={{ background: c.color || rd.color || '#c9bfa8' }} />
+                )}
+                <span className="meta">
+                  <span className="nm">
+                    {c.name}
+                    {mood && <span className="moodtag">{mood}</span>}
+                  </span>
+                  <span className="dm">
+                    {dimText}
+                    <span className={`badge sm ${acc.tone}`}>{acc.short}</span>
+                    <span className="sizetag">{deriveSize(c)}</span>
+                    {c.source ? ` · ${c.source}` : ''}
+                    {typeof c.price === 'number' && c.price > 0 ? <> · <span className="pr">{c.price.toLocaleString()}원</span></> : null}
+                  </span>
                 </span>
-                <span className="dm">
-                  {dimText}
-                  <span className={`badge sm ${acc.tone}`}>{acc.short}</span>
-                  <span className="sizetag">{deriveSize(c)}</span>
-                  {c.source ? ` · ${c.source}` : ''}
-                  {typeof c.price === 'number' && c.price > 0 ? <> · <span className="pr">{c.price.toLocaleString()}원</span></> : null}
-                </span>
-              </span>
-            </button>
+              </button>
+              <button className="recbtn" title="네이버에서 비슷한 상품 추천" onClick={() => openRec(c)}>🔎<span>비슷</span></button>
+            </div>
           );
         })}
         {!filtered.length && !loading && <div className="mockup-note">조건에 맞는 가구가 없어요. 필터를 풀거나 다르게 검색해 보세요.</div>}
         {loading && <div className="mockup-note">검색 중…</div>}
       </div>
+
+      {recFor && (
+        <div className="modal-back" onClick={() => setRecFor(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>🔎 ‘{recFor.name}’와 비슷한 상품</h2>
+            <p className="mockup-note">AI가 종류·분위기·크기를 보고 네이버 쇼핑에서 비슷한 상품을 찾았어요. 눌러서 방에 추가하거나 구매로 이동.</p>
+            {recLoading ? (
+              <div className="mockup-note">추천 찾는 중…</div>
+            ) : recItems.length ? (
+              <div className="catlist rec">
+                {recItems.map((it) => (
+                  <div key={it.id || it.name} className="catrow">
+                    <button className="catitem" onClick={() => { onAdd(it); setRecFor(null); }} title="방에 추가">
+                      {it.image ? <img className="swatch" src={it.image} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <span className="swatch" />}
+                      <span className="meta">
+                        <span className="nm">{it.name}</span>
+                        <span className="dm">
+                          {it.w ? `${it.w}×${it.d}cm · ` : ''}{it.source || '네이버'}
+                          {typeof it.price === 'number' && it.price > 0 ? <> · <span className="pr">{it.price.toLocaleString()}원</span></> : null}
+                        </span>
+                      </span>
+                    </button>
+                    {it.buyUrl && <a className="recbtn" href={it.buyUrl} target="_blank" rel="noreferrer" title="구매 페이지">🛒<span>구매</span></a>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mockup-note">추천 결과가 없어요. (네이버 키 미연동이거나 결과 없음)</div>
+            )}
+            <div className="selbar" style={{ justifyContent: 'flex-end', marginTop: 10 }}>
+              <button className="btn ghost" onClick={() => setRecFor(null)}>닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

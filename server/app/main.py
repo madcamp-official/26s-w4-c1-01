@@ -332,6 +332,77 @@ async def shape_query(q: str) -> Optional[str]:
         return q
 
 
+class RecommendReq(BaseModel):
+    item: dict = {}
+
+
+async def _naver_items(query: str):
+    async with httpx.AsyncClient(timeout=6) as cx:
+        r = await cx.get("https://openapi.naver.com/v1/search/shop.json",
+                         params={"query": query or "가구", "display": 12},
+                         headers={"X-Naver-Client-Id": NAVER_ID, "X-Naver-Client-Secret": NAVER_SECRET})
+        r.raise_for_status()
+        data = r.json()
+    out = []
+    for it in data.get("items", []):
+        title = re.sub(r"<[^>]+>", "", it.get("title", ""))
+        dims = parse_dims(title)
+        out.append({"id": it.get("productId"), "name": title,
+                    "cat": it.get("category3") or it.get("category2") or "가구",
+                    "w": (dims or {}).get("w"), "d": (dims or {}).get("d"), "h": (dims or {}).get("h"),
+                    "dimAccuracy": "추정" if dims else "미상", "price": _to_int(it.get("lprice")),
+                    "image": it.get("image"), "buyUrl": it.get("link"), "source": it.get("mallName") or "네이버"})
+    return out
+
+
+async def _recommend_queries(item: dict):
+    """참조 가구 → 비슷한 상품을 찾을 한국어 네이버 검색어(LLM). 실패/키없음 시 []."""
+    gkey = os.getenv("GEMINI_API_KEY")
+    if not (gkey and httpx):
+        return []
+    sysmsg = ("너는 가구 쇼핑 추천 엔진이다. 참조 가구와 '비슷한'(같은 종류 + 비슷한 분위기/스타일 + 비슷한 크기) 상품을 "
+              "네이버 쇼핑에서 찾기 위한 한국어 검색어를 서로 조금씩 다르게 3개 만들어 JSON 문자열 배열로만 출력한다. "
+              "브랜드명 대신 '종류+분위기+소재+크기' 위주.")
+    user = (f"참조 가구 - 이름:'{item.get('name', '')}', 종류:'{item.get('cat', '')}', "
+            f"분위기:'{item.get('style', '')}', 크기:{item.get('w')}x{item.get('d')}cm")
+    try:
+        async with httpx.AsyncClient(timeout=30) as cx:
+            r = await cx.post(f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}",
+                              json={"system_instruction": {"parts": [{"text": sysmsg}]},
+                                    "contents": [{"role": "user", "parts": [{"text": user}]}],
+                                    "generationConfig": {"maxOutputTokens": 512, "temperature": 0.6, "responseMimeType": "application/json"}})
+            r.raise_for_status()
+            data = r.json()
+        txt = "".join(p.get("text", "") for p in (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
+        m = re.search(r"\[.*\]", txt, re.S)
+        arr = json.loads(m.group(0) if m else txt)
+        return [str(q).strip() for q in arr if str(q).strip()][:3]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+@app.post("/api/recommend")
+async def recommend(req: RecommendReq):
+    """유사 가구 추천 — LLM이 네이버 검색어 생성 → 네이버 검색 병합/중복제거."""
+    if not (NAVER_ID and NAVER_SECRET and httpx):
+        return {"status": "FALLBACK", "reason": "no_naver_key", "items": []}
+    item = req.item or {}
+    queries = await _recommend_queries(item)
+    if not queries:
+        queries = [f"{item.get('style', '')} {item.get('cat', '가구')}".strip() or "가구"]
+    seen, out = set(), []
+    for q in queries[:3]:
+        try:
+            for it in await _naver_items(q):
+                k = it.get("id") or it.get("name")
+                if k and k not in seen:
+                    seen.add(k)
+                    out.append(it)
+        except Exception:  # noqa: BLE001
+            pass
+    return {"status": "OK", "queries": queries, "items": out[:18]}
+
+
 def _text_card(req: ComposeReq) -> str:
     n = len(req.items)
     w = req.room.get("widthM")
