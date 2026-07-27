@@ -17,6 +17,12 @@ const TABS = [
   { id: 'preview', label: '3D 미리보기', icon: '🧊' },
 ];
 
+// 자동 배치: Gemini 유효 후보가 LAYOUT_TARGET개 모일 때까지 재시도(최대 LAYOUT_MAX_TRIES회).
+// 현재는 목표 1개(추후 3개로 올리면 3개 다 Gemini로).
+const LAYOUT_TARGET = 1;
+const LAYOUT_MAX_TRIES = 20;
+const layoutSig = (c) => c.items.map((i) => `${Math.round(i.cx * 100)},${Math.round(i.cy * 100)},${i.rotationDeg}`).join('|');
+
 const accLabel = (a) => (a === 'MEASURED' ? '(실측)' : a === 'MEASURED_PARTIAL' ? '(한 변 실측)' : '(추정)');
 
 export default function App() {
@@ -63,13 +69,22 @@ export default function App() {
     if (!room || !items.length || layoutBusy) return;
     setLayoutBusy(true);
     try {
+      const seen = new Set();
       let opts = [];
-      // 1) LLM 후보 → 우리 기하엔진으로 겹침 재검증(안전망: 겹치는 후보 폐기)
-      const r = await layoutFurniture(room, items, openings);
-      if (r?.status === 'OK' && Array.isArray(r.candidates)) {
-        opts = validateCandidates(r.candidates, room, items, openings);
+      // 1) Gemini 후보 → 기하엔진 재검증(겹침/문·창 위반 폐기). 유효 후보 LAYOUT_TARGET개 모일 때까지 재시도.
+      for (let t = 0; t < LAYOUT_MAX_TRIES && opts.length < LAYOUT_TARGET; t++) {
+        const r = await layoutFurniture(room, items, openings);
+        if (r?.status === 'OK' && Array.isArray(r.candidates)) {
+          for (const c of validateCandidates(r.candidates, room, items, openings)) {
+            const s = layoutSig(c);
+            if (!seen.has(s)) { seen.add(s); opts.push(c); }   // 서로 다른 유효 후보만 누적
+          }
+        } else if (r?.status === 'NOKEY' || r?.status === 'CLIENT') {
+          break;   // 키/서버 미연동이면 재시도 무의미 → 로컬로
+        }
+        // OK인데 유효 0개거나 일시적 ERROR면 계속 재시도(최대 LAYOUT_MAX_TRIES)
       }
-      // 2) 유효 후보가 3개 미만이면 로컬 규칙 배치로 채움(항상 3개 보장). 문 스윙/창 회피 포함.
+      // 2) 3개 미만이면 로컬 규칙 배치로 채움(로컬도 R1~R3·문/창 회피 준수). 항상 3개 보장.
       if (opts.length < 3) opts = [...opts, ...generateLayouts(room, items, 3 - opts.length, 400, openings)];
       if (!opts.length) {
         alert('가구가 많아 겹치지 않게 배치할 공간이 부족해요. 방을 키우거나 가구를 줄여 주세요.');
