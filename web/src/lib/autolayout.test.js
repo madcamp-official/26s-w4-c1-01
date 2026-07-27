@@ -166,6 +166,43 @@ test('generateLayouts/validateCandidates: 문 스윙 부채꼴을 가구가 안 
   assert.equal(validateCandidates(blocking, room, items, openings).length, 0);
 });
 
+// 로컬 폴백 엔진의 필수 관계 R1~R3 (Gemini 실패해도 규칙 보장)
+const FR = { 0: [0, 1], 90: [-1, 0], 180: [0, -1], 270: [1, 0] };
+const mk = (id, cat, w, d, name) => ({ id, cat, name: name || cat, wM: w, dM: d, hM: 0.7, cx: 0, cy: 0, rotationDeg: 0 });
+const facing = (a, b) => FR[a][0] === -FR[b][0] && FR[a][1] === -FR[b][1];
+
+test('로컬 R2: 책상+의자 세트 — 의자가 책상 앞면 정면 마주봄·정렬·인접', () => {
+  const room = { widthM: 3.2, depthM: 3.8 };
+  const items = [mk('bed', '침대', 1.5, 2.0), mk('desk', '책상', 1.2, 0.6), mk('chair', '의자', 0.55, 0.55)];
+  const c = generateLayouts(room, items, 3, 800)[0];
+  assert.ok(c, '후보 생성됨');
+  const desk = c.items.find((x) => x.id === 'desk'), chair = c.items.find((x) => x.id === 'chair');
+  assert.ok(facing(desk.rotationDeg, chair.rotationDeg), '의자 앞면이 책상 앞면 정반대(마주봄)');
+  const vert = FR[desk.rotationDeg][1] !== 0;
+  assert.ok((vert ? Math.abs(chair.cx - desk.cx) : Math.abs(chair.cy - desk.cy)) <= 0.35, '중심축 정렬');
+  assert.ok(!validateLayout([desk, chair], 3.2, 3.8).flags.some((f) => f.overlap), '겹침 없음');
+});
+
+test('로컬 R1: TV장이 침대 반대편 벽에서 정면 마주봄·정렬', () => {
+  const room = { widthM: 3.2, depthM: 4.0 };
+  const items = [mk('bed', '침대', 1.5, 2.0), mk('tv', '수납', 1.2, 0.4, '미디어 콘솔')];
+  const c = generateLayouts(room, items, 3, 800)[0];
+  const bed = c.items.find((x) => x.id === 'bed'), tv = c.items.find((x) => x.id === 'tv');
+  assert.ok(facing(bed.rotationDeg, tv.rotationDeg), 'TV 앞면이 침대 앞면 정반대');
+  const vert = FR[bed.rotationDeg][1] !== 0;
+  assert.ok((vert ? Math.abs(tv.cx - bed.cx) : Math.abs(tv.cy - bed.cy)) <= 0.5, '침대 중심축 정렬');
+});
+
+test('로컬 R3: 조명이 침대 헤드 쪽·벽면 0~10cm 밀착', () => {
+  const room = { widthM: 3.2, depthM: 4.0 };
+  const items = [mk('bed', '침대', 1.5, 2.0), mk('lamp', '조명', 0.3, 0.3)];
+  const c = generateLayouts(room, items, 3, 800)[0];
+  const lamp = c.items.find((x) => x.id === 'lamp');
+  const b = itemAABB(lamp);
+  const wallgap = Math.min(b.left, 3.2 - b.right, b.top, 4.0 - b.bottom);
+  assert.ok(wallgap <= 0.1, `벽면 0~10cm (got ${wallgap.toFixed(3)})`);
+});
+
 test('validateCandidates: 겹치는 LLM 후보는 폐기', () => {
   const room = { widthM: 3.0, depthM: 4.0 };
   const items = [
