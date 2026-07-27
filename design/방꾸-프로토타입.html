@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css">
+<style>body{margin:0;background:#F0EEE9;font-family:'Pretendard Variable',-apple-system,sans-serif}::-webkit-scrollbar{display:none}@keyframes spin{to{transform:rotate(360deg)}}</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+
+    <sc-if value="{{ isSplash }}" hint-placeholder-val="{{ true }}">
+      <div style="width:100%;height:100%;background:linear-gradient(160deg,#E8C7B2,#835151);display:flex;flex-direction:column;padding:54px 28px 40px;box-sizing:border-box;position:relative;overflow:hidden">
+        <div style="text-align:right;position:relative"><span onClick="{{ goLogin }}" style="font:600 13px 'Pretendard Variable',sans-serif;color:rgba(255,255,255,0.9);cursor:pointer">건너뛰기</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;position:relative">
+          <div style="width:220px;height:220px;border-radius:36px;background:repeating-linear-gradient(45deg,rgba(255,255,255,0.28),rgba(255,255,255,0.28) 10px,rgba(255,255,255,0.14) 10px,rgba(255,255,255,0.14) 20px);display:flex;align-items:center;justify-content:center">
+            <span style="font:600 12px monospace;color:#fff">배치 완성컷 이미지</span>
+          </div>
+          <div style="text-align:center">
+            <div style="font:800 23px/1.4 'Pretendard Variable',sans-serif;color:#fff;margin-bottom:8px">방 사진만 찍으면<br>가구 배치 뚝딱 ✨</div>
+            <div style="font:400 14px/1.6 'Pretendard Variable',sans-serif;color:rgba(255,255,255,0.9)">사이즈 재고 견적 내는 거, 이제 앱이 다 해줄게</div>
+          </div>
+        </div>
+        <div onClick="{{ goLogin }}" style="background:#fff;color:#835151;font:800 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:20px;position:relative;cursor:pointer">다음</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isLogin }}">
+      <div style="width:100%;height:100%;background:#FFF8F3;display:flex;flex-direction:column;padding:80px 32px 44px;box-sizing:border-box">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+          <div style="width:92px;height:92px;border-radius:28px;background:#F2E3DC;display:flex;align-items:center;justify-content:center"><span style="font:700 12px monospace;color:#835151">LOGO</span></div>
+          <div style="font:800 21px 'Pretendard Variable',sans-serif;color:#2B2118">방꾸요정 🧚</div>
+          <div style="font:400 14px 'Pretendard Variable',sans-serif;color:#9C8B7E">3초만에 로그인하고 바로 시작해</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div onClick="{{ goOnboarding }}" style="background:#FEE500;color:#3A2E00;font:700 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px;cursor:pointer">카카오로 계속하기</div>
+          <div onClick="{{ goOnboarding }}" style="background:#03C75A;color:#fff;font:700 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px;cursor:pointer">네이버로 계속하기</div>
+          <div onClick="{{ goOnboarding }}" style="background:#fff;color:#2B2118;font:700 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px;border:1px solid rgba(43,33,24,0.12);cursor:pointer">Google로 계속하기</div>
+          <div onClick="{{ goHome }}" style="text-align:center;font:400 13px 'Pretendard Variable',sans-serif;color:#B5A79A;margin-top:6px;text-decoration:underline;cursor:pointer">나중에 할게요</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isOnboarding }}">
+      <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column;padding:60px 24px 24px;box-sizing:border-box">
+        <div style="font:800 20px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:2px">취향을 알려줘 🐣</div>
+        <div style="font:400 13px 'Pretendard Variable',sans-serif;color:#9C8B7E;margin-bottom:16px">한번에 골라두면 딱 맞는 배치를 추천해줄게</div>
+        <div style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:20px;padding-bottom:8px">
+          <div>
+            <div style="font:700 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">좋아하는 무드 (최대 2개)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <sc-for list="{{ moods }}" as="m" hint-placeholder-count="6">
+                <div onClick="{{ m.toggle }}" style="border-radius:16px;overflow:hidden;background:#fff;cursor:pointer;position:relative;border:{{ m.border }}">
+                  <div style="height:56px;background:{{ m.bg }};display:flex;align-items:center;justify-content:center"><span style="font:600 9px monospace;color:rgba(0,0,0,0.4)">{{ m.name }} 룸 사진</span></div>
+                  <div style="padding:6px 8px;font:700 11.5px 'Pretendard Variable',sans-serif;color:#2B2118">{{ m.name }}</div>
+                  <sc-if value="{{ m.selected }}"><span style="position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;background:#F08FC0;color:#fff;font:700 9px sans-serif;display:flex;align-items:center;justify-content:center">✓</span></sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div>
+            <div style="font:700 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">가구 구매에 쓸 예산은 어느 정도?</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+              <sc-for list="{{ budgets }}" as="b" hint-placeholder-count="5">
+                <span onClick="{{ b.select }}" style="text-align:center;padding:11px 4px;border-radius:14px;background:{{ b.bg }};color:{{ b.fg }};font:700 12px 'Pretendard Variable',sans-serif;cursor:pointer">{{ b.label }}</span>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <div onClick="{{ goHome }}" style="background:#835151;color:#fff;font:800 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px;margin-top:12px;cursor:pointer">방꾸 시작하기</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isHome }}">
+      <div style="width:100%;height:100%;background:#FFF8F3;display:flex;flex-direction:column">
+        <div style="padding:60px 22px 16px"><div style="font:800 19px 'Pretendard Variable',sans-serif;color:#2B2118">안녕, 오늘도 방꾸해볼까? 🧡</div></div>
+        <div style="flex:1;overflow:auto;padding:0 22px 16px;display:flex;flex-direction:column;gap:14px">
+          <div onClick="{{ goUpload }}" style="background:linear-gradient(135deg,#D9A793,#835151);border-radius:24px;padding:22px;cursor:pointer">
+            <div style="font:800 17px 'Pretendard Variable',sans-serif;color:#fff;margin-bottom:6px">새 방 배치 시작하기</div>
+            <div style="font:400 12.5px 'Pretendard Variable',sans-serif;color:rgba(255,255,255,0.9);margin-bottom:14px">사진 한 장이면 충분해</div>
+            <span style="background:#fff;color:#835151;font:700 13px 'Pretendard Variable',sans-serif;padding:10px 18px;border-radius:100px">시작하기 →</span>
+          </div>
+          <div style="background:#fff;border-radius:20px;padding:14px 16px">
+            <div style="font:700 12.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:10px">나의 방꾸 도장</div>
+            <div style="display:flex;justify-content:space-between">
+              <div style="text-align:center"><div style="width:40px;height:40px;border-radius:50%;background:#835151;color:#fff;display:flex;align-items:center;justify-content:center;font:14px sans-serif">✓</div><div style="font:600 10px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-top:5px">취향입력</div></div>
+              <div style="text-align:center"><div style="width:40px;height:40px;border-radius:50%;background:#F5F2EE;color:#C7BCAE;display:flex;align-items:center;justify-content:center;font:14px sans-serif">✓</div><div style="font:600 10px 'Pretendard Variable',sans-serif;color:#C7BCAE;margin-top:5px">방 업로드</div></div>
+              <div style="text-align:center"><div style="width:40px;height:40px;border-radius:50%;background:#F5F2EE;color:#C7BCAE;display:flex;align-items:center;justify-content:center;font:14px sans-serif">✓</div><div style="font:600 10px 'Pretendard Variable',sans-serif;color:#C7BCAE;margin-top:5px">배치 완성</div></div>
+              <div style="text-align:center"><div style="width:40px;height:40px;border-radius:50%;background:#F5F2EE;color:#C7BCAE;display:flex;align-items:center;justify-content:center;font:14px sans-serif">✓</div><div style="font:600 10px 'Pretendard Variable',sans-serif;color:#C7BCAE;margin-top:5px">가구 구매</div></div>
+            </div>
+          </div>
+        </div>
+        <dc-import name="TabBar" active="home" on-home="{{ goHome }}" on-market="{{ goMarket }}" on-mypage="{{ goMypage }}" hint-size="100%,84px"></dc-import>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isUpload }}">
+      <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column;padding:60px 24px 30px;box-sizing:border-box">
+        <div onClick="{{ goHome }}" style="font:700 13px 'Pretendard Variable',sans-serif;color:#9C8B7E;margin-bottom:10px;cursor:pointer">← 뒤로</div>
+        <div style="font:800 20px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:6px">우리 방을 알려줘 📐</div>
+        <div style="font:400 13px 'Pretendard Variable',sans-serif;color:#9C8B7E;margin-bottom:14px">방 치수를 고르거나 도면을 가져오면 그걸로 배치할게</div>
+        <div style="display:flex;gap:8px;background:#FFF3ED;border-radius:100px;padding:4px;margin-bottom:16px">
+          <span onClick="{{ selectDims }}" style="flex:1;text-align:center;padding:10px;border-radius:100px;background:{{ dimsTabBg }};box-shadow:{{ dimsTabShadow }};font:700 13px 'Pretendard Variable',sans-serif;color:{{ dimsTabFg }};cursor:pointer">방 치수 선택</span>
+          <span onClick="{{ selectPlan }}" style="flex:1;text-align:center;padding:10px;border-radius:100px;background:{{ planTabBg }};box-shadow:{{ planTabShadow }};font:700 13px 'Pretendard Variable',sans-serif;color:{{ planTabFg }};cursor:pointer">도면 가져오기</span>
+        </div>
+        <sc-if value="{{ isDimsTab }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;background:#FFF3ED;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:14px">
+            <div>
+              <div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">평수로 고르기</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <sc-for list="{{ pyeongOptions }}" as="p" hint-placeholder-count="5">
+                  <span onClick="{{ p.select }}" style="padding:9px 12px;border-radius:100px;background:{{ p.bg }};color:{{ p.fg }};font:700 12px 'Pretendard Variable',sans-serif;cursor:pointer">{{ p.label }}</span>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:#fff;border-radius:14px;padding:12px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font:600 11.5px 'Pretendard Variable',sans-serif;color:#8A7A6C">예상 방 크기</span>
+              <span style="font:800 14px 'Pretendard Variable',sans-serif;color:#2B2118">{{ estimatedSize }}</span>
+            </div>
+            <span style="align-self:flex-start;background:#F2E3DC;color:#835151;font:700 10.5px 'Pretendard Variable',sans-serif;padding:5px 10px;border-radius:100px">추정 치수</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isPlanTab }}">
+          <div style="flex:1;border-radius:20px;border:2.5px dashed #E3CCC2;background:#FFF8F3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+            <div style="width:44px;height:44px;border-radius:50%;background:#F2E3DC;display:flex;align-items:center;justify-content:center;font:700 18px sans-serif;color:#835151">＋</div>
+            <div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118">도면 이미지 가져오기</div>
+            <div style="font:400 11.5px 'Pretendard Variable',sans-serif;color:#B5A79A">평면도 사진이나 파일이면 돼</div>
+          </div>
+        </sc-if>
+        <div onClick="{{ goPlanner }}" style="margin-top:16px;background:#835151;color:#fff;font:800 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px;cursor:pointer">다음 → 배치하러 가기</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isPlanner }}">
+      <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column;padding:60px 16px 16px;box-sizing:border-box">
+        <div onClick="{{ goUpload }}" style="font:700 13px 'Pretendard Variable',sans-serif;color:#9C8B7E;margin-bottom:8px;cursor:pointer">← 뒤로</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font:800 15px 'Pretendard Variable',sans-serif;color:#2B2118">🧚 방꾸요정</span></div>
+        <div style="flex:1;background:#FFF3ED;border-radius:16px;position:relative;overflow:hidden;margin-bottom:12px">
+          <div style="position:absolute;left:8%;top:6%;right:8%;bottom:8%;background:#fff;border:1px solid rgba(43,33,24,0.08)"></div>
+          <div style="position:absolute;left:8%;top:6%;width:34%;height:44%;background:#F2E3DC;border:2px solid #835151;border-radius:4px"></div>
+          <div style="position:absolute;left:44%;top:6%;width:20%;height:24%;background:#EAD7CE;border-radius:4px"></div>
+          <div style="position:absolute;left:66%;top:6%;width:26%;height:34%;background:#FFD9C4;border-radius:4px"></div>
+        </div>
+        <div onClick="{{ goLoading }}" style="background:#835151;color:#fff;font:800 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px;cursor:pointer">✨ 이 배치로 방 채우기</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isLoading }}">
+      <div style="width:100%;height:100%;background:#2B2118;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px">
+        <div style="width:56px;height:56px;border-radius:50%;border:4px solid rgba(255,255,255,0.18);border-top-color:#F08FC0;animation:spin 0.9s linear infinite"></div>
+        <div style="font:700 14.5px 'Pretendard Variable',sans-serif;color:#fff">방을 예쁘게 채우는 중이야 🧚</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isResult }}">
+      <div style="width:100%;height:100%;background:#2B2118;position:relative">
+        <sc-if value="{{ showBefore }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,#E7E3DE,#E7E3DE 10px,#F2EFEA 10px,#F2EFEA 20px);display:flex;align-items:center;justify-content:center">
+            <span style="font:600 12px monospace;color:#8A7A6C">빈 방 원본 사진 (Before)</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ !showBefore }}" hint-placeholder-val="{{ true }}">
+          <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,#4a3a2c,#4a3a2c 10px,#3a2c20 10px,#3a2c20 20px);display:flex;align-items:center;justify-content:center">
+            <span style="font:600 12px monospace;color:rgba(255,255,255,0.6)">완성된 배치 이미지 (After)</span>
+          </div>
+        </sc-if>
+        <div style="position:absolute;top:60px;left:20px;right:20px;display:flex;justify-content:space-between">
+          <span onClick="{{ goPlanner }}" style="width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer">←</span>
+          <span onClick="{{ toggleBeforeAfter }}" style="padding:8px 14px;border-radius:100px;background:rgba(0,0,0,0.4);color:#fff;font:700 12px 'Pretendard Variable',sans-serif;cursor:pointer;white-space:nowrap">{{ beforeAfterLabel }}</span>
+        </div>
+        <sc-if value="{{ !showBefore }}">
+          <div style="position:absolute;top:106px;left:20px;background:#F08FC0;color:#fff;font:700 10.5px 'Pretendard Variable',sans-serif;padding:6px 12px;border-radius:100px;max-width:280px;white-space:nowrap">🪄 목업이야 · 실제 조명·재질은 조금 다를 수 있어</div>
+        </sc-if>
+        <div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:28px 28px 0 0;padding:20px 20px 30px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118">예상 견적 💰</span>
+            <span style="font:800 18px 'Pretendard Variable',sans-serif;color:#835151">142만원</span>
+          </div>
+          <div style="display:flex;gap:10px">
+            <span onClick="{{ goPlanner }}" style="flex:1;text-align:center;padding:14px;border-radius:16px;background:#FFF3ED;color:#2B2118;font:700 14px 'Pretendard Variable',sans-serif;cursor:pointer">다시 배치</span>
+            <span onClick="{{ goMarket }}" style="flex:1;text-align:center;padding:14px;border-radius:16px;background:#835151;color:#fff;font:700 14px 'Pretendard Variable',sans-serif;cursor:pointer">닮은 상품 찾기</span>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isMarket }}">
+<div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column;position:relative">
+        <div style="padding:60px 18px 0;flex:1;overflow:auto;display:flex;flex-direction:column">
+          <div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto">
+            <sc-for list="{{ categories }}" as="cat" hint-placeholder-count="5">
+              <span onClick="{{ cat.select }}" style="padding:8px 14px;border-radius:100px;background:{{ cat.bg }};color:{{ cat.fg }};font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap;cursor:pointer">{{ cat.label }}</span>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:8px;background:#FFF3ED;border-radius:100px;padding:11px 16px;margin-bottom:12px"><span style="font:400 13px 'Pretendard Variable',sans-serif;color:#B5A79A">우리 방에 어울리는 {{ activeCategory }} 찾기</span></div>
+          <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto">
+            <sc-for list="{{ marketChips }}" as="c" hint-placeholder-count="4">
+              <span onClick="{{ c.toggle }}" style="padding:8px 14px;border-radius:100px;background:{{ c.bg }};color:{{ c.fg }};font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:5px">{{ c.label }}<sc-if value="{{ c.badge }}"><span style="background:#fff;color:{{ c.badgeFg }};width:16px;height:16px;border-radius:50%;font:800 9px 'Pretendard Variable',sans-serif;display:flex;align-items:center;justify-content:center">{{ c.badge }}</span></sc-if></span>
+            </sc-for>
+          </div>
+          <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-bottom:12px">
+            <div><div style="border-radius:18px;background:#EAD7CE;aspect-ratio:1;position:relative"><span style="position:absolute;bottom:8px;left:8px;width:18px;height:18px;border-radius:50%;background:#03C75A;color:#fff;font:700 10px sans-serif;display:flex;align-items:center;justify-content:center">N</span></div><div style="font:700 12.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-top:6px">라운드 러그</div><div style="font:800 12.5px 'Pretendard Variable',sans-serif;color:#835151">39,000원</div></div>
+            <div><div style="border-radius:18px;background:#FFD9C4;aspect-ratio:1;position:relative"><span style="position:absolute;bottom:8px;left:8px;width:18px;height:18px;border-radius:50%;background:#03C75A;color:#fff;font:700 10px sans-serif;display:flex;align-items:center;justify-content:center">N</span></div><div style="font:700 12.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-top:6px">우드 스탠드</div><div style="font:800 12.5px 'Pretendard Variable',sans-serif;color:#835151">58,000원</div></div>
+          </div>
+        </div>
+        <dc-import name="TabBar" active="market" on-home="{{ goHome }}" on-market="{{ goMarket }}" on-mypage="{{ goMypage }}" hint-size="100%,84px"></dc-import>
+
+        <sc-if value="{{ isMoodSheet }}">
+          <div style="position:absolute;inset:0;background:rgba(43,33,24,0.35);display:flex;flex-direction:column;justify-content:flex-end">
+            <div style="background:#fff;border-radius:24px 24px 0 0;padding:20px 18px 28px;display:flex;flex-direction:column;gap:14px">
+              <div style="width:36px;height:4px;border-radius:100px;background:#E7E1D8;margin:0 auto"></div>
+              <div style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118">어떤 분위기가 좋아? (최대 2개)</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                <sc-for list="{{ marketMoods }}" as="m" hint-placeholder-count="6">
+                  <div onClick="{{ m.toggle }}" style="border-radius:14px;overflow:hidden;background:#F5F2EE;position:relative;cursor:pointer;border:{{ m.border }}">
+                    <div style="height:44px;background:{{ m.bg }}"></div>
+                    <div style="padding:5px 6px;font:700 10.5px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">{{ m.name }}</div>
+                    <sc-if value="{{ m.selected }}"><span style="position:absolute;top:4px;right:4px;width:14px;height:14px;border-radius:50%;background:#835151;color:#fff;font:700 8px sans-serif;display:flex;align-items:center;justify-content:center">✓</span></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+              <div onClick="{{ closeSheet }}" style="background:#835151;color:#fff;font:800 14px 'Pretendard Variable',sans-serif;text-align:center;padding:14px;border-radius:16px;cursor:pointer">적용하기</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isPriceSheet }}">
+          <div style="position:absolute;inset:0;background:rgba(43,33,24,0.35);display:flex;flex-direction:column;justify-content:flex-end">
+            <div style="background:#fff;border-radius:24px 24px 0 0;padding:20px 18px 28px;display:flex;flex-direction:column;gap:14px">
+              <div style="width:36px;height:4px;border-radius:100px;background:#E7E1D8;margin:0 auto"></div>
+              <div style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118">가격대는 어느 정도가 좋아?</div>
+              <div style="display:flex;gap:6px">
+                <sc-for list="{{ marketPrices }}" as="p" hint-placeholder-count="5">
+                  <span onClick="{{ p.select }}" style="flex:1;text-align:center;padding:10px 4px;border-radius:100px;background:{{ p.bg }};color:{{ p.fg }};font:700 11px 'Pretendard Variable',sans-serif;white-space:nowrap;cursor:pointer">{{ p.label }}</span>
+                </sc-for>
+              </div>
+              <div onClick="{{ closeSheet }}" style="background:#835151;color:#fff;font:800 14px 'Pretendard Variable',sans-serif;text-align:center;padding:14px;border-radius:16px;cursor:pointer">적용하기</div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isMypage }}">
+      <div style="width:100%;height:100%;background:#FFF8F3;display:flex;flex-direction:column">
+        <div style="flex:1;overflow:auto;padding:60px 22px 16px;display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:56px;height:56px;border-radius:50%;background:#EAD7CE"></div>
+            <div style="flex:1"><div style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118">soomin.room</div><div style="font:400 12px 'Pretendard Variable',sans-serif;color:#9C8B7E">원룸 · 코지 우드 무드</div></div>
+          </div>
+          <div>
+            <div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">내 취향 태그</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <span style="padding:9px 14px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 12px 'Pretendard Variable',sans-serif">코지 우드</span>
+              <span style="padding:9px 14px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 12px 'Pretendard Variable',sans-serif">예산 150만원</span>
+            </div>
+          </div>
+        </div>
+        <dc-import name="TabBar" active="mypage" on-home="{{ goHome }}" on-market="{{ goMarket }}" on-mypage="{{ goMypage }}" hint-size="100%,84px"></dc-import>
+      </div>
+    </sc-if>
+
+  </x-import>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    screen: 'splash',
+    moods: ['포근한 북유럽', '시크한 인더스트리얼', '화사한 내추럴', '모던', '빈티지 레트로', '러블리 파스텔'],
+    selectedMoods: ['포근한 북유럽', '러블리 파스텔'],
+    budget: '30~50만원',
+    marketFilters: {},
+    roomInputTab: 'dims',
+    pyeong: '6.5평',
+    showBefore: false,
+    marketSheet: null,
+    marketSelectedMoods: [],
+    marketPrice: null,
+    category: '침대',
+  };
+
+  go(screen) {
+    this.setState({ screen, showBefore: false });
+    if (screen === 'loading') {
+      setTimeout(() => this.setState({ screen: 'result' }), 1400);
+    }
+  }
+
+  toggleMood(name) {
+    this.setState(s => {
+      const has = s.selectedMoods.includes(name);
+      let next = has ? s.selectedMoods.filter(m => m !== name) : [...s.selectedMoods, name];
+      if (next.length > 2) next = next.slice(1);
+      return { selectedMoods: next };
+    });
+  }
+
+  moodBg(name) {
+    const map = {
+      '포근한 북유럽': 'repeating-linear-gradient(45deg,#E8DCCB,#E8DCCB 7px,#F2E9DD 7px,#F2E9DD 14px)',
+      '시크한 인더스트리얼': 'repeating-linear-gradient(45deg,#B8B2A8,#B8B2A8 7px,#CFCAC1 7px,#CFCAC1 14px)',
+      '화사한 내추럴': 'repeating-linear-gradient(45deg,#C7D4B8,#C7D4B8 7px,#DDE6D2 7px,#DDE6D2 14px)',
+      '모던': 'repeating-linear-gradient(45deg,#C9CDD1,#C9CDD1 7px,#E2E5E7 7px,#E2E5E7 14px)',
+      '빈티지 레트로': 'repeating-linear-gradient(45deg,#D9B679,#D9B679 7px,#E7CE9C 7px,#E7CE9C 14px)',
+      '러블리 파스텔': 'repeating-linear-gradient(45deg,#F0CFDA,#F0CFDA 7px,#F8E4EA 7px,#F8E4EA 14px)',
+    };
+    return map[name];
+  }
+
+  renderVals() {
+    const s = this.state;
+    const pyeongList = ['4평', '5평', '6.5평', '8평', '10평+'];
+    const pyeongOptions = pyeongList.map(label => ({
+      label,
+      select: () => this.setState({ pyeong: label }),
+      bg: s.pyeong === label ? '#835151' : '#fff',
+      fg: s.pyeong === label ? '#fff' : '#8A7A6C',
+    }));
+    const sizeMap = { '4평': '약 2.4m × 3.1m', '5평': '약 2.6m × 3.4m', '6.5평': '약 2.8m × 3.6m', '8평': '약 3.1m × 4.0m', '10평+': '약 3.5m × 4.5m' };
+    const isDimsTab = s.roomInputTab === 'dims';
+    const isPlanTab = s.roomInputTab === 'plan';
+    const budgets = ['10만원 이하', '10~30만원', '30~50만원', '50~100만원', '100만원+'].map(label => ({
+      label,
+      select: () => this.setState({ budget: label }),
+      bg: s.budget === label ? '#835151' : '#FFF3ED',
+      fg: s.budget === label ? '#fff' : '#8A7A6C',
+    }));
+    const moods = s.moods.map(name => ({
+      name,
+      selected: s.selectedMoods.includes(name),
+      border: s.selectedMoods.includes(name) ? '2px solid #835151' : '2px solid transparent',
+      bg: this.moodBg(name),
+      toggle: () => this.toggleMood(name),
+    }));
+    const chipDefs = [
+      { key: 'mood', label: '분위기', open: 'mood' },
+      { key: 'price', label: '가격대', open: 'price' },
+      { key: 'size', label: '사이즈' },
+      { key: 'ship', label: '배송' },
+    ];
+    const marketChips = chipDefs.map(c => {
+      const active = c.key === 'mood' ? s.marketSelectedMoods.length > 0 : c.key === 'price' ? !!s.marketPrice : !!s.marketFilters[c.key];
+      const badge = c.key === 'mood' && s.marketSelectedMoods.length ? String(s.marketSelectedMoods.length) : null;
+      return {
+        label: c.label,
+        toggle: c.open ? (() => this.setState({ marketSheet: c.open })) : (() => this.setState(st => ({ marketFilters: { ...st.marketFilters, [c.key]: !st.marketFilters[c.key] } }))),
+        bg: active ? '#835151' : '#F5F2EE',
+        fg: active ? '#fff' : '#8A7A6C',
+        badge,
+        badgeFg: '#835151',
+      };
+    });
+    const marketMoods = s.moods.map(name => ({
+      name,
+      selected: s.marketSelectedMoods.includes(name),
+      border: s.marketSelectedMoods.includes(name) ? '2px solid #835151' : '2px solid transparent',
+      bg: this.moodBg(name),
+      toggle: () => this.setState(st => {
+        const has = st.marketSelectedMoods.includes(name);
+        let next = has ? st.marketSelectedMoods.filter(m => m !== name) : [...st.marketSelectedMoods, name];
+        if (next.length > 2) next = next.slice(1);
+        return { marketSelectedMoods: next };
+      }),
+    }));
+    const categories = ['침대', '책상·의자', '수납', '조명', '러그'].map(label => ({
+      label,
+      select: () => this.setState({ category: label }),
+      bg: s.category === label ? '#2B2118' : '#F5F2EE',
+      fg: s.category === label ? '#fff' : '#8A7A6C',
+    }));
+    const marketPrices = ['~10만', '10~30', '30~50', '50~100', '100+'].map(label => ({
+      label,
+      select: () => this.setState({ marketPrice: label }),
+      bg: s.marketPrice === label ? '#835151' : '#F5F2EE',
+      fg: s.marketPrice === label ? '#fff' : '#8A7A6C',
+    }));
+    return {
+      isSplash: s.screen === 'splash',
+      isLogin: s.screen === 'login',
+      isOnboarding: s.screen === 'onboarding',
+      isHome: s.screen === 'home',
+      isUpload: s.screen === 'upload',
+      isPlanner: s.screen === 'planner',
+      isLoading: s.screen === 'loading',
+      isResult: s.screen === 'result',
+      isMarket: s.screen === 'market',
+      isMypage: s.screen === 'mypage',
+      goLogin: () => this.go('login'),
+      goOnboarding: () => this.go('onboarding'),
+      goHome: () => this.go('home'),
+      goUpload: () => this.go('upload'),
+      goPlanner: () => this.go('planner'),
+      goLoading: () => this.go('loading'),
+      goMarket: () => this.go('market'),
+      goMypage: () => this.go('mypage'),
+      showBefore: s.showBefore,
+      beforeAfterLabel: s.showBefore ? 'After 보기' : 'Before/After',
+      toggleBeforeAfter: () => this.setState(st => ({ showBefore: !st.showBefore })),
+      moods,
+      budgets,
+      marketChips,
+      marketMoods,
+      marketPrices,
+      categories,
+      activeCategory: s.category,
+      isMoodSheet: s.marketSheet === 'mood',
+      isPriceSheet: s.marketSheet === 'price',
+      closeSheet: () => this.setState({ marketSheet: null }),
+      isDimsTab,
+      isPlanTab,
+      selectDims: () => this.setState({ roomInputTab: 'dims' }),
+      selectPlan: () => this.setState({ roomInputTab: 'plan' }),
+      dimsTabBg: isDimsTab ? '#fff' : 'transparent',
+      dimsTabFg: isDimsTab ? '#2B2118' : '#9C8B7E',
+      dimsTabShadow: isDimsTab ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
+      planTabBg: isPlanTab ? '#fff' : 'transparent',
+      planTabFg: isPlanTab ? '#2B2118' : '#9C8B7E',
+      planTabShadow: isPlanTab ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
+      pyeongOptions,
+      estimatedSize: sizeMap[s.pyeong],
+    };
+  }
+}
+
+</script>
+</body>
+</html>
