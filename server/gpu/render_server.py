@@ -20,10 +20,10 @@ def auto_camera(view, W, D, H):
     cx, cy = W * 0.5, D * 0.5
     if view == "cozy":
         cam = {"pos": [-W * 0.28, -D * 0.30, H * 0.46], "target": [cx * 1.08, cy * 1.02, 0.45], "lens": 30}
-    else:  # wide (기본)
-        b = 0.6 + 0.30 * max(W, D)
-        cam = {"pos": [-b * 0.62, -b * 0.62, min(1.45 + 0.42 * H, H * 0.92)],
-               "target": [cx, cy * 0.96, 0.35], "lens": 24}
+    else:  # wide (기본) — 방 전체가 여백과 함께 들어오게 코너 밖으로 더 물러남(줌/잘림 완화)
+        b = 0.75 + 0.38 * max(W, D)
+        cam = {"pos": [-b * 0.80, -b * 0.80, min(1.65 + 0.42 * H, H * 1.0)],
+               "target": [cx, cy * 0.93, 0.4], "lens": 22}
     return cam, ["near", "left", "ceil"]
 
 

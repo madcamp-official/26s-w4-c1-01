@@ -397,7 +397,8 @@ input[type="number"], input[type="text"], select {
 /* ── 합성 결과 ── */
 .result { background: var(--ink); position: relative; padding: 0; overflow: hidden; }
 .result .canvas { position: absolute; inset: 0; }
-.result .canvas img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* contain — 세로 폰에서 가로(16:9) 렌더가 양옆으로 잘리지 않게 전체를 보여줌(어두운 여백은 결과 배경과 융화) */
+.result .canvas img { width: 100%; height: 100%; object-fit: contain; object-position: center 44%; display: block; }
 .hatch-after { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   background: repeating-linear-gradient(45deg, #4a3a2c, #4a3a2c 10px, #3a2c20 10px, #3a2c20 20px); color: rgba(255,255,255,.6); font: 600 12px monospace; }
 .hatch-before { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
