@@ -21,7 +21,7 @@ export function validateCandidates(candidates, room, items, openings = []) {
     if (!complete) continue;                      // 일부 가구 누락 → 폐기
     const nonRug = mapped.filter((it) => it.cat !== '러그');
     if (!validateLayout(nonRug, W, D).ok) continue; // 겹침/방밖 → 폐기(핵심 안전망)
-    if (openings.length && nonRug.some((it) => openings.some((o) => openingBlocksAABB(itemAABB(it), o, W, D)))) continue; // 문 스윙/창 가리면 폐기
+    if (openings.length && nonRug.some((it) => openings.some((o) => openingBlocksAABB(itemAABB(it), o, W, D, it.hM)))) continue; // 문 스윙/창 가리면 폐기
     const touch = nonRug.filter((it) => {
       const b = itemAABB(it);
       return b.left < EDGE || b.top < EDGE || b.right > W - EDGE || b.bottom > D - EDGE;
@@ -104,7 +104,7 @@ function interiorCandidates(it, W, D) {
 }
 // 겹치지 않고 개구부(문 스윙/창)도 안 가리는 첫 자리(벽 먼저, 없으면 내부). 없으면 null.
 function placeItem(it, placedBoxes, W, D, openings) {
-  const free = (b) => placedBoxes.every((pb) => !aabbOverlap(b, pb)) && !openings.some((o) => openingBlocksAABB(b, o, W, D));
+  const free = (b) => placedBoxes.every((pb) => !aabbOverlap(b, pb)) && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM));
   for (const c of shuffle(wallCandidates(it, W, D))) {
     const b = boxAt(it, c.cx, c.cy, c.rot);
     if (free(b)) return { ...c, box: b, onWall: true };
@@ -119,7 +119,7 @@ function placeItem(it, placedBoxes, W, D, openings) {
 // 아이템을 (cx,cy,rot)에 확정 배치(빈자리면 push하고 true).
 function commit(it, cx, cy, rot, placed, W, D, openings) {
   const b = boxAt(it, cx, cy, rot);
-  const free = placed.every((pb) => !aabbOverlap(b, pb)) && !openings.some((o) => openingBlocksAABB(b, o, W, D));
+  const free = placed.every((pb) => !aabbOverlap(b, pb)) && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM));
   if (!inRoom(b, W, D) || !free) return false;
   it.cx = cx; it.cy = cy; it.rotationDeg = rot; placed.push(b);
   return true;
@@ -144,7 +144,7 @@ function placeDeskChair(desk, chair, placed, W, D, openings) {
   for (const wall of shuffle(['top', 'bottom', 'left', 'right'])) {
     for (const c of shuffle(wallSlots(desk, wall, W, D))) {
       const deskBox = boxAt(desk, c.cx, c.cy, c.rot);
-      const deskFree = placed.every((pb) => !aabbOverlap(deskBox, pb)) && !openings.some((o) => openingBlocksAABB(deskBox, o, W, D));
+      const deskFree = placed.every((pb) => !aabbOverlap(deskBox, pb)) && !openings.some((o) => openingBlocksAABB(deskBox, o, W, D, desk.hM));
       if (!inRoom(deskBox, W, D) || !deskFree) continue;
       if (!chair) { desk.cx = c.cx; desk.cy = c.cy; desk.rotationDeg = c.rot; placed.push(deskBox); return { wall, chair: false }; }
       const crot = (c.rot + 180) % 360;                 // 의자 앞면이 책상 향함
@@ -153,7 +153,7 @@ function placeDeskChair(desk, chair, placed, W, D, openings) {
       const chx = c.cx + f[0] * off, chy = c.cy + f[1] * off;
       const chairBox = boxAt(chair, chx, chy, crot);
       const chairFree = placed.every((pb) => !aabbOverlap(chairBox, pb)) && !aabbOverlap(chairBox, deskBox)
-        && !openings.some((o) => openingBlocksAABB(chairBox, o, W, D));
+        && !openings.some((o) => openingBlocksAABB(chairBox, o, W, D, chair.hM));
       if (!inRoom(chairBox, W, D) || !chairFree) continue;
       desk.cx = c.cx; desk.cy = c.cy; desk.rotationDeg = c.rot; placed.push(deskBox);
       chair.cx = chx; chair.cy = chy; chair.rotationDeg = crot; placed.push(chairBox);

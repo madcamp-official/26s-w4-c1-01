@@ -2,7 +2,7 @@
 // 핵심: generateLayouts가 내놓는 모든 후보는 '겹침 0 + 방밖 0'이어야 한다(사용자 요구: 겹치면 기각).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB } from './geometry.js';
+import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB, WINDOW_SILL_M } from './geometry.js';
 import { generateLayouts, validateCandidates } from './autolayout.js';
 
 // 결정론적 PRNG(가구셋 생성용) — 레이아웃 내부 랜덤과 무관하게 '입력'만 재현 가능하게.
@@ -106,7 +106,7 @@ test('openingZones: 벽별 존 좌표', () => {
   assert.deepEqual(zl, { left: 0, right: 0.6, top: 1.5, bottom: 2.5 });
 });
 
-test('generateLayouts: 창문 앞 확보 — 창 keep-clear에 solid 없음', () => {
+test('generateLayouts: 창문은 창턱보다 높은 가구만 회피(낮은 가구는 창 앞 허용)', () => {
   const room = { widthM: 3.0, depthM: 4.0 };
   const items = [
     { id: 'bed', cat: '침대', name: '침대', wM: 1.6, dM: 2.0, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 },
@@ -118,8 +118,9 @@ test('generateLayouts: 창문 앞 확보 — 창 keep-clear에 solid 없음', ()
   assert.ok(cands.length >= 1, '창문이 있어도 배치는 가능해야');
   const zones = openingZones(openings, 3.0, 4.0);
   for (const c of cands) {
-    for (const it of c.items.filter((x) => x.cat !== '러그')) {
-      for (const z of zones) assert.ok(!aabbOverlap(itemAABB(it), z), `${it.id}가 창을 가리면 안 됨`);
+    // 창턱(1.1m)보다 높은 가구(책장 1.8m)만 창 앞을 비워야 함. 낮은 침대·책상은 창 앞 허용.
+    for (const it of c.items.filter((x) => x.hM > WINDOW_SILL_M)) {
+      for (const z of zones) assert.ok(!aabbOverlap(itemAABB(it), z), `키큰 ${it.id}가 창을 가리면 안 됨`);
     }
   }
 });
