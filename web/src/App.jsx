@@ -3,7 +3,7 @@ import { toPlacedItem, resolveDims, CATALOG } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
 import { fetchDims, layoutFurniture, renderScene, chatLayout } from './lib/api.js';
-import { parseCommand } from './lib/chatcmd.js';
+import { parseCommand, hasPlaceHint } from './lib/chatcmd.js';
 
 import TabBar from './components/TabBar.jsx';
 import Splash from './components/Splash.jsx';
@@ -56,6 +56,7 @@ export default function App() {
   );
   const sel = items.find((it) => it.id === selectedId);
   const estimate = useMemo(() => items.reduce((s, it) => s + (typeof it.price === 'number' && it.price > 0 ? it.price : 0), 0), [items]);
+  const estimateIsEst = useMemo(() => items.some((it) => it.priceEst), [items]);   // 추정가 포함 여부
 
   // ── 가구/배치 조작(기존 오케스트레이션 보존) ──
   function addFurniture(cat) {
@@ -161,7 +162,23 @@ export default function App() {
     }
     return null;
   }
+  // LLM 좌표 응답(cm)을 base 배치에 적용 → 검증 통과 시 새 배열, 실패 시 null.
+  function applyLLMPositions(base, rItems) {
+    if (!Array.isArray(rItems) || !rItems.length) return null;
+    const map = new Map(rItems.map((it) => [it.id, it]));
+    const next = base.map((it) => {
+      const ni = map.get(it.id);
+      if (!ni) return it;
+      const rot = [0, 90, 180, 270].includes(ni.rotation) ? ni.rotation : it.rotationDeg;
+      const cx = Number.isFinite(ni.cx) ? ni.cx / 100 : it.cx;
+      const cy = Number.isFinite(ni.cy) ? ni.cy / 100 : it.cy;
+      return { ...it, cx, cy, rotationDeg: rot };
+    });
+    const v = validateLayout(next.filter((it) => it.cat !== '러그'), room.widthM, room.depthM, openings);
+    return v.ok && !v.blockOpen ? next : null;
+  }
   // 배치 도우미 제출 — 빠른 명령이면 로컬 적용, 아니면 LLM 재배치. 적용되면 결과 화면으로.
+  // '창가에 조명 추가해줘'처럼 위치가 있는 추가는 2단계: 로컬 추가 → LLM이 문장대로 위치 조정.
   // 반환: { applied, reply } — applied면 결과로 이동(칩/문장 전송 → 로딩 → 결과).
   async function onChatSubmit(text, history = []) {
     if (!room) return { applied: false, reply: '먼저 방을 만들어 주세요.' };
@@ -173,23 +190,22 @@ export default function App() {
       }
       const next = applyChatCommand(cmd);
       if (!next) return { applied: false, reply: '그 요청은 반영하기 어려워요.' };
+      if (cmd.op === 'add' && hasPlaceHint(text)) {
+        // 위치 표현이 있으면 LLM에게 방금 추가한 가구를 문장대로 옮기게 함(실패해도 추가 자체는 유지).
+        const added = next[next.length - 1];
+        const r = await chatLayout(room, openings, next, `${text} — 방금 추가한 '${added.name}'(id: ${added.id})의 위치를 이 문장대로 조정해줘.`, history);
+        const moved = r?.decision === 'apply' ? applyLLMPositions(next, r.items) : null;
+        goResultWith(moved || next);
+        return { applied: true };
+      }
       goResultWith(next);
       return { applied: true };
     }
     // 자연어 → LLM 재배치(기존 위치 재검증 후에만 반영)
     const r = await chatLayout(room, openings, items, text, history);
-    if (r.decision === 'apply' && Array.isArray(r.items) && r.items.length) {
-      const map = new Map(r.items.map((it) => [it.id, it]));
-      const next = items.map((it) => {
-        const ni = map.get(it.id);
-        if (!ni) return it;
-        const rot = [0, 90, 180, 270].includes(ni.rotation) ? ni.rotation : it.rotationDeg;
-        const cx = Number.isFinite(ni.cx) ? ni.cx / 100 : it.cx;
-        const cy = Number.isFinite(ni.cy) ? ni.cy / 100 : it.cy;
-        return { ...it, cx, cy, rotationDeg: rot };
-      });
-      const v = validateLayout(next.filter((it) => it.cat !== '러그'), room.widthM, room.depthM, openings);
-      if (v.ok && !v.blockOpen) { goResultWith(next); return { applied: true }; }
+    if (r.decision === 'apply') {
+      const next = applyLLMPositions(items, r.items);
+      if (next) { goResultWith(next); return { applied: true }; }
       return { applied: false, reply: (r.reason || '') + ' — 다만 겹치거나 문·창을 가려서 반영하진 않았어요. 🚫' };
     }
     return { applied: false, reply: r.reason || '그 요청은 반영하기 어려워요.' };
@@ -263,7 +279,7 @@ export default function App() {
       {screen === 'result' && (
         <CompositeResult
           renderImg={renderImg} renderBusy={renderBusy} showBefore={showBefore}
-          onToggle={() => setShowBefore((v) => !v)} photo={roomPhoto} estimate={estimate}
+          onToggle={() => setShowBefore((v) => !v)} photo={roomPhoto} estimate={estimate} estimateIsEst={estimateIsEst}
           timePreset={renderPreset} onTime={(p) => renderWith(p, renderView)}
           view={renderView} onView={(v) => renderWith(renderPreset, v)}
           onBack={() => setScreen('planner')} onRerender={() => setScreen('planner')} onFindSimilar={findSimilar}

@@ -179,9 +179,11 @@ input[type="number"], input[type="text"], select {
 .chat-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
 .chat-msg.assistant { align-self: flex-start; background: var(--chip); color: var(--ink); border-bottom-left-radius: 4px; }
 .chat-msg.busy { color: var(--muted); font-style: italic; }
-/* 자주 쓰는 문장 칩 — 누르면 입력창에 채워짐 */
-.chat-chips { display: flex; gap: 6px; padding: 10px 12px 0; overflow-x: auto; }
+/* 자주 쓰는 문장 칩 — 누르면 입력창에 채워짐. 우측 페이드로 '더 있음' 힌트(마지막 칩 잘림 안내). */
+.chat-chips { display: flex; gap: 6px; padding: 10px 12px 0; overflow-x: auto;
+  -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
 .chat-chips::-webkit-scrollbar { display: none; }
+.chat-chips::after { content: ''; flex: none; width: 28px; }   /* 끝 여백 — 마지막 칩이 페이드에 안 가리게 */
 .chat-chip { flex: none; border: 1px solid var(--line); background: var(--bg2); color: var(--accent); font-weight: 700; font-size: 12px; padding: 7px 12px; border-radius: var(--r-pill); white-space: nowrap; }
 .chat-chip:hover { border-color: var(--accent); }
 .chat-chip:disabled { opacity: .5; }
@@ -436,7 +438,9 @@ input[type="number"], input[type="text"], select {
 /* ── 마켓 탭 ── */
 .market { background: #fff; }   /* position:relative 없음 → 바텀시트가 .phone에 스코프되어 탭바까지 덮음(플래너 드로어와 동일) */
 .market .body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 56px 18px 0; display: flex; flex-direction: column; }
-.catseg { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
+/* 카테고리 세그먼트 — 스크롤해도 상단 고정(반쯤 잘린 채 밀려나지 않게 + 스크롤 중 카테고리 전환 가능) */
+.catseg { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding: 6px 0 8px;
+  position: sticky; top: 0; background: #fff; z-index: 2; }
 .catseg::-webkit-scrollbar { display: none; }
 .search-fake { display: flex; align-items: center; gap: 8px; background: var(--bg2); border-radius: var(--r-pill); padding: 11px 16px; margin-bottom: 12px; border: 0; width: 100%; }
 .search-fake input { flex: 1; border: 0; background: transparent; font-size: 13px; color: var(--ink); outline: none; }

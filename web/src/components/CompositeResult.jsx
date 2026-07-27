@@ -4,7 +4,7 @@ const TIMES = [['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['nig
 const VIEWS = [['wide', '와이드'], ['cozy', '아늑'], ['me', '내 시점']];
 
 export default function CompositeResult({
-  renderImg, renderBusy, showBefore, onToggle, photo, estimate,
+  renderImg, renderBusy, showBefore, onToggle, photo, estimate, estimateIsEst,
   timePreset, onTime, view, onView, onBack, onRerender, onFindSimilar,
 }) {
   if (renderBusy && !renderImg) {
@@ -62,8 +62,8 @@ export default function CompositeResult({
           <span className="angle-hint">각도</span>
         </div>
         <div className="estimate">
-          <span className="k">예상 견적 💰</span>
-          <span className="v">{estimate > 0 ? `${estimate.toLocaleString()}원` : '가격 정보 없음'}</span>
+          <span className="k">예상 견적 💰{estimateIsEst && <span className="badge est sm">추정</span>}</span>
+          <span className="v">{estimate > 0 ? `${estimateIsEst ? '약 ' : ''}${estimate.toLocaleString()}원` : '추정 견적 준비 중'}</span>
         </div>
         <div className="acts">
           <button className="sheet-btn sub" onClick={onRerender}>다시 배치</button>

@@ -26,9 +26,19 @@ const SEED = [
   { id: 'lamp-floor', name: '플로어 스탠드', cat: '조명', w: 30, d: 30, h: 150, lowBox: false, color: '#cfc4ad', source: 'IKEA', dimAccuracy: '정형' },
 ];
 
+// ABO 카탈로그에는 판매가가 없다 → 카테고리·크기 기반 추정가(KRW)를 채워 견적·가격필터가 동작하게.
+// 만원 단위 반올림, priceEst=true로 '추정가'임을 표시(정직 원칙 — UI가 추정임을 밝힘).
+const PRICE_MODEL = { '침대': [250000, 8], '소파': [180000, 10], '책상': [90000, 6], '의자': [60000, 8], '수납': [80000, 6], '조명': [45000, 15], '러그': [30000, 1.2], '테이블': [50000, 8] };
+function estimatePrice(it) {
+  const [base, k] = PRICE_MODEL[it.cat] || [50000, 5];
+  const area = ((it.w || 60) * (it.d || 60)) / 100;          // cm²/100
+  return Math.max(10000, Math.round((base + area * k * 100) / 10000) * 10000);
+}
+const withPrice = (list) => list.map((it) => (typeof it.price === 'number' ? it : { ...it, price: estimatePrice(it), priceEst: true }));
+
 // 3D 피벗: 실측 GLB 카탈로그(ABO3D) 우선 → 없으면 누끼 이미지(ABO) → 색상 시드(SEED)
 // (사진→3D 생성은 가구 품질이 폐급이라 폐기 — 아키스케치처럼 큐레이션 실측 카탈로그로.)
-export const CATALOG = ABO3D.length ? ABO3D : (ABO.length ? ABO : SEED);
+export const CATALOG = withPrice(ABO3D.length ? ABO3D : (ABO.length ? ABO : SEED));
 export const CATEGORIES = [...new Set(CATALOG.map((c) => c.cat))];
 
 // 카테고리별 표준 치수(cm) — 실제 치수가 미상인 실상품(네이버 등)의 기본값.
@@ -137,6 +147,7 @@ export function toPlacedItem(cat, cx, cy, rotationDeg = 0) {
     dimAccuracy: d.accuracy,
     source: cat.source,
     price: cat.price,
+    priceEst: cat.priceEst,   // 추정가 여부(견적 표시에 '추정' 명시)
     buyUrl: cat.buyUrl,
     image: cat.image,
     glb,
