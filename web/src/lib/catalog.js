@@ -58,6 +58,29 @@ export function resolveDims(item) {
   return { w: base.w, d: base.d, h: base.h, accuracy: '추정(기본)', color: item.color || base.color, lowBox: base.lowBox };
 }
 
+// 분위기(스타일) — 제품명 키워드에서 도출. 없으면 null. 미드센추리를 모던보다 먼저(더 구체적).
+const STYLE_MAP = [
+  ['미드센추리', /mid-?century/i],
+  ['인더스트리얼', /industrial/i],
+  ['북유럽', /scandinav|nordic/i],
+  ['내추럴', /rustic|farmhouse|stone\s*&\s*beam|solid pine/i],
+  ['클래식', /classic|traditional|tufted/i],
+  ['모던', /\bmodern\b|contemporary/i],
+];
+export const STYLE_OPTIONS = ['미드센추리', '모던', '북유럽', '내추럴', '인더스트리얼', '클래식'];
+export function deriveStyle(item) {
+  const n = `${item?.name || ''}`;
+  for (const [label, re] of STYLE_MAP) if (re.test(n)) return label;
+  return null;
+}
+// 사이즈 — 발자국 최대 변(cm)으로 소/중/대(방에 맞춰 고르기용).
+export const SIZE_OPTIONS = ['소형', '중형', '대형'];
+export function deriveSize(item) {
+  const rd = resolveDims(item);
+  const m = Math.max(rd.w, rd.d);
+  return m <= 90 ? '소형' : m <= 155 ? '중형' : '대형';
+}
+
 // 치수 신뢰도 → 표시용 {short, tone, hex}. tone: ok(정형·입력) / mid(상세·AI) / warn(추정·미상)
 export function accuracyMeta(a) {
   if (a === '정형') return { short: '정형', tone: 'ok', hex: '#3f6a3a' };
