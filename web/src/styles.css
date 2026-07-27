@@ -226,6 +226,7 @@ input[type="number"], input[type="text"], select {
 .room3d {
   position: relative;
   height: 440px;
+  flex: none;                  /* flex 컨테이너 안에서도 눌리지 않게(높이 보존) */
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
@@ -375,7 +376,8 @@ input[type="number"], input[type="text"], select {
 .dropzone img { max-width: 100%; max-height: 220px; border-radius: 12px; }
 
 /* ── 플래너 화면 chrome ── */
-.planner-screen { background: #fff; padding: 56px 16px 16px; }
+/* 일반 블록 흐름으로 스크롤 — flex 컬럼이면 .room3d(고정 440px div)가 눌려 3D 뷰가 안 보임 */
+.planner-screen { background: #fff; padding: 56px 16px 16px; display: block; }
 .planner-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
 .planner-head b { font-weight: 800; font-size: 15px; color: var(--ink); }
 .planner-head .spacer { flex: 1; }

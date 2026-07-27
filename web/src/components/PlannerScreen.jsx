@@ -4,6 +4,7 @@ import Room3D from './Room3D.jsx';
 import OpeningsBar from './OpeningsBar.jsx';
 import LayoutChat from './LayoutChat.jsx';
 import CatalogPanel from './CatalogPanel.jsx';
+import ViewErrorBoundary from './ViewErrorBoundary.jsx';
 
 // 배치 플래너 화면 — ywlee chrome + 기존 기능 컴포넌트(2D/3D/문창/자동배치/채팅/가구담기) 조립.
 export default function PlannerScreen({
@@ -34,8 +35,10 @@ export default function PlannerScreen({
       <OpeningsBar room={room} openings={openings} setOpenings={setOpenings} />
 
       {view3d ? (
-        <Room3D room={room} items={items} selectedId={selectedId} setSelectedId={setSelectedId}
-          onMove={moveItem} onRotate={rotateItem} flags={flagIds} camRef={cam3d} openings={openings} />
+        <ViewErrorBoundary resetKey={view3d}>
+          <Room3D room={room} items={items} selectedId={selectedId} setSelectedId={setSelectedId}
+            onMove={moveItem} onRotate={rotateItem} flags={flagIds} camRef={cam3d} openings={openings} />
+        </ViewErrorBoundary>
       ) : (
         <Planner room={room} items={items} setItems={setItems} selectedId={selectedId}
           setSelectedId={setSelectedId} flags={val.flags} openings={openings} />
