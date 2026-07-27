@@ -403,6 +403,56 @@ async def recommend(req: RecommendReq):
     return {"status": "OK", "queries": queries, "items": out[:18]}
 
 
+_CHAT_SYS = (
+    "너는 원룸 가구배치 대화형 어시스턴트다. 현재 배치(방 치수, 문/창, 각 가구의 현재 위치 cx·cy(cm)·rotation)와 "
+    "사용자 요청을 받아, 요청을 '이행(apply)' 또는 '기각(reject)' 판단한다.\n"
+    "좌표계: 원점=방 좌상단, +x=오른쪽(너비 W), +y=아래(깊이 D), 단위 cm 정수, rotation∈{0,90,180,270}(시계방향).\n"
+    "하드제약(위반하면 apply 금지): ①가구 겹침 금지 ②모든 가구 방 경계 0..W,0..D 내 ③문 스윙 부채꼴·창 앞 침범 금지.\n"
+    "선호: 대형가구는 벽 밀착. TV장은 침대 정면 마주봄. 책상+의자는 의자가 책상 앞면 마주봄. 조명은 침대 헤드 옆.\n"
+    "판단: 가능하면 decision=\"apply\"+요청 반영한 '모든 가구의 새 위치' items. 불가능/위험/제약위반이면 decision=\"reject\"+배치 그대로.\n"
+    "어느 경우든 reason에 한국어로 친근하게 1~3문장 이유를 쓴다. 출력은 JSON만: "
+    "{\"decision\":\"apply\"|\"reject\",\"reason\":\"...\",\"items\":[{\"id\":\"...\",\"cx\":0,\"cy\":0,\"rotation\":0}]} "
+    "apply면 items에 모든 가구(변경없는 것 포함), id는 입력 그대로."
+)
+
+
+class ChatReq(BaseModel):
+    room: dict = {}
+    openings: list = []
+    furniture: list = []
+    message: str = ""
+    history: list = []
+
+
+@app.post("/api/chat-layout")
+async def chat_layout(req: ChatReq):
+    """대화형 배치 — 현재 배치 + 요청 → {decision, reason, items?}. 앱이 겹침/문·창 재검증 후 반영."""
+    gkey = os.getenv("GEMINI_API_KEY")
+    if not (gkey and httpx):
+        return {"status": "NOKEY", "decision": "reject", "reason": "AI 연결이 안 돼 있어요(키 미설정)."}
+    ctx = json.dumps({"room": req.room, "openings": req.openings, "furniture": req.furniture}, ensure_ascii=False)
+    contents = []
+    for h in (req.history or [])[-8:]:
+        contents.append({"role": "model" if h.get("role") == "assistant" else "user", "parts": [{"text": str(h.get("text", ""))[:500]}]})
+    contents.append({"role": "user", "parts": [{"text": f"[현재 배치]\n{ctx}\n\n[사용자 요청]\n{req.message}"}]})
+    try:
+        async with httpx.AsyncClient(timeout=60) as cx:
+            r = await cx.post(f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}",
+                              json={"system_instruction": {"parts": [{"text": _CHAT_SYS}]}, "contents": contents,
+                                    "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.5, "responseMimeType": "application/json"}})
+            r.raise_for_status()
+            data = r.json()
+        txt = "".join(p.get("text", "") for p in (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
+        try:
+            obj = json.loads(txt)
+        except Exception:  # noqa: BLE001
+            s, e = txt.find("{"), txt.rfind("}")
+            obj = json.loads(txt[s:e + 1]) if 0 <= s < e else {"decision": "reject", "reason": "이해하지 못했어요."}
+        return {"status": "OK", "decision": obj.get("decision", "reject"), "reason": obj.get("reason", ""), "items": obj.get("items", [])}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "ERROR", "decision": "reject", "reason": "처리 중 문제가 생겼어요. 다시 시도해 주세요.", "error": str(e)[:150]}
+
+
 def _text_card(req: ComposeReq) -> str:
     n = len(req.items)
     w = req.room.get("widthM")

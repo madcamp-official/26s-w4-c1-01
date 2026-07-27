@@ -119,6 +119,34 @@ export async function layoutFurniture(room, items, openings = []) {
   }
 }
 
+// 대화형 배치 — 현재 배치 + 사용자 요청 → {decision:'apply'|'reject', reason, items?}. 앱이 apply를 기하 재검증 후 반영.
+export async function chatLayout(room, openings, items, message, history) {
+  const payload = {
+    room: { W: Math.round(room.widthM * 100), D: Math.round(room.depthM * 100) },
+    openings: (openings || []).map((o) => ({
+      kind: o.kind, wall: o.wall, pos: Math.round((o.pos || 0) * 100),
+      width: Math.round((o.width || 0.9) * 100), ...(o.kind === 'door' ? { hinge: o.hinge || 'a' } : {}),
+    })),
+    furniture: items.map((it) => ({
+      id: it.id, name: it.name, category: it.cat,
+      w: Math.round(it.wM * 100), d: Math.round(it.dM * 100), h: Math.round((it.hM || 0.5) * 100),
+      cx: Math.round(it.cx * 100), cy: Math.round(it.cy * 100), rotation: it.rotationDeg || 0,
+    })),
+    message,
+    history: (history || []).map((h) => ({ role: h.role, text: h.text })),
+  };
+  try {
+    const res = await fetch(`${API_BASE}/api/chat-layout`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload), signal: timeout(70000),
+    });
+    if (!res.ok) return { status: 'ERROR', decision: 'reject', reason: `서버 오류(${res.status})` };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', decision: 'reject', reason: '연결 실패: ' + String(e.message || e) };
+  }
+}
+
 // 상품 상세페이지에서 치수 자동 추출. 성공 시 {w,d,h,accuracy}, 실패/미상 시 null.
 export async function fetchDims(url) {
   if (!url) return null;

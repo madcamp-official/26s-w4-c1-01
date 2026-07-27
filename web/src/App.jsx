@@ -5,6 +5,7 @@ import Planner from './components/Planner.jsx';
 import Room3D from './components/Room3D.jsx';
 import LayoutPicker from './components/LayoutPicker.jsx';
 import OpeningsBar from './components/OpeningsBar.jsx';
+import LayoutChat from './components/LayoutChat.jsx';
 import { toPlacedItem, resolveDims } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
@@ -210,6 +211,7 @@ export default function App() {
               <span className="chip">치수 정형·입력 {solid} · 추정 {items.length - solid}</span>
             </div>
             {items.length === 0 && <p className="mockup-note">‘가구’ 탭에서 가구를 담으면 여기에 실치수로 배치돼요.</p>}
+            <LayoutChat room={room} openings={openings} items={items} setItems={setItems} />
           </div>
         ))}
 

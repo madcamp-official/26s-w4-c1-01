@@ -229,6 +229,48 @@ def recommend_similar(item):
     return {"queries": queries, "items": out[:18]}
 
 
+CHAT_SYS = (
+    "너는 원룸 가구배치 대화형 어시스턴트다. 현재 배치(방 치수, 문/창, 각 가구의 현재 위치 cx·cy(cm)·rotation)와 "
+    "사용자 요청을 받아, 요청을 '이행(apply)' 또는 '기각(reject)' 판단한다.\n"
+    "좌표계: 원점=방 좌상단, +x=오른쪽(너비 W), +y=아래(깊이 D), 단위 cm 정수, rotation∈{0,90,180,270}(시계방향).\n"
+    "하드제약(위반하면 apply 금지): ①가구 겹침 금지 ②모든 가구 방 경계 0..W,0..D 내 ③문 스윙 부채꼴·창 앞 침범 금지.\n"
+    "선호: 대형가구는 벽 밀착. TV장은 침대 정면 마주봄. 책상+의자는 의자가 책상 앞면 마주봄. 조명은 침대 헤드 옆.\n"
+    "판단 규칙:\n"
+    "- 이행 가능(물리적 가능 + 하드제약 안 깨짐): decision=\"apply\", 요청을 반영한 '모든 가구의 새 위치'를 items로.\n"
+    "- 불가능/위험/제약위반(예: 문을 막게 됨, 겹칠 수밖에 없음, 방 밖으로 나감, 모순된 요청): decision=\"reject\", 배치 그대로.\n"
+    "어느 경우든 reason에 한국어로 친근하게 1~3문장으로 이유·결과를 설명한다.\n"
+    "출력은 JSON만: {\"decision\":\"apply\"|\"reject\",\"reason\":\"...\",\"items\":[{\"id\":\"...\",\"cx\":0,\"cy\":0,\"rotation\":0}]}\n"
+    "apply면 items에 모든 가구(변경 없는 것 포함)를 넣는다. reject면 items는 생략/무시. id는 입력 그대로 사용."
+)
+
+
+def gemini_chat_layout(payload):
+    """현재 배치 + 사용자 요청 → {decision, reason, items?}. LLM이 이행/기각 판단."""
+    ctx = json.dumps({"room": payload.get("room", {}), "openings": payload.get("openings", []),
+                      "furniture": payload.get("furniture", [])}, ensure_ascii=False)
+    contents = []
+    for h in (payload.get("history") or [])[-8:]:
+        contents.append({"role": "model" if h.get("role") == "assistant" else "user",
+                         "parts": [{"text": str(h.get("text", ""))[:500]}]})
+    contents.append({"role": "user", "parts": [{"text": f"[현재 배치]\n{ctx}\n\n[사용자 요청]\n{payload.get('message', '')}"}]})
+    body = json.dumps({
+        "system_instruction": {"parts": [{"text": CHAT_SYS}]},
+        "contents": contents,
+        "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.5, "responseMimeType": "application/json"},
+    }).encode()
+    url = ("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + GEMINI_API_KEY)
+    req = urllib.request.Request(url, data=body, headers={"content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        data = json.load(r)
+    txt = "".join(p.get("text", "") for p in (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
+    try:
+        obj = json.loads(txt)
+    except Exception:
+        s, e = txt.find("{"), txt.rfind("}")
+        obj = json.loads(txt[s:e + 1]) if 0 <= s < e else {"decision": "reject", "reason": "이해하지 못했어요. 다시 말씀해 주세요."}
+    return {"decision": obj.get("decision", "reject"), "reason": obj.get("reason", ""), "items": obj.get("items", [])}
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def _json(self, obj, code=200):
         body = json.dumps(obj, ensure_ascii=False).encode()
@@ -260,7 +302,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
-        if path not in ("/api/relight", "/api/layout", "/api/render", "/api/recommend"):
+        if path not in ("/api/relight", "/api/layout", "/api/render", "/api/recommend", "/api/chat-layout"):
             return self._json({"error": "not found"}, 404)
         try:
             n = int(self.headers.get("Content-Length", 0))
@@ -293,6 +335,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"status": "OK", **rec})
             except Exception as e:  # noqa: BLE001
                 return self._json({"status": "ERROR", "reason": str(e)[:200], "items": []})
+
+        # 대화형 배치 — 현재 배치+사용자 요청 → 이행/기각+이유(앱이 겹침 재검증 후 반영)
+        if path == "/api/chat-layout":
+            if not (LLM_PROVIDER == "gemini" and GEMINI_API_KEY):
+                return self._json({"status": "NOKEY", "decision": "reject",
+                                   "reason": "AI 연결이 안 돼 있어요(키 미설정)."})
+            try:
+                return self._json({"status": "OK", **gemini_chat_layout(body)})
+            except Exception as e:  # noqa: BLE001
+                return self._json({"status": "ERROR", "decision": "reject",
+                                   "reason": "처리 중 문제가 생겼어요. 다시 시도해 주세요.", "error": str(e)[:150]})
 
         # 원룸 자동 배치 — LLM(Gemini/Claude)이 후보 생성(앱이 겹침 재검증)
         if path == "/api/layout":
