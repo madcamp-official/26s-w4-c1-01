@@ -66,6 +66,50 @@ function Piece({ item, W, D, selected, flagged, onSelect, onDragStart }) {
   );
 }
 
+// 개구부 3D — 2D 평면의 문/창을 3D 미리보기 벽에 표시. 2D(x∈[0,W],y∈[0,D]) → 월드(x−W/2, z=y−D/2).
+// top→뒤벽(z=−D/2) · bottom→앞(z=D/2) · left→좌벽(x=−W/2) · right→우(x=W/2). along='x'(상/하벽) or 'z'(좌/우벽).
+function Window3D({ cx, cz, w, along }) {
+  const h = 1.2, yc = 1.3, fr = 0.04;
+  return (
+    <group position={[cx, 0, cz]} rotation={[0, along === 'z' ? Math.PI / 2 : 0, 0]}>
+      <mesh position={[0, yc, 0]}>
+        <planeGeometry args={[w, h]} />
+        <meshStandardMaterial color="#bcd8ef" transparent opacity={0.5} emissive="#e2f0fb" emissiveIntensity={0.55} side={THREE.DoubleSide} />
+      </mesh>
+      {[[0, yc + h / 2, w + 2 * fr, fr], [0, yc - h / 2, w + 2 * fr, fr], [-w / 2 - fr / 2, yc, fr, h + 2 * fr], [w / 2 + fr / 2, yc, fr, h + 2 * fr]].map(([px, py, bw, bh], i) => (
+        <mesh key={i} position={[px, py, 0]}><boxGeometry args={[bw, bh, 0.06]} /><meshStandardMaterial color="#f1ece2" roughness={0.9} /></mesh>
+      ))}
+      <mesh position={[0, yc, 0.012]}><boxGeometry args={[w, 0.03, 0.04]} /><meshStandardMaterial color="#f1ece2" /></mesh>
+      <mesh position={[0, yc, 0.012]}><boxGeometry args={[0.03, h, 0.04]} /><meshStandardMaterial color="#f1ece2" /></mesh>
+    </group>
+  );
+}
+function Door3D({ cx, cz, w, along }) {
+  const h = 2.05, fr = 0.05;
+  return (
+    <group position={[cx, 0, cz]} rotation={[0, along === 'z' ? Math.PI / 2 : 0, 0]}>
+      <mesh position={[0, h / 2, 0]}><boxGeometry args={[w, h, 0.05]} /><meshStandardMaterial color="#8a5a34" roughness={0.65} /></mesh>
+      <mesh position={[0, h + fr / 2, 0]}><boxGeometry args={[w + 2 * fr, fr, 0.08]} /><meshStandardMaterial color="#5a463a" /></mesh>
+      <mesh position={[-w / 2 - fr / 2, h / 2, 0]}><boxGeometry args={[fr, h + fr, 0.08]} /><meshStandardMaterial color="#5a463a" /></mesh>
+      <mesh position={[w / 2 + fr / 2, h / 2, 0]}><boxGeometry args={[fr, h + fr, 0.08]} /><meshStandardMaterial color="#5a463a" /></mesh>
+      <mesh position={[w / 2 - 0.09, 1.0, 0.04]}><boxGeometry args={[0.04, 0.1, 0.04]} /><meshStandardMaterial color="#c9b98f" metalness={0.6} roughness={0.4} /></mesh>
+    </group>
+  );
+}
+function Openings3D({ room, openings }) {
+  const W = room.widthM, D = room.depthM;
+  return (openings || []).map((o) => {
+    const w = o.width || (o.kind === 'door' ? 0.9 : 1.2);
+    let cx, cz, along;
+    if (o.wall === 'top') { cz = -D / 2; cx = o.pos - W / 2; along = 'x'; }
+    else if (o.wall === 'bottom') { cz = D / 2; cx = o.pos - W / 2; along = 'x'; }
+    else if (o.wall === 'left') { cx = -W / 2; cz = o.pos - D / 2; along = 'z'; }
+    else { cx = W / 2; cz = o.pos - D / 2; along = 'z'; }
+    const P = { cx, cz, w, along };
+    return o.kind === 'door' ? <Door3D key={o.id} {...P} /> : <Window3D key={o.id} {...P} />;
+  });
+}
+
 // 방 — 바닥 + 뒤쪽 2벽(카메라가 안을 보도록 개방).
 function Shell({ W, D, H = 2.4 }) {
   return (
@@ -146,7 +190,7 @@ function CamCapture({ camRef, controls }) {
   return null;
 }
 
-export default function Room3D({ room, items, selectedId, setSelectedId, onMove, onRotate, flags = [], camRef }) {
+export default function Room3D({ room, items, selectedId, setSelectedId, onMove, onRotate, flags = [], camRef, openings = [] }) {
   const W = room.widthM, D = room.depthM;
   const [dragId, setDragId] = useState(null);
   const controls = useRef();
@@ -186,6 +230,7 @@ export default function Room3D({ room, items, selectedId, setSelectedId, onMove,
 
         <Suspense fallback={<Html center><div className="r3d-load">3D 불러오는 중…</div></Html>}>
           <Shell W={W} D={D} />
+          <Openings3D room={room} openings={openings} />
           {items.map((it) => it.glb ? (
             <Piece
               key={it.id}

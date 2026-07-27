@@ -246,6 +246,7 @@ export default function App() {
                   onRotate={rotateItem}
                   flags={val.flags}
                   camRef={cam3d}
+                  openings={openings}
                 />
                 {selBar}
                 <div className="statrow">
