@@ -310,21 +310,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             return self._json({"status": "ERROR", "reason": "bad request"}, 400)
 
-        # 포토리얼 렌더 — camp-3 Blender 서비스로 프록시(배치 3D → 사진)
+        # 포토리얼 렌더 — camp-3 Blender 서비스로 프록시(배치 3D → 사진).
+        # Blender가 연속 렌더에서 간헐 크래시(500)하므로 1회 재시도 + 상류 에러 본문 표면화.
         if path == "/api/render":
             if not RENDER_SERVER_URL:
                 return self._json({"status": "CLIENT", "reason": "no_render_server"})
-            try:
-                payload = json.dumps(body).encode()
-                req = urllib.request.Request(RENDER_SERVER_URL.rstrip("/") + "/render", data=payload,
-                                             headers={"Content-Type": "application/json"})
-                with urllib.request.urlopen(req, timeout=300) as r:
-                    data = json.load(r)
-                if data.get("status") == "OK" and data.get("image"):
-                    return self._json({"status": "OK", "image": data["image"]})
-                return self._json({"status": "ERROR", "reason": str(data.get("reason", "render error"))[:200]})
-            except Exception as e:  # noqa: BLE001
-                return self._json({"status": "ERROR", "reason": str(e)[:200]})
+            payload = json.dumps(body).encode()
+            last = "render error"
+            for _ in range(2):
+                try:
+                    req = urllib.request.Request(RENDER_SERVER_URL.rstrip("/") + "/render", data=payload,
+                                                 headers={"Content-Type": "application/json"})
+                    with urllib.request.urlopen(req, timeout=300) as r:
+                        data = json.load(r)
+                    if data.get("status") == "OK" and data.get("image"):
+                        return self._json({"status": "OK", "image": data["image"]})
+                    last = str(data.get("reason", "render error"))[:200]
+                except urllib.error.HTTPError as e:  # 상류 500 — 본문에 blender stderr tail이 있음
+                    try:
+                        last = str(json.load(e).get("reason", str(e)))[:200]
+                    except Exception:  # noqa: BLE001
+                        last = str(e)[:200]
+                except Exception as e:  # noqa: BLE001
+                    last = str(e)[:200]
+            return self._json({"status": "ERROR", "reason": last})
 
         # 유사 가구 추천 — LLM이 네이버 검색어 생성 → 네이버 검색 병합
         if path == "/api/recommend":

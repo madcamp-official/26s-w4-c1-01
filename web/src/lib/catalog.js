@@ -119,9 +119,11 @@ let _seq = 0;
 export function toPlacedItem(cat, cx, cy, rotationDeg = 0) {
   const d = resolveDims(cat);
   const glb = glbForItem(cat);
-  // ABO GLB는 전부 정면 −y로 저작됨 → 배치 규칙(rot0=앞면+y)과 180° 반대라 orient 180으로 교정.
-  // (대칭 가구는 180이 무해. cat.orient로 개별 오버라이드 가능.)
-  const orient = cat.orient != null ? cat.orient : (glb ? 180 : 0);
+  // ABO GLB 정면 보정각. Blender 지오메트리 검출(chair_orient.py, 비대칭 82종 전수)로 확정:
+  // 모든 비대칭 ABO 모델은 Blender 프레임 정면 −y로 저작 → 렌더/3D의 깊이축 뒤집기(y_B=D−cy)를
+  // 거치면 2D 규칙(rot0=앞면+y)과 정확히 일치 = 보정 불필요(orient 0). 과거 180은 뒤집힘 오진.
+  // (실증: 암체어 raw rot0 렌더가 카메라 쪽을 정면으로 봄. 대칭 가구는 어느 값이든 무해.)
+  const orient = cat.orient != null ? cat.orient : 0;
   return {
     id: `${cat.id ?? cat.name ?? 'item'}-${++_seq}`,
     catId: cat.id,
