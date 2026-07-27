@@ -118,6 +118,10 @@ let _seq = 0;
 // cm → m footprint 아이템으로 변환(배치 엔진 입력). 치수 미상이면 카테고리 표준으로 보정.
 export function toPlacedItem(cat, cx, cy, rotationDeg = 0) {
   const d = resolveDims(cat);
+  const glb = glbForItem(cat);
+  // ABO GLB는 전부 정면 −y로 저작됨 → 배치 규칙(rot0=앞면+y)과 180° 반대라 orient 180으로 교정.
+  // (대칭 가구는 180이 무해. cat.orient로 개별 오버라이드 가능.)
+  const orient = cat.orient != null ? cat.orient : (glb ? 180 : 0);
   return {
     id: `${cat.id ?? cat.name ?? 'item'}-${++_seq}`,
     catId: cat.id,
@@ -132,7 +136,8 @@ export function toPlacedItem(cat, cx, cy, rotationDeg = 0) {
     price: cat.price,
     buyUrl: cat.buyUrl,
     image: cat.image,
-    glb: glbForItem(cat),
+    glb,
+    orient,
     cx,
     cy,
     rotationDeg,

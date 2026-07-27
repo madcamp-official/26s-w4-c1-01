@@ -66,7 +66,7 @@ export async function renderScene(room, items, cam3d, preset = 'day', view = nul
     // 2D 평면의 문/창(m). 서버가 렌더 벽 좌표로 매핑해 창·문을 그 위치에 그린다.
     openings: (openings || []).map((o) => ({ kind: o.kind, wall: o.wall, pos: o.pos, width: o.width })),
     items: items.filter((it) => it.glb).map((it) => ({
-      glb: it.glb, x: it.cx, y: it.cy, rot: it.rotationDeg || 0,
+      glb: it.glb, x: it.cx, y: it.cy, rot: (it.rotationDeg || 0) + (it.orient || 0),   // orient=모델 정면 보정각
     })),
   };
   if (view) {

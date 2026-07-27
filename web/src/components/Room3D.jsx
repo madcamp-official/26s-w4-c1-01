@@ -33,7 +33,8 @@ function Piece({ item, W, D, selected, flagged, onSelect, onDragStart }) {
   }, [obj, item.wM, item.dM, item.hM]);
 
   const [x, , z] = toWorld(item.cx, item.cy, W, D);
-  const rot = (-(item.rotationDeg || 0) * Math.PI) / 180;
+  // 배치 회전 + 모델 정면 보정각(orient) — GLB별 저작 방향 불일치 교정.
+  const rot = (-(((item.rotationDeg || 0) + (item.orient || 0))) * Math.PI) / 180;
 
   return (
     <group
