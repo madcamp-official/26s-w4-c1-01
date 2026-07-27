@@ -93,11 +93,12 @@ def _http_json(url, data=None, headers=None):
         return json.load(r)
 
 
-def oauth_exchange(provider, code):
-    """인가코드 → access_token → 프로필({provider,id,name,avatar,email})."""
+def oauth_exchange(provider, code, base=None):
+    """인가코드 → access_token → 프로필({provider,id,name,avatar,email}).
+    base: 인가 때 쓴 리다이렉트 베이스와 반드시 동일해야 함(요청 호스트 기준)."""
     conf = OAUTH[provider]
     form = {"grant_type": "authorization_code", "client_id": conf["id"],
-            "redirect_uri": f"{AUTH_BASE}/api/auth/{provider}/callback", "code": code}
+            "redirect_uri": f"{base or AUTH_BASE}/api/auth/{provider}/callback", "code": code}
     if conf.get("secret"):
         form["client_secret"] = conf["secret"]
     if provider == "naver":
@@ -360,6 +361,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Location", url)
         self.end_headers()
 
+    def _auth_base(self):
+        """요청 Host 기반 OAuth 리다이렉트 베이스 — localhost와 배포 도메인을 동시에 지원.
+        (serve_build/cloudflared가 X-Forwarded-Host로 원 호스트를 전달. 허용 목록 밖이면 env 기본값.)"""
+        host = (self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or "").split(",")[0].strip()
+        if host.endswith(".madcamp-kaist.org"):
+            return "https://" + host
+        if host.startswith("localhost") or host.startswith("127.0.0.1"):
+            return "http://" + host
+        return AUTH_BASE
+
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         if u.path == "/health":
@@ -390,24 +401,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if m:
             provider, action = m.group(1), m.group(2)
             conf = OAUTH[provider]
+            base = self._auth_base()               # 요청 호스트 기준(로컬/배포 동시 지원)
             if not conf.get("id"):
-                return self._redirect(AUTH_BASE + "/#auth_error=unconfigured")
+                return self._redirect(base + "/#auth_error=unconfigured")
             if action == "login":
                 q = {"response_type": "code", "client_id": conf["id"],
-                     "redirect_uri": f"{AUTH_BASE}/api/auth/{provider}/callback", "state": "bk"}
+                     "redirect_uri": f"{base}/api/auth/{provider}/callback", "state": "bk"}
                 if conf.get("scope"):
                     q["scope"] = conf["scope"]
                 return self._redirect(conf["auth"] + "?" + urllib.parse.urlencode(q))
             # callback: 코드 교환 → 프로필 → 서명 토큰 → 프론트로(#auth=)
             code = urllib.parse.parse_qs(u.query).get("code", [""])[0]
             if not code:
-                return self._redirect(AUTH_BASE + "/#auth_error=denied")
+                return self._redirect(base + "/#auth_error=denied")
             try:
-                user = oauth_exchange(provider, code)
+                user = oauth_exchange(provider, code, base)
                 user["exp"] = int(time.time()) + 60 * 60 * 24 * 30   # 30일
-                return self._redirect(AUTH_BASE + "/#auth=" + sign_token(user))
+                return self._redirect(base + "/#auth=" + sign_token(user))
             except Exception as e:  # noqa: BLE001
-                return self._redirect(AUTH_BASE + "/#auth_error=" + urllib.parse.quote(str(e)[:80]))
+                return self._redirect(base + "/#auth_error=" + urllib.parse.quote(str(e)[:80]))
         self._json({"error": "not found"}, 404)
 
     def do_POST(self):

@@ -37,6 +37,10 @@ class Handler(SimpleHTTPRequestHandler):
         headers = {"Content-Type": self.headers.get("Content-Type", "application/json")}
         if self.headers.get("Authorization"):                       # /api/auth/me 토큰 전달
             headers["Authorization"] = self.headers["Authorization"]
+        # 원 호스트 전달 — OAuth 리다이렉트 베이스를 요청 도메인(로컬/터널)으로 정확히 잡게
+        orig_host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host")
+        if orig_host:
+            headers["X-Forwarded-Host"] = orig_host
         req = urllib.request.Request(url, data=body, method=method, headers=headers)
         loc = None
         try:
