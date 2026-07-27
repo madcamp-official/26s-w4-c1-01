@@ -1,5 +1,7 @@
 import { useMemo, useState, useRef } from 'react';
 import RoomForm from './components/RoomForm.jsx';
+import RoomPresets from './components/RoomPresets.jsx';
+import { roomFromMeasured } from './lib/roomEstimate.js';
 import CatalogPanel from './components/CatalogPanel.jsx';
 import Planner from './components/Planner.jsx';
 import Room3D from './components/Room3D.jsx';
@@ -50,6 +52,13 @@ export default function App() {
 
   function onRoomDone(r) {
     setRoom(r);
+    setTab('plan');
+  }
+  // 데모 방 프리셋 선택 → 방 + 문/창 즉시 세팅 후 배치 탭으로.
+  function onPresetPick(p) {
+    setRoom(roomFromMeasured({ widthM: p.widthM, depthM: p.depthM }));
+    setOpenings(p.openings.map((o, i) => ({ id: `op-preset-${i}-${Math.round(Math.random() * 1e4)}`, ...o })));
+    setItems([]);
     setTab('plan');
   }
   function addFurniture(cat) {
@@ -178,7 +187,10 @@ export default function App() {
       <main className="screen">
         {/* 방 */}
         {tab === 'room' && (!room ? (
-          <RoomForm onDone={onRoomDone} />
+          <div className="pane">
+            <RoomPresets onPick={onPresetPick} />
+            <RoomForm onDone={onRoomDone} />
+          </div>
         ) : (
           <div className="pane">
             <div className="stat">
