@@ -43,6 +43,7 @@ export default function App() {
   const [renderImg, setRenderImg] = useState(null);
   const [renderBusy, setRenderBusy] = useState(false);
   const [renderPreset, setRenderPreset] = useState('day');
+  const [renderView, setRenderView] = useState('wide');   // 'wide' | 'cozy' | 'me'(내 3D 시점) — 렌더 카메라 고정
   const [showBefore, setShowBefore] = useState(false);
 
   const [marketRecommend, setMarketRecommend] = useState(null);
@@ -115,6 +116,11 @@ export default function App() {
       else setRenderImg(null);
     } catch { setRenderImg(null); } finally { setRenderBusy(false); }
   }
+  // 시간대·각도를 함께 확정해 렌더(뷰를 명시적으로 고정). 'me'=내 3D 시점(cam3d), 그 외=서버 프레이밍.
+  function renderWith(preset, viewMode) {
+    setRenderPreset(preset); setRenderView(viewMode);
+    doRender(preset, viewMode === 'me' ? null : viewMode);
+  }
 
   // ── 네비게이션 ──
   function newRoom() {
@@ -129,10 +135,10 @@ export default function App() {
     setScreen('planner');
   }
   function finishPlanner() {
-    setShowBefore(false); setRenderImg(null); setRenderPreset('day');
+    setShowBefore(false); setRenderImg(null);
     setScreen('result');
     if (!roomCounted) { setRoomsDone((n) => n + 1); setRoomCounted(true); }   // 같은 방 재완성 시 중복 카운트 방지
-    doRender('day');
+    renderWith('day', 'wide');   // 항상 같은 와이드 앵글로 시작 → 매번 같은 뷰(일관성)
   }
   function findSimilar() {
     setVisitedMarket(true);
@@ -184,7 +190,8 @@ export default function App() {
         <CompositeResult
           renderImg={renderImg} renderBusy={renderBusy} showBefore={showBefore}
           onToggle={() => setShowBefore((v) => !v)} photo={roomPhoto} estimate={estimate}
-          timePreset={renderPreset} onTime={(p) => { setRenderPreset(p); doRender(p); }}
+          timePreset={renderPreset} onTime={(p) => renderWith(p, renderView)}
+          view={renderView} onView={(v) => renderWith(renderPreset, v)}
           onBack={() => setScreen('planner')} onRerender={() => setScreen('planner')} onFindSimilar={findSimilar}
         />
       )}

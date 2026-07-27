@@ -410,6 +410,11 @@ input[type="number"], input[type="text"], select {
 .result-sheet .estimate { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .result-sheet .estimate .k { font-weight: 800; font-size: 16px; color: var(--ink); }
 .result-sheet .estimate .v { font-weight: 800; font-size: 18px; color: var(--accent); }
+.angle-row { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+.angle-pill { border: 0; padding: 7px 13px; border-radius: var(--r-pill); background: var(--bg2); color: var(--muted); font-weight: 700; font-size: 12px; white-space: nowrap; }
+.angle-pill.on { background: var(--ink); color: #fff; }
+.angle-pill:disabled { opacity: .5; }
+.angle-hint { margin-left: auto; font-size: 11px; color: var(--muted3); white-space: nowrap; }
 .result-sheet .acts { display: flex; gap: 10px; }
 .sheet-btn { flex: 1; border: 0; text-align: center; padding: 14px; border-radius: 16px; font-weight: 700; font-size: 14px; }
 .sheet-btn.sub { background: var(--bg2); color: var(--ink); }

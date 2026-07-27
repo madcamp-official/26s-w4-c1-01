@@ -1,10 +1,11 @@
 // 합성 결과 — camp-3 포토리얼 렌더를 After로, 업로드한 빈 방 사진을 Before로.
 // 렌더 서버 미연동/실패 시 빗금 플레이스홀더로 폴백(과잉약속 금지, 흐름 유지).
 const TIMES = [['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['night', '🌙']];
+const VIEWS = [['wide', '와이드'], ['cozy', '아늑'], ['me', '내 시점']];
 
 export default function CompositeResult({
   renderImg, renderBusy, showBefore, onToggle, photo, estimate,
-  timePreset, onTime, onBack, onRerender, onFindSimilar,
+  timePreset, onTime, view, onView, onBack, onRerender, onFindSimilar,
 }) {
   if (renderBusy && !renderImg) {
     return (
@@ -49,6 +50,12 @@ export default function CompositeResult({
       )}
 
       <div className="result-sheet">
+        <div className="angle-row">
+          {VIEWS.map(([v, label]) => (
+            <button key={v} className={`angle-pill ${view === v ? 'on' : ''}`} disabled={renderBusy} onClick={() => onView(v)}>{label}</button>
+          ))}
+          <span className="angle-hint">각도</span>
+        </div>
         <div className="estimate">
           <span className="k">예상 견적 💰</span>
           <span className="v">{estimate > 0 ? `${estimate.toLocaleString()}원` : '가격 정보 없음'}</span>
