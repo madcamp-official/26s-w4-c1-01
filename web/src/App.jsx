@@ -4,6 +4,7 @@ import CatalogPanel from './components/CatalogPanel.jsx';
 import Planner from './components/Planner.jsx';
 import Room3D from './components/Room3D.jsx';
 import LayoutPicker from './components/LayoutPicker.jsx';
+import OpeningsBar from './components/OpeningsBar.jsx';
 import { toPlacedItem, resolveDims } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
@@ -30,11 +31,12 @@ export default function App() {
   const [renderBusy, setRenderBusy] = useState(false);
   const [renderImg, setRenderImg] = useState(null);
   const [renderPreset, setRenderPreset] = useState('day');   // 시간대 조명
+  const [openings, setOpenings] = useState([]);              // 문/창 (문=90° 스윙 접근불가, 창=가림 금지)
   const cam3d = useRef(null);   // Room3D의 현재 카메라(위치+타깃) — 렌더가 같은 시점으로
 
   const val = useMemo(
-    () => (room ? validateLayout(items, room.widthM, room.depthM) : { flags: [], ok: true, freeRatio: 0 }),
-    [items, room]
+    () => (room ? validateLayout(items, room.widthM, room.depthM, openings) : { flags: [], ok: true, freeRatio: 0 }),
+    [items, room, openings]
   );
   const sel = items.find((it) => it.id === selectedId);
   const solid = items.filter((it) => ['정형', '사용자입력'].includes(it.dimAccuracy) || String(it.dimAccuracy).startsWith('추정(상세')).length;
@@ -63,12 +65,12 @@ export default function App() {
     try {
       let opts = [];
       // 1) LLM 후보 → 우리 기하엔진으로 겹침 재검증(안전망: 겹치는 후보 폐기)
-      const r = await layoutFurniture(room, items);
+      const r = await layoutFurniture(room, items, openings);
       if (r?.status === 'OK' && Array.isArray(r.candidates)) {
-        opts = validateCandidates(r.candidates, room, items);
+        opts = validateCandidates(r.candidates, room, items, openings);
       }
-      // 2) 유효 후보가 3개 미만이면 로컬 규칙 배치로 채움(항상 3개 보장)
-      if (opts.length < 3) opts = [...opts, ...generateLayouts(room, items, 3 - opts.length)];
+      // 2) 유효 후보가 3개 미만이면 로컬 규칙 배치로 채움(항상 3개 보장). 문 스윙/창 회피 포함.
+      if (opts.length < 3) opts = [...opts, ...generateLayouts(room, items, 3 - opts.length, 400, openings)];
       if (!opts.length) {
         alert('가구가 많아 겹치지 않게 배치할 공간이 부족해요. 방을 키우거나 가구를 줄여 주세요.');
         return;
@@ -183,10 +185,12 @@ export default function App() {
               <button className="btn primary sm" onClick={openAutoLayout} disabled={!items.length || layoutBusy}>{layoutBusy ? '🤖 AI 배치 중…' : '✨ 자동 배치'}</button>
               <span className="chip">가구를 담고 누르면 원룸에 자동으로 배치돼요</span>
             </div>
-            <Planner room={room} items={items} setItems={setItems} selectedId={selectedId} setSelectedId={setSelectedId} flags={val.flags} />
+            <OpeningsBar room={room} openings={openings} setOpenings={setOpenings} />
+            <Planner room={room} items={items} setItems={setItems} selectedId={selectedId} setSelectedId={setSelectedId} flags={val.flags} openings={openings} />
             {selBar}
             <div className="statrow">
               {val.ok ? <span className="badge ok">맞음 문제없음</span> : <span className="badge warn">겹침/방밖 있음</span>}
+              {val.blockOpen && <span className="badge warn">문/창 가림</span>}
               <span className="chip">남은 바닥 {Math.round(val.freeRatio * 100)}%</span>
               <span className="chip">치수 정형·입력 {solid} · 추정 {items.length - solid}</span>
             </div>

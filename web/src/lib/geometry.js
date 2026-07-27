@@ -45,11 +45,15 @@ export function outOfBounds(aabb, roomWM, roomDM) {
 }
 
 // 배치 전체 검증 → 각 아이템의 문제 플래그와 남은 바닥면적.
-export function validateLayout(items, roomWM, roomDM) {
+// openings: 문/창 배열(있으면 각 가구가 문 스윙/창을 가리는지 blockOpen 플래그).
+export function validateLayout(items, roomWM, roomDM, openings = []) {
   const boxes = items.map(itemAABB);
-  const flags = items.map(() => ({ overlap: false, out: false }));
+  const flags = items.map(() => ({ overlap: false, out: false, blockOpen: false }));
   for (let i = 0; i < boxes.length; i++) {
     if (outOfBounds(boxes[i], roomWM, roomDM)) flags[i].out = true;
+    for (const o of openings) {
+      if (openingBlocksAABB(boxes[i], o, roomWM, roomDM)) { flags[i].blockOpen = true; break; }
+    }
     for (let j = i + 1; j < boxes.length; j++) {
       if (aabbOverlap(boxes[i], boxes[j])) {
         flags[i].overlap = true;
@@ -66,7 +70,8 @@ export function validateLayout(items, roomWM, roomDM) {
     usedArea,
     freeArea: Math.max(0, roomArea - usedArea),
     freeRatio: roomArea > 0 ? Math.max(0, 1 - usedArea / roomArea) : 0,
-    ok: !anyProblem,
+    ok: !anyProblem,                                  // 겹침/방밖만 '무효'. 개구부 가림은 경고(blockOpen).
+    blockOpen: flags.some((f) => f.blockOpen),
   };
 }
 
@@ -87,6 +92,40 @@ export function openingZones(openings, roomWM, roomDM) {
     else if (o.wall === 'right') zones.push({ left: roomWM - c, right: roomWM, top: p - ww / 2, bottom: p + ww / 2 });
   }
   return zones;
+}
+
+// 문 스윙 부채꼴 기하 — 반지름 R=문폭, 힌지 코너에서 방 안쪽 90° 사분면.
+// 반환: {box(사분면 바운딩 = R×R 정사각), hinge:{x,y}(힌지 코너), R}. box는 벽을 따라 [pos±폭/2], 안쪽으로 R.
+export function doorSwing(o, roomWM, roomDM) {
+  const w = o.width ?? 0.9, R = w;
+  const a = o.pos - w / 2, b = o.pos + w / 2;   // 벽을 따라 문 양끝
+  const hb = o.hinge === 'b';                    // 힌지가 b(끝)쪽인지
+  let box, hinge;
+  if (o.wall === 'top')         { box = { left: a, right: b, top: 0, bottom: R };          hinge = { x: hb ? b : a, y: 0 }; }
+  else if (o.wall === 'bottom') { box = { left: a, right: b, top: roomDM - R, bottom: roomDM }; hinge = { x: hb ? b : a, y: roomDM }; }
+  else if (o.wall === 'left')   { box = { left: 0, right: R, top: a, bottom: b };            hinge = { x: 0, y: hb ? b : a }; }
+  else                          { box = { left: roomWM - R, right: roomWM, top: a, bottom: b }; hinge = { x: roomWM, y: hb ? b : a }; }
+  return { box, hinge, R };
+}
+
+// AABB가 문 스윙 부채꼴(사분면)과 겹치나 — 사분면 박스∩AABB의 힌지 최근접점이 반지름 안이면 hit.
+// (벽·스윙이 축정렬이라 '박스 교차 + 원 판정'만으로 정확.)
+export function aabbHitsDoorSwing(aabb, o, roomWM, roomDM) {
+  const { box, hinge, R } = doorSwing(o, roomWM, roomDM);
+  const ix0 = Math.max(aabb.left, box.left), ix1 = Math.min(aabb.right, box.right);
+  const iy0 = Math.max(aabb.top, box.top), iy1 = Math.min(aabb.bottom, box.bottom);
+  if (ix0 >= ix1 - EPS || iy0 >= iy1 - EPS) return false;              // 사분면 박스와 안 겹침
+  const nx = Math.max(ix0, Math.min(hinge.x, ix1));
+  const ny = Math.max(iy0, Math.min(hinge.y, iy1));
+  return (nx - hinge.x) ** 2 + (ny - hinge.y) ** 2 <= R * R + EPS;      // 부채꼴(원) 안
+}
+
+// 가구(AABB)가 개구부를 침범하나 — 문=스윙 부채꼴, 창문=앞 얕은 keep-clear 사각(가리면 안 됨).
+export function openingBlocksAABB(aabb, o, roomWM, roomDM) {
+  if (!o || !o.wall) return false;
+  if (o.kind === 'door') return aabbHitsDoorSwing(aabb, o, roomWM, roomDM);
+  const z = openingZones([{ wall: o.wall, pos: o.pos, width: o.width, clearance: o.clearance ?? 0.4 }], roomWM, roomDM)[0];
+  return z ? aabbOverlap(aabb, z) : false;
 }
 
 // 동선 점수 — 바닥을 격자로 보고 '빈 칸'이 하나로 이어지는 정도(connected: 1이면 빈 공간이 통짜, 걷기 좋음).

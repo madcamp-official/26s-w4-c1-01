@@ -77,10 +77,14 @@ export async function renderScene(room, items, cam3d, preset = 'day', view = nul
 
 // 원룸 자동 배치 — 백엔드(Claude)로 후보 생성. 반환: {status:'OK'|'NOKEY'|'ERROR', candidates}.
 // 치수는 cm 정수로 보낸다(LLM이 정수 좌표를 잘 다룸). 앱이 받은 후보를 기하엔진으로 재검증한다.
-export async function layoutFurniture(room, items) {
+export async function layoutFurniture(room, items, openings = []) {
   const payload = {
     room: { W: Math.round(room.widthM * 100), D: Math.round(room.depthM * 100) },
-    openings: [],
+    // 문/창을 cm로 전달(문=90° 스윙 앞을 비우고, 창은 가리지 말라고 LLM에 알림). 앱이 다시 기하 검증.
+    openings: openings.map((o) => ({
+      kind: o.kind, wall: o.wall, pos: Math.round((o.pos || 0) * 100),
+      width: Math.round((o.width || 0.9) * 100), ...(o.kind === 'door' ? { hinge: o.hinge || 'a' } : {}),
+    })),
     furniture: items.map((it) => ({
       id: it.id, category: it.cat,
       w: Math.round(it.wM * 100), d: Math.round(it.dM * 100), h: Math.round((it.hM || 0.5) * 100),
