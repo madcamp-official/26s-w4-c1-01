@@ -468,3 +468,106 @@ def _to_int(v):
         return int(v)
     except (TypeError, ValueError):
         return None
+
+
+# ── 소셜 로그인(OAuth) — devserver.py와 동일 계약. 키 없으면 프론트가 데모 폴백 ──
+import time as _time
+import hmac as _hmac
+import hashlib as _hashlib
+import base64 as _base64
+import urllib.parse as _uparse
+from fastapi.responses import RedirectResponse
+from fastapi import Request
+
+AUTH_SECRET = os.getenv("AUTH_SECRET", "bangkku-dev-secret-rotate-me")
+AUTH_BASE = os.getenv("AUTH_REDIRECT_BASE", "http://localhost:5173").rstrip("/")
+OAUTH = {
+    "kakao": {"id": os.getenv("KAKAO_CLIENT_ID"), "secret": os.getenv("KAKAO_CLIENT_SECRET"),
+              "auth": "https://kauth.kakao.com/oauth/authorize", "token": "https://kauth.kakao.com/oauth/token",
+              "profile": "https://kapi.kakao.com/v2/user/me", "scope": None},
+    "naver": {"id": os.getenv("NAVER_LOGIN_CLIENT_ID"), "secret": os.getenv("NAVER_LOGIN_CLIENT_SECRET"),
+              "auth": "https://nid.naver.com/oauth2.0/authorize", "token": "https://nid.naver.com/oauth2.0/token",
+              "profile": "https://openapi.naver.com/v1/nid/me", "scope": None},
+    "google": {"id": os.getenv("GOOGLE_CLIENT_ID"), "secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+               "auth": "https://accounts.google.com/o/oauth2/v2/auth", "token": "https://oauth2.googleapis.com/token",
+               "profile": "https://www.googleapis.com/oauth2/v2/userinfo", "scope": "openid profile email"},
+}
+
+
+def _sign_token(payload: dict) -> str:
+    b = _base64.urlsafe_b64encode(json.dumps(payload, ensure_ascii=False).encode()).decode().rstrip("=")
+    sig = _hmac.new(AUTH_SECRET.encode(), b.encode(), _hashlib.sha256).hexdigest()[:32]
+    return f"{b}.{sig}"
+
+
+def _verify_token(token: str):
+    try:
+        b, sig = token.rsplit(".", 1)
+        want = _hmac.new(AUTH_SECRET.encode(), b.encode(), _hashlib.sha256).hexdigest()[:32]
+        if not _hmac.compare_digest(sig, want):
+            return None
+        p = json.loads(_base64.urlsafe_b64decode(b + "=" * (-len(b) % 4)))
+        if p.get("exp") and p["exp"] < int(_time.time()):
+            return None
+        return p
+    except Exception:  # noqa: BLE001
+        return None
+
+
+@app.get("/api/auth/providers")
+async def auth_providers():
+    return {p: bool(c.get("id")) for p, c in OAUTH.items()}
+
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    tok = (request.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+    p = _verify_token(tok)
+    return {"status": "OK", "user": p} if p else {"status": "NOAUTH"}
+
+
+@app.get("/api/auth/{provider}/login")
+async def auth_login(provider: str):
+    conf = OAUTH.get(provider)
+    if not conf or not conf.get("id"):
+        return RedirectResponse(AUTH_BASE + "/#auth_error=unconfigured")
+    q = {"response_type": "code", "client_id": conf["id"],
+         "redirect_uri": f"{AUTH_BASE}/api/auth/{provider}/callback", "state": "bk"}
+    if conf.get("scope"):
+        q["scope"] = conf["scope"]
+    return RedirectResponse(conf["auth"] + "?" + _uparse.urlencode(q))
+
+
+@app.get("/api/auth/{provider}/callback")
+async def auth_callback(provider: str, code: str = "", error: str = ""):
+    conf = OAUTH.get(provider)
+    if not conf or not conf.get("id") or not code or not httpx:
+        return RedirectResponse(AUTH_BASE + "/#auth_error=" + (error or "denied"))
+    try:
+        form = {"grant_type": "authorization_code", "client_id": conf["id"],
+                "redirect_uri": f"{AUTH_BASE}/api/auth/{provider}/callback", "code": code}
+        if conf.get("secret"):
+            form["client_secret"] = conf["secret"]
+        if provider == "naver":
+            form["state"] = "bk"
+        async with httpx.AsyncClient(timeout=12) as cx:
+            tr = await cx.post(conf["token"], data=form)
+            access = tr.json().get("access_token")
+            if not access:
+                raise RuntimeError("token exchange failed")
+            pr = (await cx.get(conf["profile"], headers={"Authorization": f"Bearer {access}"})).json()
+        if provider == "kakao":
+            info = (pr.get("kakao_account") or {}).get("profile") or pr.get("properties") or {}
+            user = {"provider": "kakao", "id": str(pr.get("id")), "name": info.get("nickname") or "카카오 사용자",
+                    "avatar": info.get("profile_image_url") or info.get("profile_image")}
+        elif provider == "naver":
+            r = pr.get("response") or {}
+            user = {"provider": "naver", "id": r.get("id"), "name": r.get("nickname") or r.get("name") or "네이버 사용자",
+                    "avatar": r.get("profile_image"), "email": r.get("email")}
+        else:
+            user = {"provider": "google", "id": pr.get("id") or pr.get("sub"), "name": pr.get("name") or "Google 사용자",
+                    "avatar": pr.get("picture"), "email": pr.get("email")}
+        user["exp"] = int(_time.time()) + 60 * 60 * 24 * 30
+        return RedirectResponse(AUTH_BASE + "/#auth=" + _sign_token(user))
+    except Exception as e:  # noqa: BLE001
+        return RedirectResponse(AUTH_BASE + "/#auth_error=" + _uparse.quote(str(e)[:80]))

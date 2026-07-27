@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef } from 'react';
+import { consumeAuthHash, currentUser, logout } from './lib/auth.js';
 import { toPlacedItem, resolveDims, CATALOG } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
@@ -23,8 +24,15 @@ const LAYOUT_MAX_TRIES = 20;
 const layoutSig = (c) => c.items.map((i) => `${Math.round(i.cx * 100)},${Math.round(i.cy * 100)},${i.rotationDeg}`).join('|');
 const TAB_SCREENS = ['home', 'market', 'mypage'];
 
+// 부팅 시 1회: OAuth 콜백 해시 소비(로그인 복귀) 또는 보관된 세션 복원.
+const bootAuth = consumeAuthHash();
+const bootUser = bootAuth?.user || currentUser();
+
 export default function App() {
-  const [screen, setScreen] = useState('splash');
+  // 로그인 복귀면 온보딩으로, 기존 세션 있으면 홈으로, 처음이면 스플래시.
+  const [screen, setScreen] = useState(bootAuth?.user ? 'onboarding' : bootUser ? 'home' : 'splash');
+  const [user, setUser] = useState(bootUser);
+  const [authError] = useState(bootAuth?.error || null);
   const [taste, setTaste] = useState(null);           // {moods, budget, pet}
   const [tasteDone, setTasteDone] = useState(false);
   const [visitedMarket, setVisitedMarket] = useState(false);
@@ -245,7 +253,7 @@ export default function App() {
   return (
     <div className="phone">
       {screen === 'splash' && <Splash onNext={() => setScreen('login')} onSkip={() => setScreen('login')} />}
-      {screen === 'login' && <Login onLogin={() => setScreen('onboarding')} onSkip={() => setScreen('home')} />}
+      {screen === 'login' && <Login onLogin={() => setScreen('onboarding')} onSkip={() => setScreen('home')} authError={authError} />}
       {screen === 'onboarding' && (
         <Onboarding initial={taste} onDone={(t) => { setTaste(t); setTasteDone(true); setScreen('home'); }} />
       )}
@@ -291,7 +299,8 @@ export default function App() {
       )}
 
       {screen === 'mypage' && (
-        <MyTab taste={taste} savedCount={roomsDone} onEditTaste={() => setScreen('onboarding')} />
+        <MyTab taste={taste} savedCount={roomsDone} user={user} onEditTaste={() => setScreen('onboarding')}
+          onLogout={() => { logout(); setUser(null); setScreen('login'); }} />
       )}
 
       {showTab && <TabBar active={screen} onNav={navTab} />}

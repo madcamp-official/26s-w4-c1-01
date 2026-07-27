@@ -495,3 +495,8 @@ input[type="number"], input[type="text"], select {
 
 /* 탭바 아이콘 톤(ywlee 브라운 강조) */
 .tabbar { box-shadow: 0 -2px 12px rgba(43,33,24,.05); }
+
+/* 소셜 로그인 상태 */
+img.ava { object-fit: cover; }
+.auth-err { font-size: 12px; color: var(--bad); background: rgba(204,91,82,.1); padding: 8px 14px; border-radius: 12px; }
+.demo-note { text-align: center; font-size: 11.5px; color: var(--muted3); }

@@ -17,6 +17,7 @@ import json
 import re
 import os
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "app"))
@@ -45,6 +46,80 @@ LLM_MODEL = ENV.get("LLM_MODEL") or os.getenv("LLM_MODEL") or "claude-sonnet-5"
 GEMINI_API_KEY = ENV.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = ENV.get("GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-flash-latest"
 LLM_PROVIDER = "gemini" if GEMINI_API_KEY else ("anthropic" if ANTHROPIC_API_KEY else None)
+# ── 소셜 로그인(OAuth 2.0 인가코드) — 키는 server/.env, 없으면 프론트가 데모 로그인 폴백 ──
+# 네이버 '로그인' 앱 키는 쇼핑검색 키(NAVER_CLIENT_ID)와 별개 앱이라 이름을 분리한다.
+AUTH_SECRET = ENV.get("AUTH_SECRET") or os.getenv("AUTH_SECRET") or "bangkku-dev-secret-rotate-me"
+AUTH_BASE = (ENV.get("AUTH_REDIRECT_BASE") or os.getenv("AUTH_REDIRECT_BASE") or "http://localhost:5173").rstrip("/")
+OAUTH = {
+    "kakao": {"id": (ENV.get("KAKAO_CLIENT_ID") or os.getenv("KAKAO_CLIENT_ID")), "secret": (ENV.get("KAKAO_CLIENT_SECRET") or os.getenv("KAKAO_CLIENT_SECRET")),
+              "auth": "https://kauth.kakao.com/oauth/authorize", "token": "https://kauth.kakao.com/oauth/token",
+              "profile": "https://kapi.kakao.com/v2/user/me", "scope": None},
+    "naver": {"id": (ENV.get("NAVER_LOGIN_CLIENT_ID") or os.getenv("NAVER_LOGIN_CLIENT_ID")), "secret": (ENV.get("NAVER_LOGIN_CLIENT_SECRET") or os.getenv("NAVER_LOGIN_CLIENT_SECRET")),
+              "auth": "https://nid.naver.com/oauth2.0/authorize", "token": "https://nid.naver.com/oauth2.0/token",
+              "profile": "https://openapi.naver.com/v1/nid/me", "scope": None},
+    "google": {"id": (ENV.get("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID")), "secret": (ENV.get("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_CLIENT_SECRET")),
+               "auth": "https://accounts.google.com/o/oauth2/v2/auth", "token": "https://oauth2.googleapis.com/token",
+               "profile": "https://www.googleapis.com/oauth2/v2/userinfo", "scope": "openid profile email"},
+}
+
+
+def sign_token(payload):
+    """HMAC 서명 세션 토큰 — base64url(json).sig32. 외부 JWT 라이브러리 없이 stdlib로."""
+    import hmac as _hmac, hashlib, base64
+    b = base64.urlsafe_b64encode(json.dumps(payload, ensure_ascii=False).encode()).decode().rstrip("=")
+    sig = _hmac.new(AUTH_SECRET.encode(), b.encode(), hashlib.sha256).hexdigest()[:32]
+    return f"{b}.{sig}"
+
+
+def verify_token(token):
+    import hmac as _hmac, hashlib, base64
+    try:
+        b, sig = token.rsplit(".", 1)
+        want = _hmac.new(AUTH_SECRET.encode(), b.encode(), hashlib.sha256).hexdigest()[:32]
+        if not _hmac.compare_digest(sig, want):
+            return None
+        pad = "=" * (-len(b) % 4)
+        p = json.loads(base64.urlsafe_b64decode(b + pad))
+        if p.get("exp") and p["exp"] < int(time.time()):
+            return None
+        return p
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _http_json(url, data=None, headers=None):
+    req = urllib.request.Request(url, data=data, headers=headers or {})
+    with urllib.request.urlopen(req, timeout=12) as r:
+        return json.load(r)
+
+
+def oauth_exchange(provider, code):
+    """인가코드 → access_token → 프로필({provider,id,name,avatar,email})."""
+    conf = OAUTH[provider]
+    form = {"grant_type": "authorization_code", "client_id": conf["id"],
+            "redirect_uri": f"{AUTH_BASE}/api/auth/{provider}/callback", "code": code}
+    if conf.get("secret"):
+        form["client_secret"] = conf["secret"]
+    if provider == "naver":
+        form["state"] = "bk"
+    tok = _http_json(conf["token"], data=urllib.parse.urlencode(form).encode(),
+                     headers={"Content-Type": "application/x-www-form-urlencoded"})
+    access = tok.get("access_token")
+    if not access:
+        raise RuntimeError(f"token exchange failed: {str(tok)[:120]}")
+    prof = _http_json(conf["profile"], headers={"Authorization": f"Bearer {access}"})
+    if provider == "kakao":
+        pr = (prof.get("kakao_account") or {}).get("profile") or prof.get("properties") or {}
+        return {"provider": "kakao", "id": str(prof.get("id")), "name": pr.get("nickname") or "카카오 사용자",
+                "avatar": pr.get("profile_image_url") or pr.get("profile_image")}
+    if provider == "naver":
+        r = prof.get("response") or {}
+        return {"provider": "naver", "id": r.get("id"), "name": r.get("nickname") or r.get("name") or "네이버 사용자",
+                "avatar": r.get("profile_image"), "email": r.get("email")}
+    return {"provider": "google", "id": prof.get("id") or prof.get("sub"), "name": prof.get("name") or "Google 사용자",
+            "avatar": prof.get("picture"), "email": prof.get("email")}
+
+
 _PROMPT_PATH = os.path.join(HERE, "..", "docs", "방꾸요정-배치-LLM-프롬프트.md")
 LAYOUT_PROMPT = (open(_PROMPT_PATH, encoding="utf-8").read()
                  if os.path.exists(_PROMPT_PATH)
@@ -280,6 +355,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _redirect(self, url):
+        self.send_response(302)
+        self.send_header("Location", url)
+        self.end_headers()
+
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         if u.path == "/health":
@@ -298,6 +378,36 @@ class Handler(http.server.BaseHTTPRequestHandler):
             url = urllib.parse.parse_qs(u.query).get("url", [""])[0]
             d = fetch_dims_from_url(url, ENV)
             return self._json({"status": "OK", "dims": d} if d else {"status": "MISS"})
+
+        # ── 소셜 로그인 ──
+        if u.path == "/api/auth/providers":     # 프론트가 실연동/데모 폴백을 구분
+            return self._json({p: bool(c.get("id")) for p, c in OAUTH.items()})
+        if u.path == "/api/auth/me":
+            tok = (self.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+            p = verify_token(tok)
+            return self._json({"status": "OK", "user": p} if p else {"status": "NOAUTH"}, 200 if p else 401)
+        m = re.match(r"^/api/auth/(kakao|naver|google)/(login|callback)$", u.path)
+        if m:
+            provider, action = m.group(1), m.group(2)
+            conf = OAUTH[provider]
+            if not conf.get("id"):
+                return self._redirect(AUTH_BASE + "/#auth_error=unconfigured")
+            if action == "login":
+                q = {"response_type": "code", "client_id": conf["id"],
+                     "redirect_uri": f"{AUTH_BASE}/api/auth/{provider}/callback", "state": "bk"}
+                if conf.get("scope"):
+                    q["scope"] = conf["scope"]
+                return self._redirect(conf["auth"] + "?" + urllib.parse.urlencode(q))
+            # callback: 코드 교환 → 프로필 → 서명 토큰 → 프론트로(#auth=)
+            code = urllib.parse.parse_qs(u.query).get("code", [""])[0]
+            if not code:
+                return self._redirect(AUTH_BASE + "/#auth_error=denied")
+            try:
+                user = oauth_exchange(provider, code)
+                user["exp"] = int(time.time()) + 60 * 60 * 24 * 30   # 30일
+                return self._redirect(AUTH_BASE + "/#auth=" + sign_token(user))
+            except Exception as e:  # noqa: BLE001
+                return self._redirect(AUTH_BASE + "/#auth_error=" + urllib.parse.quote(str(e)[:80]))
         self._json({"error": "not found"}, 404)
 
     def do_POST(self):
