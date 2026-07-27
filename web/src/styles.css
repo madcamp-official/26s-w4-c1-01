@@ -415,7 +415,7 @@ input[type="number"], input[type="text"], select {
 
 /* ── 마켓 탭 ── */
 .market { background: #fff; }   /* position:relative 없음 → 바텀시트가 .phone에 스코프되어 탭바까지 덮음(플래너 드로어와 동일) */
-.market .body { flex: 1; min-height: 0; overflow: auto; padding: 56px 18px 0; display: flex; flex-direction: column; }
+.market .body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 56px 18px 0; display: flex; flex-direction: column; }
 .catseg { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
 .catseg::-webkit-scrollbar { display: none; }
 .search-fake { display: flex; align-items: center; gap: 8px; background: var(--bg2); border-radius: var(--r-pill); padding: 11px 16px; margin-bottom: 12px; border: 0; width: 100%; }
@@ -430,9 +430,10 @@ input[type="number"], input[type="text"], select {
 
 /* 상품 2열 그리드 */
 .pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-bottom: 14px; }
-.pcard { text-align: left; border: 0; background: none; padding: 0; text-decoration: none; }
-.pcard .thumb { border-radius: 18px; aspect-ratio: 1; position: relative; overflow: hidden; background: var(--muted-surface); display: block; }
-.pcard .thumb img { width: 100%; height: 100%; object-fit: cover; }
+/* min-width:0 필수 — 긴 상품명(nowrap)이 그리드 트랙을 늘려 가로 오버플로(카드 잘림)되는 것 방지 */
+.pcard { display: block; text-align: left; border: 0; background: none; padding: 0; text-decoration: none; min-width: 0; }
+.pcard .thumb { width: 100%; border-radius: 18px; aspect-ratio: 1; position: relative; overflow: hidden; background: var(--muted-surface); display: block; }
+.pcard .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .pcard .nbadge { position: absolute; bottom: 8px; left: 8px; width: 18px; height: 18px; border-radius: 50%; background: var(--naver); color: #fff; font: 700 10px sans-serif; display: flex; align-items: center; justify-content: center; }
 .pcard .pnm { font-weight: 700; font-size: 12.5px; color: var(--ink); margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pcard .ppr { font-weight: 800; font-size: 12.5px; color: var(--accent); }
