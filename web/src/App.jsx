@@ -1,8 +1,9 @@
 import { useMemo, useState, useRef } from 'react';
-import { toPlacedItem, resolveDims } from './lib/catalog.js';
+import { toPlacedItem, resolveDims, CATALOG } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
-import { fetchDims, layoutFurniture, renderScene } from './lib/api.js';
+import { fetchDims, layoutFurniture, renderScene, chatLayout } from './lib/api.js';
+import { parseCommand } from './lib/chatcmd.js';
 
 import TabBar from './components/TabBar.jsx';
 import Splash from './components/Splash.jsx';
@@ -105,21 +106,85 @@ export default function App() {
       setLayoutOpts(opts);
     } finally { setLayoutBusy(false); }
   }
-  // 포토리얼 렌더(camp-3). 결과 화면 흐름을 막지 않게 실패해도 alert 없이 renderImg만 비움.
-  async function doRender(preset = renderPreset, view = null) {
+  // 포토리얼 렌더(camp-3) — 지정 아이템 배열로. 결과 화면 흐름을 막지 않게 실패해도 renderImg만 비움.
+  // its를 인자로 받아 방금 바뀐 배치(setItems 직후 stale state)로도 정확히 렌더.
+  async function doRenderItems(its, preset, viewMode) {
     if (!room || renderBusy) return;
-    if (!items.some((it) => it.glb)) return;
+    if (!its.some((it) => it.glb)) { setRenderImg(null); return; }
     setRenderBusy(true);
     try {
-      const r = await renderScene(room, items, cam3d.current, preset, view, openings);
-      if (r?.status === 'OK' && r.image) setRenderImg(r.image);
-      else setRenderImg(null);
+      const r = await renderScene(room, its, cam3d.current, preset, viewMode === 'me' ? null : viewMode, openings);
+      setRenderImg(r?.status === 'OK' && r.image ? r.image : null);
     } catch { setRenderImg(null); } finally { setRenderBusy(false); }
   }
-  // 시간대·각도를 함께 확정해 렌더(뷰를 명시적으로 고정). 'me'=내 3D 시점(cam3d), 그 외=서버 프레이밍.
+  // 시간대·각도를 함께 확정해 현재 배치로 렌더. 'me'=내 3D 시점(cam3d), 그 외=서버 프레이밍.
   function renderWith(preset, viewMode) {
     setRenderPreset(preset); setRenderView(viewMode);
-    doRender(preset, viewMode === 'me' ? null : viewMode);
+    doRenderItems(items, preset, viewMode);
+  }
+  // 배치를 바꾼 뒤 결과 화면으로(로딩 스피너 → 렌더 사진). 방금 만든 next 배치로 즉시 렌더.
+  function goResultWith(next) {
+    setItems(next); setSelectedId(null);
+    setShowBefore(false); setRenderImg(null);
+    setRenderPreset('day'); setRenderView('wide');
+    setScreen('result');
+    doRenderItems(next, 'day', 'wide');
+  }
+  // 빠른 명령(추가/삭제/크기)을 로컬로 적용 → 새 배치 배열 반환(불가하면 null).
+  function applyChatCommand(cmd) {
+    if (cmd.op === 'add') {
+      const catItem = CATALOG.find((c) => c.cat === cmd.cat);
+      if (!catItem || !room) return null;
+      const d = resolveDims(catItem);
+      const probe = { wM: d.w / 100, dM: d.d / 100, rotationDeg: 0 };
+      const spot = findFreeSpot(probe, items, room.widthM, room.depthM) || { cx: room.widthM / 2, cy: room.depthM / 2 };
+      return [...items, toPlacedItem(catItem, spot.cx, spot.cy)];
+    }
+    if (cmd.op === 'remove') {
+      const idx = items.map((it) => it.cat).lastIndexOf(cmd.cat);
+      return idx < 0 ? null : items.filter((_, i) => i !== idx);
+    }
+    if (cmd.op === 'resize') {
+      let hit = false;
+      const next = items.map((it) => (!hit && it.cat === cmd.cat
+        ? (hit = true, { ...it, wM: it.wM * cmd.factor, dM: it.dM * cmd.factor, hM: it.hM * cmd.factor, dimAccuracy: '사용자입력' })
+        : it));
+      return hit ? next : null;
+    }
+    return null;
+  }
+  // 배치 도우미 제출 — 빠른 명령이면 로컬 적용, 아니면 LLM 재배치. 적용되면 결과 화면으로.
+  // 반환: { applied, reply } — applied면 결과로 이동(칩/문장 전송 → 로딩 → 결과).
+  async function onChatSubmit(text, history = []) {
+    if (!room) return { applied: false, reply: '먼저 방을 만들어 주세요.' };
+    const cmd = parseCommand(text);
+    if (cmd) {
+      const catLabel = cmd.cat;
+      if (cmd.op !== 'add' && !items.some((it) => it.cat === catLabel)) {
+        return { applied: false, reply: `${catLabel}이(가) 아직 없어요.` };
+      }
+      const next = applyChatCommand(cmd);
+      if (!next) return { applied: false, reply: '그 요청은 반영하기 어려워요.' };
+      goResultWith(next);
+      return { applied: true };
+    }
+    // 자연어 → LLM 재배치(기존 위치 재검증 후에만 반영)
+    const r = await chatLayout(room, openings, items, text, history);
+    if (r.decision === 'apply' && Array.isArray(r.items) && r.items.length) {
+      const map = new Map(r.items.map((it) => [it.id, it]));
+      const next = items.map((it) => {
+        const ni = map.get(it.id);
+        if (!ni) return it;
+        const rot = [0, 90, 180, 270].includes(ni.rotation) ? ni.rotation : it.rotationDeg;
+        const cx = Number.isFinite(ni.cx) ? ni.cx / 100 : it.cx;
+        const cy = Number.isFinite(ni.cy) ? ni.cy / 100 : it.cy;
+        return { ...it, cx, cy, rotationDeg: rot };
+      });
+      const v = validateLayout(next.filter((it) => it.cat !== '러그'), room.widthM, room.depthM, openings);
+      if (v.ok && !v.blockOpen) { goResultWith(next); return { applied: true }; }
+      return { applied: false, reply: (r.reason || '') + ' — 다만 겹치거나 문·창을 가려서 반영하진 않았어요. 🚫' };
+    }
+    return { applied: false, reply: r.reason || '그 요청은 반영하기 어려워요.' };
   }
 
   // ── 네비게이션 ──
@@ -182,6 +247,7 @@ export default function App() {
           onAutoLayout={openAutoLayout} moveItem={moveItem} rotateItem={rotateItem}
           onDelete={deleteSel} onRotateSel={rotateSel} onSetDim={setSelDim} onAutoFillDims={autoFillDims}
           dimBusy={dimBusy} addFurniture={addFurniture} cam3d={cam3d}
+          onChatSubmit={onChatSubmit}
           onBack={() => setScreen('roominput')} onFinish={finishPlanner}
         />
       )}

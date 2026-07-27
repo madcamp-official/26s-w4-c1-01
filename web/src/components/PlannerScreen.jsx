@@ -10,7 +10,7 @@ import ViewErrorBoundary from './ViewErrorBoundary.jsx';
 export default function PlannerScreen({
   room, items, setItems, selectedId, setSelectedId, openings, setOpenings,
   val, layoutBusy, onAutoLayout, moveItem, rotateItem, onDelete, onRotateSel,
-  onSetDim, onAutoFillDims, dimBusy, addFurniture, cam3d, onBack, onFinish,
+  onSetDim, onAutoFillDims, dimBusy, addFurniture, cam3d, onChatSubmit, onBack, onFinish,
 }) {
   const [view3d, setView3d] = useState(false);
   const [drawer, setDrawer] = useState(false);
@@ -69,7 +69,7 @@ export default function PlannerScreen({
 
       {items.length === 0 && <p className="mockup-note">＋가구로 원룸에 담으면 실치수로 배치돼요. ‘자동배치’를 누르면 AI가 알아서 놓아줘요.</p>}
 
-      <LayoutChat room={room} openings={openings} items={items} setItems={setItems} />
+      <LayoutChat items={items} onSubmit={onChatSubmit} />
 
       <button className="cta footer-cta" onClick={onFinish} disabled={!items.some((it) => it.glb)}>✨ 이 배치로 방 채우기</button>
 
