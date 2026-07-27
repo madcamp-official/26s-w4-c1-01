@@ -2,7 +2,7 @@
 // 원칙: 배치할 때마다 겹침/방밖을 검증해 "유효한 자리"에만 놓는다. 한 가구라도 못 놓으면 그 배치는 폐기.
 // 가중치: 대부분의 가구는 벽에 밀착(벽 자리를 먼저 시도). 러그는 바닥 레이어(중앙, 충돌 제외).
 // 랜덤 변주로 서로 다른 유효 배치 여러 개를 만들고, 벽밀착률 높은 순 + 다양성으로 상위 N개를 고른다.
-import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore, openingBlocksAABB, EPS } from './geometry.js';
+import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore, openingBlocksAABB, pairOverlapOK, EPS } from './geometry.js';
 
 // LLM 후보(cm 좌표) → 우리 아이템으로 매핑 + 겹침/방밖 재검증(안전망). 유효한 배치만 반환.
 // LLM 산술은 틀릴 수 있으므로 여기서 반드시 재검사해 겹치는 후보를 폐기한다.
@@ -42,25 +42,28 @@ function repairCandidate(items, room, openings = []) {
   const res = items.map((it) => ({ ...it }));       // rug 포함 전부 복사(rug는 바닥 레이어라 그대로 유지)
   const solids = res.filter((it) => roles.get(it.id) !== 'rug');
   const order = [...solids.filter((it) => ANCHOR.has(roles.get(it.id))), ...solids.filter((it) => !ANCHOR.has(roles.get(it.id)))];
-  const placed = [];
+  const placed = [];   // {box, it} — 의자-책상 구도 겹침 허용 위해 아이템도 보관
+  const overlapsOther = (b, it) => placed.some((p) => aabbOverlap(b, p.box) && !pairOverlapOK(it, p.it));
   let moved = 0;
   for (const it of order) {
     if (!it._place) {                                // Gemini 위치가 있으면 유효한지 확인 후 유지
       const b = boxAt(it, it.cx, it.cy, it.rotationDeg);
-      if (inRoom(b, W, D) && placed.every((pb) => !aabbOverlap(b, pb))
-          && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))) { placed.push(b); continue; }
+      if (inRoom(b, W, D) && !overlapsOther(b, it)
+          && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))) { placed.push({ box: b, it }); continue; }
     }
-    // 누락(_place)이거나 Gemini 위치가 무효 → 재배치. 누락은 벽 우선 새 자리, 무효는 원위치 근처로 스냅.
-    const p = it._place ? placeItem(it, placed, W, D, openings) : placeItemNear(it, it.cx, it.cy, placed, W, D, openings);
+    // 누락(_place)이거나 Gemini 위치가 무효 → 원위치(누락은 방 중앙) 근처 유효 자리로 스냅.
+    const ox = it._place ? (it.cx || W / 2) : it.cx, oy = it._place ? (it.cy || D / 2) : it.cy;
+    const p = placeItemNear(it, ox, oy, placed, W, D, openings);
     if (!p) return null;                             // 배치 실패 → 후보 폐기(로컬 폴백으로)
-    it.cx = p.cx; it.cy = p.cy; it.rotationDeg = p.rot; delete it._place; placed.push(p.box); moved++;
+    it.cx = p.cx; it.cy = p.cy; it.rotationDeg = p.rot; delete it._place; placed.push({ box: p.box, it }); moved++;
   }
   res.forEach((it) => delete it._place);           // 내부 플래그 정리(러그 등 미처리분 포함)
   return { items: res, moved };
 }
-// 원위치(ox,oy)에 가장 가까운 유효 자리(벽 우선 → 내부). 없으면 null.
-function placeItemNear(it, ox, oy, placedBoxes, W, D, openings) {
-  const free = (b) => inRoom(b, W, D) && placedBoxes.every((pb) => !aabbOverlap(b, pb))
+// 원위치(ox,oy)에 가장 가까운 유효 자리(벽 우선 → 내부). placed=[{box,it}]. 없으면 null.
+function placeItemNear(it, ox, oy, placed, W, D, openings) {
+  const free = (b) => inRoom(b, W, D)
+    && !placed.some((p) => aabbOverlap(b, p.box) && !pairOverlapOK(it, p.it))
     && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM));
   const cands = [...wallCandidates(it, W, D), ...interiorCandidates(it, W, D)]
     .sort((a, b) => Math.hypot(a.cx - ox, a.cy - oy) - Math.hypot(b.cx - ox, b.cy - oy));
@@ -185,10 +188,11 @@ function placeDeskChair(desk, chair, placed, W, D, openings) {
       if (!chair) { desk.cx = c.cx; desk.cy = c.cy; desk.rotationDeg = c.rot; placed.push(deskBox); return { wall, chair: false }; }
       const crot = (c.rot + 180) % 360;                 // 의자 앞면이 책상 향함
       const f = FRONT_VEC[c.rot];                        // 책상 앞면 방향
-      const off = desk.dM / 2 + chair.dM / 2 + 0.02;     // 앞면끼리 근접
+      const off = Math.max(0.05, desk.dM / 2 + chair.dM / 2 - 0.25);  // 의자를 책상 밑으로 ~25cm 틈입(자연스러운 구도)
       const chx = c.cx + f[0] * off, chy = c.cy + f[1] * off;
       const chairBox = boxAt(chair, chx, chy, crot);
-      const chairFree = placed.every((pb) => !aabbOverlap(chairBox, pb)) && !aabbOverlap(chairBox, deskBox)
+      // 의자는 '다른' 가구·개구부와만 안 겹치면 OK — 책상과의 겹침(틈입)은 허용.
+      const chairFree = placed.every((pb) => !aabbOverlap(chairBox, pb))
         && !openings.some((o) => openingBlocksAABB(chairBox, o, W, D, chair.hM));
       if (!inRoom(chairBox, W, D) || !chairFree) continue;
       desk.cx = c.cx; desk.cy = c.cy; desk.rotationDeg = c.rot; placed.push(deskBox);

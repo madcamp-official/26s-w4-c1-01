@@ -2,7 +2,7 @@
 // 핵심: generateLayouts가 내놓는 모든 후보는 '겹침 0 + 방밖 0'이어야 한다(사용자 요구: 겹치면 기각).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB, WINDOW_SILL_M } from './geometry.js';
+import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB, WINDOW_SILL_M, pairOverlapOK, deskChairComposed } from './geometry.js';
 import { generateLayouts, validateCandidates } from './autolayout.js';
 
 // 결정론적 PRNG(가구셋 생성용) — 레이아웃 내부 랜덤과 무관하게 '입력'만 재현 가능하게.
@@ -185,7 +185,37 @@ test('로컬 R2: 책상+의자 세트 — 의자가 책상 앞면 정면 마주�
   assert.ok(facing(desk.rotationDeg, chair.rotationDeg), '의자 앞면이 책상 앞면 정반대(마주봄)');
   const vert = FR[desk.rotationDeg][1] !== 0;
   assert.ok((vert ? Math.abs(chair.cx - desk.cx) : Math.abs(chair.cy - desk.cy)) <= 0.35, '중심축 정렬');
-  assert.ok(!validateLayout([desk, chair], 3.2, 3.8).flags.some((f) => f.overlap), '겹침 없음');
+  // 의자는 책상 밑으로 틈입(AABB 겹침 발생) — 자연스러운 구도이므로 겹침으로 플래그되지 않아야 함.
+  assert.ok(deskChairComposed(chair, desk), '의자-책상 구도 성립');
+  assert.ok(!validateLayout([desk, chair], 3.2, 3.8).flags.some((f) => f.overlap), '구도 겹침은 미플래그');
+});
+
+test('정책: 자연스러운 책상-의자 구도의 겹침만 허용', () => {
+  // 책상 앞면(+y)에 의자가 마주보며(−y 향함) 밀착 → 구도 성립.
+  const desk = { cat: '책상', wM: 1.2, dM: 0.6, hM: 0.75, cx: 1.5, cy: 1.0, rotationDeg: 0 };
+  const chairOK = { cat: '의자', wM: 0.55, dM: 0.55, hM: 0.9, cx: 1.5, cy: 1.3, rotationDeg: 180 };
+  assert.ok(deskChairComposed(chairOK, desk), '마주보고 앞면·정렬 → 구도');
+  assert.ok(pairOverlapOK(chairOK, desk) && pairOverlapOK(desk, chairOK), '순서 무관 허용');
+  // 등돌린 의자(같은 방향) → 구도 아님.
+  assert.ok(!deskChairComposed({ ...chairOK, rotationDeg: 0 }, desk), '같은 방향(등돌림)은 구도 아님');
+  // 책상 뒷면 쪽 의자 → 구도 아님.
+  assert.ok(!deskChairComposed({ ...chairOK, cy: 0.7 }, desk), '뒷면 쪽은 구도 아님');
+  // 축에서 벗어난 의자 → 구도 아님.
+  assert.ok(!deskChairComposed({ ...chairOK, cx: 2.6 }, desk), '정렬 벗어나면 구도 아님');
+  // 책상/의자가 아닌 쌍의 겹침은 절대 불허(러그 제외).
+  const bed = { cat: '침대', wM: 1.6, dM: 2.0, hM: 0.5, cx: 1.5, cy: 1.2, rotationDeg: 0 };
+  assert.ok(!pairOverlapOK(bed, desk), '침대-책상 겹침 불허');
+  assert.ok(pairOverlapOK({ cat: '러그' }, bed), '러그는 어떤 것과도 겹침 허용');
+});
+
+test('validateLayout: 구도 겹침은 통과, 나쁜 겹침은 플래그', () => {
+  const desk = { id: 'd', cat: '책상', wM: 1.2, dM: 0.6, hM: 0.75, cx: 1.5, cy: 1.0, rotationDeg: 0 };
+  const chair = { id: 'c', cat: '의자', wM: 0.55, dM: 0.55, hM: 0.9, cx: 1.5, cy: 1.28, rotationDeg: 180 };
+  const good = validateLayout([desk, chair], 3.0, 4.0);
+  assert.ok(!good.flags.some((f) => f.overlap) && good.ok, '틈입 구도는 겹침 아님');
+  // 같은 자리에 등돌린 의자 → 나쁜 겹침 플래그.
+  const bad = validateLayout([desk, { ...chair, rotationDeg: 0 }], 3.0, 4.0);
+  assert.ok(bad.flags.some((f) => f.overlap), '구도 아닌 겹침은 플래그');
 });
 
 test('로컬 R1: TV장이 침대 반대편 벽에서 정면 마주봄·정렬', () => {
@@ -227,4 +257,23 @@ test('validateCandidates: 겹치는 LLM 후보는 폐기 대신 보정', () => {
   const bigItems = [{ id: 'a', cat: '침대', name: '침대', wM: 2.0, dM: 2.2, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 }];
   const cand = [{ strategy: 'z', items: [{ id: 'a', cx: 50, cy: 50, rotation: 0 }] }];
   assert.equal(validateCandidates(cand, tiny, bigItems).length, 0);
+});
+
+test('validateCandidates: 책상 밑 틈입한 Gemini 의자는 보정에서 유지', () => {
+  const room = { widthM: 3.0, depthM: 4.0 };
+  const items = [
+    { id: 'desk', cat: '책상', name: '책상', wM: 1.2, dM: 0.6, hM: 0.75, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'chair', cat: '의자', name: '의자', wM: 0.55, dM: 0.55, hM: 0.9, cx: 0, cy: 0, rotationDeg: 0 },
+  ];
+  // 책상 앞면(+y)에 의자를 28cm만 띄워 틈입시킨 유효 구도(cm 단위)
+  const cand = [{ strategy: 'tuck', items: [
+    { id: 'desk', cx: 150, cy: 60, rotation: 0 },
+    { id: 'chair', cx: 150, cy: 88, rotation: 180 },
+  ] }];
+  const rb = validateCandidates(cand, room, items);
+  assert.equal(rb.length, 1, '구도 후보 채택');
+  const d = rb[0].items.find((x) => x.id === 'desk'), c = rb[0].items.find((x) => x.id === 'chair');
+  // 보정이 의자를 끌어내지 않고 틈입 위치 그대로 유지(구도 겹침 허용)
+  assert.ok(deskChairComposed(c, d), '보정 후에도 구도 유지');
+  assert.ok(Math.abs(c.cx - 1.5) < 1e-6 && Math.abs(c.cy - 0.88) < 1e-6, '의자 원위치 유지');
 });

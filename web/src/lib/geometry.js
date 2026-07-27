@@ -44,6 +44,29 @@ export function outOfBounds(aabb, roomWM, roomDM) {
   return aabb.left < -EPS || aabb.top < -EPS || aabb.right > roomWM + EPS || aabb.bottom > roomDM + EPS;
 }
 
+// 가구 정면 단위벡터(rot0=앞면+y 규칙). 회전에 따른 앞면 방향.
+const FRONT_DIR = { 0: [0, 1], 90: [-1, 0], 180: [0, -1], 270: [1, 0] };
+const snap4 = (r) => (((Math.round((r || 0) / 90) * 90) % 360) + 360) % 360;
+// 의자-책상(또는 테이블) 겹침이 '자연스러운 구도'인가: 의자가 책상 앞면 쪽 + 마주봄 + 중심축 정렬
+// (= 의자가 책상 밑으로 들어간 형태). 이때만 겹침을 허용한다(hard 정책).
+export function deskChairComposed(chair, desk) {
+  const fd = FRONT_DIR[snap4(desk.rotationDeg)], fc = FRONT_DIR[snap4(chair.rotationDeg)];
+  if (!(fd[0] === -fc[0] && fd[1] === -fc[1])) return false;      // 의자가 책상을 정면으로 마주봐야
+  const dx = chair.cx - desk.cx, dy = chair.cy - desk.cy;
+  if (dx * fd[0] + dy * fd[1] <= 0) return false;                 // 의자가 책상 '앞면 쪽'에 있어야(뒤/옆 금지)
+  const perp = Math.abs(dx * fd[1] - dy * fd[0]);                 // 앞면과 수직 오프셋(정렬도)
+  return perp <= Math.max(desk.wM || 0, chair.wM || 0) / 2 + 0.05; // 중심축 정렬
+}
+// 두 가구 겹침이 허용되는가: 러그(바닥 레이어) 또는 자연스러운 의자-책상 구도만.
+export function pairOverlapOK(a, b) {
+  if (!a || !b) return false;
+  if (a.cat === '러그' || b.cat === '러그') return true;
+  const chair = a.cat === '의자' ? a : (b.cat === '의자' ? b : null);
+  const surf = (a.cat === '책상' || a.cat === '테이블') ? a : ((b.cat === '책상' || b.cat === '테이블') ? b : null);
+  if (chair && surf && chair !== surf) return deskChairComposed(chair, surf);
+  return false;
+}
+
 // 배치 전체 검증 → 각 아이템의 문제 플래그와 남은 바닥면적.
 // openings: 문/창 배열(있으면 각 가구가 문 스윙/창을 가리는지 blockOpen 플래그).
 export function validateLayout(items, roomWM, roomDM, openings = []) {
@@ -55,7 +78,7 @@ export function validateLayout(items, roomWM, roomDM, openings = []) {
       if (openingBlocksAABB(boxes[i], o, roomWM, roomDM, items[i].hM)) { flags[i].blockOpen = true; break; }
     }
     for (let j = i + 1; j < boxes.length; j++) {
-      if (aabbOverlap(boxes[i], boxes[j])) {
+      if (aabbOverlap(boxes[i], boxes[j]) && !pairOverlapOK(items[i], items[j])) {   // 의자-책상 구도 겹침은 허용
         flags[i].overlap = true;
         flags[j].overlap = true;
       }
