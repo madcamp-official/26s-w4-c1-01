@@ -108,14 +108,22 @@ export default function App() {
   }
   // 포토리얼 렌더(camp-3) — 지정 아이템 배열로. 결과 화면 흐름을 막지 않게 실패해도 renderImg만 비움.
   // its를 인자로 받아 방금 바뀐 배치(setItems 직후 stale state)로도 정확히 렌더.
+  // 렌더 중 새 요청(시간대/각도 연타)은 버리지 않고 '마지막 요청'을 큐에 보관 → 끝나면 이어 실행(latest-wins).
+  const pendingRender = useRef(null);
+  const busyRef = useRef(false);           // 상태 클로저 지연과 무관한 즉시 가드
   async function doRenderItems(its, preset, viewMode) {
-    if (!room || renderBusy) return;
+    if (!room) return;
+    if (busyRef.current) { pendingRender.current = { its, preset, viewMode }; return; }
     if (!its.some((it) => it.glb)) { setRenderImg(null); return; }
-    setRenderBusy(true);
+    busyRef.current = true; setRenderBusy(true);
     try {
       const r = await renderScene(room, its, cam3d.current, preset, viewMode === 'me' ? null : viewMode, openings);
       setRenderImg(r?.status === 'OK' && r.image ? r.image : null);
-    } catch { setRenderImg(null); } finally { setRenderBusy(false); }
+    } catch { setRenderImg(null); } finally {
+      busyRef.current = false; setRenderBusy(false);
+      const p = pendingRender.current;
+      if (p) { pendingRender.current = null; setTimeout(() => doRenderItems(p.its, p.preset, p.viewMode), 0); }
+    }
   }
   // 시간대·각도를 함께 확정해 현재 배치로 렌더. 'me'=내 3D 시점(cam3d), 그 외=서버 프레이밍.
   function renderWith(preset, viewMode) {

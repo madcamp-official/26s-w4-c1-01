@@ -29,6 +29,10 @@ export default function CompositeResult({
         )}
       </div>
 
+      {renderBusy && renderImg && (
+        <div className="rerender-veil"><div className="spinner sm" /><span>새 조명으로 다시 찍는 중…</span></div>
+      )}
+
       <div className="topbar">
         <button className="rt-circle" onClick={onBack}>←</button>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -36,7 +40,8 @@ export default function CompositeResult({
             <button className="rt-pill" onClick={onToggle}>{showBefore ? 'After 보기' : 'Before/After'}</button>
           )}
           {TIMES.map(([p, ic]) => (
-            <button key={p} className="rt-circle" style={{ opacity: timePreset === p ? 1 : 0.55, fontSize: 15 }}
+            <button key={p} className={`rt-circle ${renderBusy ? 'busy' : ''}`}
+              style={{ opacity: timePreset === p ? 1 : 0.55, fontSize: 15 }}
               title={p} onClick={() => onTime(p)}>{ic}</button>
           ))}
         </div>

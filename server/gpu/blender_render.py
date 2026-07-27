@@ -15,16 +15,16 @@ R = S["room"]; W, D, H = R["w"], R["d"], R["h"]
 # sky = (위 하늘색, 아래 수평선색) 수직 그라데이션, win_s = 창 발광세기, sun = 태양광(색,세기,고도deg,방위deg) 없으면 None,
 # lamp = 실내등 세기(밤에만), hdri = 환경광 세기, exp = 노출.  (win = 폴백 단색)
 PRESETS = {
-    "morning": dict(exp=0.44, hdri=0.48, win=(0.86, 0.91, 1.0), win_s=15,
+    "morning": dict(exp=0.38, hdri=0.30, win=(1.0, 0.88, 0.66), win_s=17, bg=(1.0, 0.96, 0.90),
                     sky=((0.66, 0.78, 1.0), (1.0, 0.84, 0.62)),   # 위 하늘 아래 일출 웜글로우
-                    sun=((1.0, 0.84, 0.58), 2.9, 15, 65), lamp=0.0),  # 낮고 따뜻한 골든 저각광
-    "day":     dict(exp=0.40, hdri=0.86, win=(0.90, 0.95, 1.0), win_s=11,
+                    sun=((1.0, 0.80, 0.50), 4.2, 12, 65), lamp=0.0),  # 낮고 따뜻한 골든 저각광(뚜렷하게)
+    "day":     dict(exp=0.40, hdri=0.86, win=(0.90, 0.95, 1.0), win_s=11, bg=(1.0, 1.0, 1.0),
                     sky=((0.48, 0.68, 1.0), (0.95, 0.97, 1.0)),
                     sun=((1.0, 0.98, 0.96), 3.3, 62, 30), lamp=0.0),  # 높고 희고 청량한 정오
-    "sunset":  dict(exp=0.55, hdri=0.22, win=(1.0, 0.5, 0.22), win_s=9,
+    "sunset":  dict(exp=0.46, hdri=0.18, win=(1.0, 0.46, 0.18), win_s=7, bg=(1.0, 0.82, 0.66),
                     sky=((0.85, 0.42, 0.36), (1.0, 0.74, 0.34)),
-                    sun=((1.0, 0.52, 0.24), 4.2, 6, 80), lamp=0.4),
-    "night":   dict(exp=0.30, hdri=0.05, win=(0.16, 0.22, 0.42), win_s=2.5,
+                    sun=((1.0, 0.46, 0.18), 5.2, 5, 80), lamp=0.5),   # 진한 주황 무드(웜 배경)
+    "night":   dict(exp=0.30, hdri=0.05, win=(0.16, 0.22, 0.42), win_s=2.5, bg=(0.02, 0.03, 0.06),
                     sky=((0.04, 0.07, 0.20), (0.14, 0.19, 0.40)),
                     sun=None, lamp=1.0),
 }
@@ -61,8 +61,9 @@ bg_hdri = nt.nodes.new("ShaderNodeBackground")
 bg_hdri.inputs["Strength"].default_value = S.get("hdri_strength", PRE["hdri"])
 nt.links.new(env.outputs["Color"], bg_hdri.inputs["Color"])
 bg_white = nt.nodes.new("ShaderNodeBackground")
-_bg = (1, 1, 1, 1) if PRE["lamp"] < 0.5 else (0.02, 0.03, 0.06, 1)  # 밤엔 배경도 어둡게
-bg_white.inputs["Color"].default_value = _bg
+# 카메라 배경은 프리셋 무드 색(bg) — 아침 웜화이트/낮 화이트/노을 주황빛/밤 어두운 남색.
+_bg = PRE.get("bg") or ((1, 1, 1) if PRE["lamp"] < 0.5 else (0.02, 0.03, 0.06))
+bg_white.inputs["Color"].default_value = (*_bg, 1)
 bg_white.inputs["Strength"].default_value = 1.0
 lp = nt.nodes.new("ShaderNodeLightPath")
 mix = nt.nodes.new("ShaderNodeMixShader")
