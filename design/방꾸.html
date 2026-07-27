@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css">
+<style>
+body{margin:0;background:#FFF3ED;font-family:'Pretendard Variable',-apple-system,sans-serif}
+::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+
+<div style="min-height:100vh;padding:56px 64px 120px;">
+
+  <div style="max-width:900px;margin-bottom:48px">
+    <div style="display:inline-block;font:700 12px/1 'Pretendard Variable',sans-serif;color:#835151;background:#F2E3DC;padding:6px 12px;border-radius:100px;margin-bottom:14px">방꾸미기 앱 · 2차 드래프트 🧡</div>
+    <h1 style="font:800 30px/1.35 'Pretendard Variable',sans-serif;color:#2B2118;margin:0 0 10px">더 귀엽게, 온보딩은 한 페이지로, 탭도 3개 추가했어!</h1>
+    <p style="font:400 15px/1.7 'Pretendard Variable',sans-serif;color:#8A7A6C;margin:0 0 24px">취향·예산·스타일을 한 화면에서 고르도록 합쳤고, 하단에 🏠배치 / 🛋️마켓 / 👤마이 탭을 새로 넣었어. 가구 구매는 네이버쇼핑 연동으로 바꿨고, 전체적으로 더 동글동글 귀여운 톤으로 손봤어.</p>
+    <div style="font:700 12.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:10px">핑크 × 브라운 컬러 조합 제안 (원하는 걸 말해줘)</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(43,33,24,0.06)">
+        <div style="font:700 11px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-bottom:8px">A · 블러쉬 &amp; 코코아</div>
+        <div style="display:flex;gap:4px">
+          <div style="width:36px;height:36px;border-radius:8px;background:#FFF8F4;border:1px solid rgba(0,0,0,0.06)"></div>
+          <div style="width:36px;height:36px;border-radius:8px;background:#E7A9A0"></div>
+          <div style="width:36px;height:36px;border-radius:8px;background:#8B5D4B"></div>
+          <div style="width:36px;height:36px;border-radius:8px;background:#3A2C22"></div>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(43,33,24,0.06)">
+        <div style="font:700 11px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-bottom:8px">B · 로즈 &amp; 월넛</div>
+        <div style="display:flex;gap:4px">
+          <div style="width:36px;height:36px;border-radius:8px;background:#FDF6F3;border:1px solid rgba(0,0,0,0.06)"></div>
+          <div style="width:36px;height:36px;border-radius:8px;background:#D98C93"></div>
+          <div style="width:36px;height:36px;border-radius:8px;background:#6B4A3A"></div>
+          <div style="width:36px;height:36px;border-radius:8px;background:#2E211A"></div>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(43,33,24,0.06)">
+        <div style="font:700 11px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-bottom:8px">C · 페탈 &amp; 에스프레소</div>
+        <div style="display:flex;gap:4px">
+          <div style="width:36px;height:36px;border-radius:8px;background:#FFF5F2;border:1px solid rgba(0,0,0,0.06)"></div>
+          <div style="width:36px;height:36px;border-radius:8px;background:#F0A0AC"></div>
+          <div style="width:36px;height:36px;border-radius:8px;background:#4A3327"></div>
+          <div style="width:36px;height:36px;border-radius:8px;background:#231913"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:72px">
+
+    <div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+        <span style="font:700 12px/1 monospace;background:#2B2118;color:#fff;padding:4px 10px;border-radius:8px">1</span>
+        <span style="font:700 15px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">스플래시 &amp; 소개 캐러셀</span>
+      </div>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+          <div style="width:100%;height:100%;background:linear-gradient(160deg,#E8C7B2,#835151);display:flex;flex-direction:column;padding:54px 28px 40px;box-sizing:border-box;position:relative;overflow:hidden">
+            <div style="position:absolute;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,0.14);top:-60px;right:-60px"></div>
+            <div style="position:absolute;width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.12);bottom:120px;left:-40px"></div>
+            <div style="text-align:right;position:relative"><span style="font:600 13px 'Pretendard Variable',sans-serif;color:rgba(255,255,255,0.9)">건너뛰기</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;position:relative">
+              <div style="width:220px;height:220px;border-radius:36px;background:repeating-linear-gradient(45deg,rgba(255,255,255,0.28),rgba(255,255,255,0.28) 10px,rgba(255,255,255,0.14) 10px,rgba(255,255,255,0.14) 20px);display:flex;align-items:center;justify-content:center;box-shadow:0 20px 40px rgba(0,0,0,0.12)">
+                <span style="font:600 12px monospace;color:#fff">배치 완성컷 이미지</span>
+              </div>
+              <div style="text-align:center">
+                <div style="font:800 23px/1.4 'Pretendard Variable',sans-serif;color:#fff;margin-bottom:8px">방 사진만 찍으면<br>가구 배치 뚝딱 ✨</div>
+                <div style="font:400 14px/1.6 'Pretendard Variable',sans-serif;color:rgba(255,255,255,0.9)">사이즈 재고 견적 내는 거, 이제 앱이 다 해줄게</div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:center;gap:6px;margin-bottom:18px;position:relative">
+              <span style="width:20px;height:7px;border-radius:4px;background:#fff"></span>
+              <span style="width:7px;height:7px;border-radius:4px;background:rgba(255,255,255,0.45)"></span>
+              <span style="width:7px;height:7px;border-radius:4px;background:rgba(255,255,255,0.45)"></span>
+            </div>
+            <div style="background:#fff;color:#835151;font:800 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:20px;position:relative;box-shadow:0 10px 24px rgba(0,0,0,0.12)">다음</div>
+          </div>
+        </x-import>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+        <span style="font:700 12px/1 monospace;background:#2B2118;color:#fff;padding:4px 10px;border-radius:8px">2</span>
+        <span style="font:700 15px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">로그인</span>
+      </div>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+          <div style="width:100%;height:100%;background:#FFF8F3;display:flex;flex-direction:column;padding:80px 32px 44px;box-sizing:border-box">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+              <div style="width:92px;height:92px;border-radius:28px;background:#F2E3DC;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(131,81,81,0.16)">
+                <span style="font:700 12px monospace;color:#835151">LOGO</span>
+              </div>
+              <div style="font:800 21px 'Pretendard Variable',sans-serif;color:#2B2118">방꾸요정 🧚</div>
+              <div style="font:400 14px 'Pretendard Variable',sans-serif;color:#9C8B7E">3초만에 로그인하고 바로 시작해</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="background:#FEE500;color:#3A2E00;font:700 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px">카카오로 계속하기</div>
+              <div style="background:#03C75A;color:#fff;font:700 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px">네이버로 계속하기</div>
+              <div style="background:#fff;color:#2B2118;font:700 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px;border:1px solid rgba(43,33,24,0.12)">Google로 계속하기</div>
+              <div style="text-align:center;font:400 13px 'Pretendard Variable',sans-serif;color:#B5A79A;margin-top:6px;text-decoration:underline">나중에 할게요</div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+        <span style="font:700 12px/1 monospace;background:#2B2118;color:#fff;padding:4px 10px;border-radius:8px">3</span>
+        <span style="font:700 15px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">온보딩 — 취향·예산·스타일 한 페이지에서 선택</span>
+      </div>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+          <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column;padding:60px 24px 24px;box-sizing:border-box">
+            <div style="font:800 20px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:2px">취향을 알려줘 🐣</div>
+            <div style="font:400 13px 'Pretendard Variable',sans-serif;color:#9C8B7E;margin-bottom:16px">한번에 골라두면 딱 맞는 배치를 추천해줄게</div>
+            <div style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:20px;padding-bottom:8px">
+              <div>
+                <div style="font:700 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">좋아하는 무드 (최대 2개)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div style="border-radius:16px;overflow:hidden;background:#fff;border:2px solid #835151;position:relative">
+                    <div style="height:56px;background:repeating-linear-gradient(45deg,#E8DCCB,#E8DCCB 7px,#F2E9DD 7px,#F2E9DD 14px);display:flex;align-items:center;justify-content:center"><span style="font:600 9px monospace;color:#8A7060">북유럽 룸 사진</span></div>
+                    <div style="padding:6px 8px;font:700 11.5px 'Pretendard Variable',sans-serif;color:#2B2118">포근한 북유럽</div>
+                    <span style="position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;background:#F08FC0;color:#fff;font:700 9px sans-serif;display:flex;align-items:center;justify-content:center">✓</span>
+                  </div>
+                  <div style="border-radius:16px;overflow:hidden;background:#fff">
+                    <div style="height:56px;background:repeating-linear-gradient(45deg,#B8B2A8,#B8B2A8 7px,#CFCAC1 7px,#CFCAC1 14px);display:flex;align-items:center;justify-content:center"><span style="font:600 9px monospace;color:#fff">인더스트리얼 룸 사진</span></div>
+                    <div style="padding:6px 8px;font:700 11.5px 'Pretendard Variable',sans-serif;color:#8A7A6C">시크한 인더스트리얼</div>
+                  </div>
+                  <div style="border-radius:16px;overflow:hidden;background:#fff">
+                    <div style="height:56px;background:repeating-linear-gradient(45deg,#C7D4B8,#C7D4B8 7px,#DDE6D2 7px,#DDE6D2 14px);display:flex;align-items:center;justify-content:center"><span style="font:600 9px monospace;color:#5C6B4C">내추럴 룸 사진</span></div>
+                    <div style="padding:6px 8px;font:700 11.5px 'Pretendard Variable',sans-serif;color:#8A7A6C">화사한 내추럴</div>
+                  </div>
+                  <div style="border-radius:16px;overflow:hidden;background:#fff">
+                    <div style="height:56px;background:repeating-linear-gradient(45deg,#C9CDD1,#C9CDD1 7px,#E2E5E7 7px,#E2E5E7 14px);display:flex;align-items:center;justify-content:center"><span style="font:600 9px monospace;color:#5A6268">모던 룸 사진</span></div>
+                    <div style="padding:6px 8px;font:700 11.5px 'Pretendard Variable',sans-serif;color:#8A7A6C">모던</div>
+                  </div>
+                  <div style="border-radius:16px;overflow:hidden;background:#fff">
+                    <div style="height:56px;background:repeating-linear-gradient(45deg,#D9B679,#D9B679 7px,#E7CE9C 7px,#E7CE9C 14px);display:flex;align-items:center;justify-content:center"><span style="font:600 9px monospace;color:#6B4E1F">레트로 룸 사진</span></div>
+                    <div style="padding:6px 8px;font:700 11.5px 'Pretendard Variable',sans-serif;color:#8A7A6C">빈티지 레트로</div>
+                  </div>
+                  <div style="border-radius:16px;overflow:hidden;background:#fff;border:2px solid #835151;position:relative">
+                    <div style="height:56px;background:repeating-linear-gradient(45deg,#F0CFDA,#F0CFDA 7px,#F8E4EA 7px,#F8E4EA 14px);display:flex;align-items:center;justify-content:center"><span style="font:600 9px monospace;color:#A45D74">파스텔 룸 사진</span></div>
+                    <div style="padding:6px 8px;font:700 11.5px 'Pretendard Variable',sans-serif;color:#2B2118">러블리 파스텔</div>
+                    <span style="position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;background:#F08FC0;color:#fff;font:700 9px sans-serif;display:flex;align-items:center;justify-content:center">✓</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div style="font:700 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">가구 구매에 쓸 예산은 어느 정도?</div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+                  <span style="text-align:center;padding:11px 4px;border-radius:14px;background:#FFF3ED;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif">10만원 이하</span>
+                  <span style="text-align:center;padding:11px 4px;border-radius:14px;background:#FFF3ED;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif">10~30만원</span>
+                  <span style="text-align:center;padding:11px 4px;border-radius:14px;background:#835151;color:#fff;font:700 12px 'Pretendard Variable',sans-serif">30~50만원</span>
+                  <span style="text-align:center;padding:11px 4px;border-radius:14px;background:#FFF3ED;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif">50~100만원</span>
+                  <span style="text-align:center;padding:11px 4px;border-radius:14px;background:#FFF3ED;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif">100만원+</span>
+                </div>
+              </div>
+              <div>
+                <div style="font:700 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">반려동물 함께 살아?</div>
+                <div style="display:flex;gap:8px">
+                  <span style="flex:1;text-align:center;padding:12px;border-radius:16px;background:#FFF3ED;color:#8A7A6C;font:700 12.5px 'Pretendard Variable',sans-serif">아니</span>
+                  <span style="flex:1;text-align:center;padding:12px;border-radius:16px;background:#835151;color:#fff;font:700 12.5px 'Pretendard Variable',sans-serif">응, 키워 🐶</span>
+                </div>
+              </div>
+            </div>
+            <div style="background:#835151;color:#fff;font:800 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px;margin-top:12px;box-shadow:0 10px 24px rgba(131,81,81,0.2)">방꾸 시작하기</div>
+          </div>
+        </x-import>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+        <span style="font:700 12px/1 monospace;background:#2B2118;color:#fff;padding:4px 10px;border-radius:8px">4</span>
+        <span style="font:700 15px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">🏠 배치 탭 (홈) — 새로 시작 / 이어하기</span>
+      </div>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+          <div style="width:100%;height:100%;background:#FFF8F3;display:flex;flex-direction:column">
+            <div style="padding:60px 22px 16px">
+              <div style="font:800 19px 'Pretendard Variable',sans-serif;color:#2B2118">안녕 수민, 오늘도 방꾸해볼까? 🧡</div>
+            </div>
+            <div style="flex:1;overflow:auto;padding:0 22px 16px;display:flex;flex-direction:column;gap:14px">
+              <div style="background:linear-gradient(135deg,#D9A793,#835151);border-radius:24px;padding:22px;position:relative;overflow:hidden;box-shadow:0 12px 26px rgba(131,81,81,0.22)">
+                <div style="position:absolute;width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,0.16);top:-30px;right:-20px"></div>
+                <div style="font:800 17px 'Pretendard Variable',sans-serif;color:#fff;margin-bottom:6px">새 방 배치 시작하기</div>
+                <div style="font:400 12.5px 'Pretendard Variable',sans-serif;color:rgba(255,255,255,0.9);margin-bottom:14px">사진 한 장이면 충분해</div>
+                <span style="background:#fff;color:#835151;font:700 13px 'Pretendard Variable',sans-serif;padding:10px 18px;border-radius:100px">시작하기 →</span>
+              </div>
+              <div style="font:700 13.5px 'Pretendard Variable',sans-serif;color:#2B2118">이어서 진행 중</div>
+              <div style="display:flex;gap:12px;align-items:center;background:#fff;border-radius:20px;padding:12px">
+                <div style="width:60px;height:60px;border-radius:14px;background:#EAD7CE;flex:none"></div>
+                <div style="flex:1"><div style="font:700 13.5px 'Pretendard Variable',sans-serif;color:#2B2118">원룸 · 침실</div><div style="font:400 11.5px 'Pretendard Variable',sans-serif;color:#9C8B7E">가구 배치 70% 완료</div></div>
+                <span style="width:26px;height:26px;border-radius:50%;background:#FFF3ED;display:flex;align-items:center;justify-content:center;color:#835151">→</span>
+              </div>
+              <div style="background:#fff;border-radius:20px;padding:14px 16px">
+                <div style="font:700 12.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:10px">나의 방꾸 도장</div>
+                <div style="display:flex;justify-content:space-between">
+                  <div style="text-align:center"><div style="width:40px;height:40px;border-radius:50%;background:#835151;color:#fff;display:flex;align-items:center;justify-content:center;font:14px sans-serif;transform:rotate(-8deg)">✓</div><div style="font:600 10px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-top:5px">취향입력</div></div>
+                  <div style="text-align:center"><div style="width:40px;height:40px;border-radius:50%;background:#835151;color:#fff;display:flex;align-items:center;justify-content:center;font:14px sans-serif;transform:rotate(6deg)">✓</div><div style="font:600 10px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-top:5px">방 업로드</div></div>
+                  <div style="text-align:center"><div style="width:40px;height:40px;border-radius:50%;background:#fff;border:2px dashed #E3CCC2;color:#835151;display:flex;align-items:center;justify-content:center;font:12px 'Pretendard Variable',sans-serif;font-weight:700">70%</div><div style="font:600 10px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-top:5px">배치 완성</div></div>
+                  <div style="text-align:center"><div style="width:40px;height:40px;border-radius:50%;background:#F5F2EE;color:#C7BCAE;display:flex;align-items:center;justify-content:center;font:14px sans-serif">✓</div><div style="font:600 10px 'Pretendard Variable',sans-serif;color:#C7BCAE;margin-top:5px">가구 구매</div></div>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px">
+                <div style="flex:1;background:#fff;border-radius:18px;padding:14px;text-align:center"><div style="font:800 18px 'Pretendard Variable',sans-serif;color:#835151">2</div><div style="font:400 11.5px 'Pretendard Variable',sans-serif;color:#9C8B7E">완성한 방</div></div>
+                <div style="flex:1;background:#fff;border-radius:18px;padding:14px;text-align:center"><div style="font:800 18px 'Pretendard Variable',sans-serif;color:#835151">12</div><div style="font:400 11.5px 'Pretendard Variable',sans-serif;color:#9C8B7E">저장한 가구</div></div>
+              </div>
+            </div>
+            <div style="display:flex;padding:10px 20px 28px;background:#fff;border-top:1px solid rgba(43,33,24,0.06)">
+              <div style="flex:1;text-align:center"><div style="font:16px sans-serif">🏠</div><div style="font:700 10.5px 'Pretendard Variable',sans-serif;color:#835151;margin-top:3px">배치</div></div>
+              <div style="flex:1;text-align:center"><div style="font:16px sans-serif;opacity:0.4">🛋️</div><div style="font:600 10.5px 'Pretendard Variable',sans-serif;color:#B5A79A;margin-top:3px">마켓</div></div>
+              <div style="flex:1;text-align:center"><div style="font:16px sans-serif;opacity:0.4">👤</div><div style="font:600 10.5px 'Pretendard Variable',sans-serif;color:#B5A79A;margin-top:3px">마이</div></div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+        <span style="font:700 12px/1 monospace;background:#2B2118;color:#fff;padding:4px 10px;border-radius:8px">5</span>
+<span style="font:700 15px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">방 치수 선택 / 도면 가져오기</span>
+      </div>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+          <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column;padding:60px 24px 30px;box-sizing:border-box">
+            <div style="font:800 20px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:6px">우리 방을 알려줘 📐</div>
+            <div style="font:400 13px 'Pretendard Variable',sans-serif;color:#9C8B7E;margin-bottom:14px">방 치수를 고르거나 도면을 가져오면 그걸로 배치할게</div>
+            <div style="display:flex;gap:6px;margin-bottom:16px">
+              <span style="padding:6px 10px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 10.5px 'Pretendard Variable',sans-serif;white-space:nowrap">📐 눈높이로</span>
+              <span style="padding:6px 10px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 10.5px 'Pretendard Variable',sans-serif;white-space:nowrap">🧭 정면/벽 정렬</span>
+              <span style="padding:6px 10px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 10.5px 'Pretendard Variable',sans-serif;white-space:nowrap">🕊️ 빈 방으로</span>
+            </div>
+            <div style="display:flex;gap:8px;background:#FFF3ED;border-radius:100px;padding:4px;margin-bottom:16px">
+              <span style="flex:1;text-align:center;padding:10px;border-radius:100px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118">방 치수 선택</span>
+              <span style="flex:1;text-align:center;padding:10px;border-radius:100px;font:700 13px 'Pretendard Variable',sans-serif;color:#9C8B7E">도면 가져오기</span>
+            </div>
+            <div style="flex:1;background:#FFF3ED;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px">
+              <div>
+                <div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">평수로 고르기</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <span style="padding:9px 12px;border-radius:100px;background:#fff;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">4평</span>
+                  <span style="padding:9px 12px;border-radius:100px;background:#fff;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">5평</span>
+                  <span style="padding:9px 12px;border-radius:100px;background:#835151;color:#fff;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">6.5평</span>
+                  <span style="padding:9px 12px;border-radius:100px;background:#fff;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">8평</span>
+                  <span style="padding:9px 12px;border-radius:100px;background:#fff;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">10평+</span>
+                </div>
+              </div>
+              <div style="font:400 11.5px 'Pretendard Variable',sans-serif;color:#9C8B7E">화장실·주방은 자동으로 빼고 계산할게</div>
+              <div style="background:#fff;border-radius:14px;padding:12px;display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+                <span style="font:600 11.5px 'Pretendard Variable',sans-serif;color:#8A7A6C;white-space:nowrap">예상 방 크기</span>
+                <span style="font:800 14px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">약 2.8m × 3.6m</span>
+              </div>
+              <span style="align-self:flex-start;background:#F2E3DC;color:#835151;font:700 10.5px 'Pretendard Variable',sans-serif;padding:5px 10px;border-radius:100px;white-space:nowrap">추정 치수 · 도면을 가져오면 더 정확해</span>
+            </div>
+            <div style="margin-top:16px;background:#835151;color:#fff;font:800 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px">다음 → 배치하러 가기</div>
+          </div>
+        </x-import>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+        <span style="font:700 12px/1 monospace;background:#2B2118;color:#fff;padding:4px 10px;border-radius:8px">6</span>
+        <span style="font:700 15px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">2D 배치 플래너 (실치수 드래그) → AI 합성 결과</span>
+      </div>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="font:600 11px 'Pretendard Variable',sans-serif;color:rgba(0,0,0,0.5)"><span style="font:700 10.5px monospace;background:rgba(0,0,0,0.08);padding:3px 7px;border-radius:6px;margin-right:6px">①</span>2D 배치 플래너 (드래그 + 90도 스냅, 실치수 스케일)</div>
+          <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+            <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column;padding:60px 16px 0;box-sizing:border-box">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+                <span style="font:800 15px 'Pretendard Variable',sans-serif;color:#2B2118">🧚 방꾸요정</span>
+                <span style="font:400 10.5px 'Pretendard Variable',sans-serif;color:#9C8B7E">원룸에 실제 가구를 실치수로</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-bottom:10px">
+                <span style="flex:1;text-align:center;background:#835151;color:#fff;font:700 12px 'Pretendard Variable',sans-serif;padding:11px;border-radius:14px">✨ 자동 배치</span>
+                <span style="flex:1.4;background:#F5F2EE;color:#B5A79A;font:600 10.5px 'Pretendard Variable',sans-serif;padding:11px 8px;border-radius:14px;display:flex;align-items:center;justify-content:center;text-align:center">가구를 담고 누르면 자동 배치돼요</span>
+              </div>
+              <div style="flex:1;background:#FFF3ED;border-radius:16px;position:relative;overflow:hidden;margin-bottom:10px">
+                <div style="position:absolute;left:8%;top:6%;right:8%;bottom:8%;background:#fff;border:1px solid rgba(43,33,24,0.08)"></div>
+                <div style="position:absolute;left:8%;top:6%;width:34%;height:44%;background:#F2E3DC;border:2px solid #835151;border-radius:4px"><span style="position:absolute;bottom:2px;left:4px;font:700 8px 'Pretendard Variable',sans-serif;color:#835151;white-space:nowrap">침대</span></div>
+                <div style="position:absolute;left:44%;top:6%;width:20%;height:24%;background:#EAD7CE;border-radius:4px"><span style="position:absolute;bottom:2px;left:3px;font:700 7px 'Pretendard Variable',sans-serif;color:#8A6A55;white-space:nowrap">협탁</span></div>
+                <div style="position:absolute;left:66%;top:6%;width:26%;height:34%;background:#FFD9C4;border-radius:4px"><span style="position:absolute;bottom:2px;left:3px;font:700 7px 'Pretendard Variable',sans-serif;color:#8A6A55;white-space:nowrap">암체어</span></div>
+                <div style="position:absolute;left:9%;bottom:9%;width:22%;height:16%;border:2px dashed #C4836F;border-radius:50% 0 0 0"></div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:12px">
+                <span style="padding:5px 10px;border-radius:100px;background:#E8F2E9;color:#3F7A4E;font:700 10px 'Pretendard Variable',sans-serif">맞음 · 문제없음</span>
+                <span style="padding:5px 10px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 10px 'Pretendard Variable',sans-serif">남은 바닥 68%</span>
+                <span style="padding:5px 10px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 10px 'Pretendard Variable',sans-serif">치수 실측 2 · 추정 1</span>
+              </div>
+            </div>
+          </x-import>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="font:600 11px 'Pretendard Variable',sans-serif;color:rgba(0,0,0,0.5)"><span style="font:700 10.5px monospace;background:rgba(0,0,0,0.08);padding:3px 7px;border-radius:6px;margin-right:6px">②</span>합성 결과 (목업 라벨 필수)</div>
+          <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+            <div style="width:100%;height:100%;background:#2B2118;position:relative">
+              <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,#4a3a2c,#4a3a2c 10px,#3a2c20 10px,#3a2c20 20px);display:flex;align-items:center;justify-content:center">
+                <span style="font:600 12px monospace;color:rgba(255,255,255,0.6)">완성된 배치 이미지</span>
+              </div>
+              <div style="position:absolute;top:60px;left:20px;right:20px;display:flex;justify-content:space-between">
+                <span style="width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:#fff">←</span>
+                <span style="padding:8px 14px;border-radius:100px;background:rgba(0,0,0,0.4);color:#fff;font:700 12px 'Pretendard Variable',sans-serif">Before/After</span>
+              </div>
+              <div style="position:absolute;top:106px;left:20px;background:#F08FC0;color:#fff;font:700 10.5px 'Pretendard Variable',sans-serif;padding:6px 12px;border-radius:100px;max-width:280px">🪄 목업이야 · 실제 조명·재질은 조금 다를 수 있어</div>
+              <div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:28px 28px 0 0;padding:20px 20px 30px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                  <span style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118">예상 견적 💰</span>
+                  <span style="font:800 18px 'Pretendard Variable',sans-serif;color:#835151">142만원</span>
+                </div>
+                <div style="display:flex;gap:10px;overflow:hidden;margin-bottom:14px">
+                  <div style="min-width:64px;height:64px;border-radius:16px;background:#F2E3DC"></div>
+                  <div style="min-width:64px;height:64px;border-radius:16px;background:#EAD7CE"></div>
+                  <div style="min-width:64px;height:64px;border-radius:16px;background:#F1EDE7"></div>
+                  <div style="min-width:64px;height:64px;border-radius:16px;background:#FFD9C4"></div>
+                </div>
+                <div style="display:flex;gap:10px">
+                  <span style="flex:1;text-align:center;padding:14px;border-radius:16px;background:#FFF3ED;color:#2B2118;font:700 14px 'Pretendard Variable',sans-serif">다시 배치</span>
+                  <span style="flex:1;text-align:center;padding:14px;border-radius:16px;background:#835151;color:#fff;font:700 14px 'Pretendard Variable',sans-serif">닮은 상품 찾기</span>
+                </div>
+                <div style="font:400 10.5px 'Pretendard Variable',sans-serif;color:#B5A79A;text-align:center;margin-top:8px">배치된 가구와 닮은 상품을 네이버쇼핑에서 찾아줄게 — 정확히 같은 제품이 아닐 수 있어</div>
+              </div>
+            </div>
+          </x-import>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="font:600 11px 'Pretendard Variable',sans-serif;color:rgba(0,0,0,0.5)"><span style="font:700 10.5px monospace;background:rgba(0,0,0,0.08);padding:3px 7px;border-radius:6px;margin-right:6px">③</span>대안: 가구 리스트형 결과</div>
+          <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+            <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column">
+              <div style="height:280px;background:repeating-linear-gradient(45deg,#FFD9C4,#FFD9C4 10px,#FFE7DC 10px,#FFE7DC 20px);margin-top:54px;display:flex;align-items:center;justify-content:center">
+                <span style="font:600 12px monospace;color:#8A6A55">배치 이미지</span>
+              </div>
+              <div style="flex:1;padding:18px 20px;overflow:auto">
+                <div style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:12px">이 방에 추천하는 가구</div>
+                <div style="display:flex;flex-direction:column;gap:12px">
+                  <div style="display:flex;gap:12px;align-items:center;padding:10px;background:#FFF3ED;border-radius:18px">
+                    <div style="width:52px;height:52px;border-radius:14px;background:#EAD7CE;flex:none"></div>
+                    <div style="flex:1"><div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118">패브릭 암체어</div><div style="font:400 11px 'Pretendard Variable',sans-serif;color:#9C8B7E">189,000원</div></div>
+                    <div style="width:24px;height:24px;border-radius:8px;border:1.5px solid #835151"></div>
+                  </div>
+                  <div style="display:flex;gap:12px;align-items:center;padding:10px;background:#FFF3ED;border-radius:18px">
+                    <div style="width:52px;height:52px;border-radius:14px;background:#F1EDE7;flex:none"></div>
+                    <div style="flex:1"><div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118">우드 사이드테이블</div><div style="font:400 11px 'Pretendard Variable',sans-serif;color:#9C8B7E">79,000원</div></div>
+                    <div style="width:24px;height:24px;border-radius:8px;background:#835151"></div>
+                  </div>
+                </div>
+              </div>
+              <div style="padding:16px 20px 28px;border-top:1px solid rgba(43,33,24,0.06);display:flex;justify-content:space-between;align-items:center">
+                <div><div style="font:400 11px 'Pretendard Variable',sans-serif;color:#9C8B7E">총 견적</div><div style="font:800 17px 'Pretendard Variable',sans-serif;color:#835151">142만원</div></div>
+                <span style="padding:14px 28px;border-radius:16px;background:#835151;color:#fff;font:700 14px 'Pretendard Variable',sans-serif">전체 담기</span>
+              </div>
+            </div>
+          </x-import>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="font:600 11px 'Pretendard Variable',sans-serif;color:rgba(0,0,0,0.5)">로딩 상태 (예상 5~7초)</div>
+          <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+            <div style="width:100%;height:100%;background:#2B2118;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px">
+              <div style="width:56px;height:56px;border-radius:50%;border:4px solid rgba(255,255,255,0.18);border-top-color:#F08FC0"></div>
+              <div style="font:700 14.5px 'Pretendard Variable',sans-serif;color:#fff">방을 예쁘게 채우는 중이야 🧚</div>
+            </div>
+          </x-import>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="font:600 11px 'Pretendard Variable',sans-serif;color:rgba(0,0,0,0.5)"><span style="font:700 10.5px monospace;background:rgba(0,0,0,0.08);padding:3px 7px;border-radius:6px;margin-right:6px">④</span>합성 실패 시 — 2D 배치도로 대체</div>
+          <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+            <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column;padding:60px 16px 24px;box-sizing:border-box">
+              <div style="background:#F2E3DC;color:#835151;font:700 12px 'Pretendard Variable',sans-serif;padding:10px 14px;border-radius:14px;margin-bottom:12px">이미지 생성이 잠깐 안 됐어, 대신 배치도로 보여줄게 📐</div>
+              <div style="flex:1;background:#FFF3ED;border-radius:16px;position:relative;overflow:hidden;margin-bottom:12px">
+                <div style="position:absolute;left:8%;top:6%;right:8%;bottom:8%;background:#fff;border:1px solid rgba(43,33,24,0.08)"></div>
+                <div style="position:absolute;left:8%;top:6%;width:34%;height:44%;background:#F2E3DC;border:2px solid #835151;border-radius:4px"><span style="position:absolute;bottom:2px;left:4px;font:700 7px 'Pretendard Variable',sans-serif;color:#835151;white-space:nowrap">침대 159×217</span></div>
+                <div style="position:absolute;left:44%;top:6%;width:20%;height:24%;background:#EAD7CE;border-radius:4px"><span style="position:absolute;bottom:2px;left:3px;font:700 6.5px 'Pretendard Variable',sans-serif;color:#8A6A55;white-space:nowrap">협탁 31×31</span></div>
+                <div style="position:absolute;left:66%;top:6%;width:26%;height:34%;background:#FFD9C4;border-radius:4px"><span style="position:absolute;bottom:2px;left:3px;font:700 6.5px 'Pretendard Variable',sans-serif;color:#8A6A55;white-space:nowrap">암체어 72×89</span></div>
+              </div>
+              <div style="background:#835151;color:#fff;font:800 14px 'Pretendard Variable',sans-serif;text-align:center;padding:14px;border-radius:16px">이대로 가구 담기</div>
+            </div>
+          </x-import>
+        </div>
+
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+        <span style="font:700 12px/1 monospace;background:#2B2118;color:#fff;padding:4px 10px;border-radius:8px">7</span>
+        <span style="font:700 15px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">배치/가구 직접 수정 (LLM 채팅)</span>
+      </div>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+          <div style="width:100%;height:100%;background:repeating-linear-gradient(45deg,#FFD9C4,#FFD9C4 10px,#FFE7DC 10px,#FFE7DC 20px);position:relative">
+            <div style="position:absolute;top:54px;left:20px;right:20px;display:flex;justify-content:space-between">
+              <span style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.85);display:flex;align-items:center;justify-content:center">←</span>
+              <span style="padding:8px 14px;border-radius:100px;background:rgba(255,255,255,0.85);font:700 12px 'Pretendard Variable',sans-serif;color:#2B2118">AI 수정 모드 ✨</span>
+            </div>
+            <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(255,255,255,0.97);backdrop-filter:blur(10px);border-radius:28px 28px 0 0;padding:16px 18px 26px;display:flex;flex-direction:column;gap:10px">
+              <div style="align-self:flex-start;max-width:80%;background:#FFF3ED;padding:10px 14px;border-radius:16px 16px 16px 4px;font:400 13px 'Pretendard Variable',sans-serif;color:#2B2118">소파를 창문 쪽으로 옮겼어! 채광도 더 잘 받을 거야 ☀️</div>
+              <div style="align-self:flex-end;max-width:80%;background:#835151;padding:10px 14px;border-radius:16px 16px 4px 16px;font:400 13px 'Pretendard Variable',sans-serif;color:#fff">침대랑 자리 좀 바꿔줘</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 6px">
+                <span style="padding:7px 12px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 11.5px 'Pretendard Variable',sans-serif">책상 더 크게</span>
+                <span style="padding:7px 12px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 11.5px 'Pretendard Variable',sans-serif">색감 더 밝게</span>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;background:#FFF3ED;border-radius:100px;padding:6px 6px 6px 16px">
+                <span style="flex:1;font:400 13px 'Pretendard Variable',sans-serif;color:#B5A79A">뭘 바꿔줄까?</span>
+                <span style="width:36px;height:36px;border-radius:50%;background:#835151;color:#fff;display:flex;align-items:center;justify-content:center;font:700 14px sans-serif">↑</span>
+              </div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+        <span style="font:700 12px/1 monospace;background:#2B2118;color:#fff;padding:4px 10px;border-radius:8px">8</span>
+        <span style="font:700 15px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">🛋️ 마켓 탭 (필터 + 네이버쇼핑 연결)</span>
+      </div>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="font:600 11px 'Pretendard Variable',sans-serif;color:rgba(0,0,0,0.5)">필터 바텀시트 · 분위기 (멀티선택, 최대 2개)</div>
+          <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+            <div style="width:100%;height:100%;background:rgba(43,33,24,0.35);display:flex;flex-direction:column;justify-content:flex-end">
+              <div style="background:#fff;border-radius:24px 24px 0 0;padding:20px 18px 28px;display:flex;flex-direction:column;gap:14px">
+                <div style="width:36px;height:4px;border-radius:100px;background:#E7E1D8;margin:0 auto"></div>
+                <div style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118">어떤 분위기가 좋아? (최대 2개)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                  <div style="border-radius:14px;overflow:hidden;background:#fff;border:2px solid #835151;position:relative"><div style="height:44px;background:repeating-linear-gradient(45deg,#E8DCCB,#E8DCCB 7px,#F2E9DD 7px,#F2E9DD 14px)"></div><div style="padding:5px 6px;font:700 10.5px 'Pretendard Variable',sans-serif;color:#2B2118">북유럽</div><span style="position:absolute;top:4px;right:4px;width:14px;height:14px;border-radius:50%;background:#835151;color:#fff;font:700 8px sans-serif;display:flex;align-items:center;justify-content:center">✓</span></div>
+                  <div style="border-radius:14px;overflow:hidden;background:#F5F2EE"><div style="height:44px;background:repeating-linear-gradient(45deg,#B8B2A8,#B8B2A8 7px,#CFCAC1 7px,#CFCAC1 14px)"></div><div style="padding:5px 6px;font:700 10.5px 'Pretendard Variable',sans-serif;color:#8A7A6C">인더스트리얼</div></div>
+                  <div style="border-radius:14px;overflow:hidden;background:#F5F2EE"><div style="height:44px;background:repeating-linear-gradient(45deg,#C7D4B8,#C7D4B8 7px,#DDE6D2 7px,#DDE6D2 14px)"></div><div style="padding:5px 6px;font:700 10.5px 'Pretendard Variable',sans-serif;color:#8A7A6C">내추럴</div></div>
+                  <div style="border-radius:14px;overflow:hidden;background:#F5F2EE"><div style="height:44px;background:repeating-linear-gradient(45deg,#C9CDD1,#C9CDD1 7px,#E2E5E7 7px,#E2E5E7 14px)"></div><div style="padding:5px 6px;font:700 10.5px 'Pretendard Variable',sans-serif;color:#8A7A6C">모던</div></div>
+                  <div style="border-radius:14px;overflow:hidden;background:#F5F2EE"><div style="height:44px;background:repeating-linear-gradient(45deg,#D9B679,#D9B679 7px,#E7CE9C 7px,#E7CE9C 14px)"></div><div style="padding:5px 6px;font:700 10.5px 'Pretendard Variable',sans-serif;color:#8A7A6C">레트로</div></div>
+                  <div style="border-radius:14px;overflow:hidden;background:#fff;border:2px solid #F08FC0;position:relative"><div style="height:44px;background:repeating-linear-gradient(45deg,#F0CFDA,#F0CFDA 7px,#F8E4EA 7px,#F8E4EA 14px)"></div><div style="padding:5px 6px;font:700 10.5px 'Pretendard Variable',sans-serif;color:#2B2118">파스텔</div><span style="position:absolute;top:4px;right:4px;width:14px;height:14px;border-radius:50%;background:#F08FC0;color:#fff;font:700 8px sans-serif;display:flex;align-items:center;justify-content:center">✓</span></div>
+                </div>
+                <div style="background:#835151;color:#fff;font:800 14px 'Pretendard Variable',sans-serif;text-align:center;padding:14px;border-radius:16px">2개 선택 완료 · 적용하기</div>
+              </div>
+            </div>
+          </x-import>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="font:600 11px 'Pretendard Variable',sans-serif;color:rgba(0,0,0,0.5)">필터 바텀시트 · 가격대(5단계) &amp; 사이즈</div>
+          <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+            <div style="width:100%;height:100%;background:rgba(43,33,24,0.35);display:flex;flex-direction:column;justify-content:flex-end">
+              <div style="background:#fff;border-radius:24px 24px 0 0;padding:20px 18px 28px;display:flex;flex-direction:column;gap:16px">
+                <div style="width:36px;height:4px;border-radius:100px;background:#E7E1D8;margin:0 auto"></div>
+                <div>
+                  <div style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:10px">가격대는 어느 정도가 좋아?</div>
+                  <div style="display:flex;gap:6px">
+                    <span style="flex:1;text-align:center;padding:10px 4px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 11px 'Pretendard Variable',sans-serif">~10만</span>
+                    <span style="flex:1;text-align:center;padding:10px 4px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 11px 'Pretendard Variable',sans-serif">10~30</span>
+                    <span style="flex:1;text-align:center;padding:10px 4px;border-radius:100px;background:#835151;color:#fff;font:700 11px 'Pretendard Variable',sans-serif">30~50</span>
+                    <span style="flex:1;text-align:center;padding:10px 4px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 11px 'Pretendard Variable',sans-serif">50~100</span>
+                    <span style="flex:1;text-align:center;padding:10px 4px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 11px 'Pretendard Variable',sans-serif">100+</span>
+                  </div>
+                </div>
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118">우리 방에 맞는 것만</span>
+                    <span style="width:40px;height:23px;border-radius:100px;background:#835151;position:relative;display:inline-block"><span style="position:absolute;top:2px;right:2px;width:19px;height:19px;border-radius:50%;background:#fff"></span></span>
+                  </div>
+                  <div style="font:400 11.5px 'Pretendard Variable',sans-serif;color:#9C8B7E;margin-top:6px">방 크기 기준으로 자동 필터링돼</div>
+                </div>
+                <div style="background:#835151;color:#fff;font:800 14px 'Pretendard Variable',sans-serif;text-align:center;padding:14px;border-radius:16px">필터 적용하기</div>
+              </div>
+            </div>
+          </x-import>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="font:600 11px 'Pretendard Variable',sans-serif;color:rgba(0,0,0,0.5)">채택: 배지형 필터 칩 + 결과 개수 실시간 프리뷰</div>
+          <div style="display:flex;gap:6px;align-items:flex-start;overflow-x:auto;padding-bottom:6px">
+
+            <div style="display:flex;flex-direction:column;gap:6px;flex:none;width:150px">
+              <span style="font:700 10.5px 'Pretendard Variable',sans-serif;color:#835151">① 칩 탭 전</span>
+              <div style="width:150px;height:220px;border-radius:16px;background:#fff;border:1px solid rgba(43,33,24,0.08);padding:10px 10px 0;box-sizing:border-box">
+                <div style="display:flex;gap:5px">
+                  <span style="padding:5px 9px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 9px 'Pretendard Variable',sans-serif;white-space:nowrap">분위기</span>
+                  <span style="padding:5px 9px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 9px 'Pretendard Variable',sans-serif;white-space:nowrap">가격대</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+                  <div style="border-radius:10px;background:#EAD7CE;aspect-ratio:1"></div>
+                  <div style="border-radius:10px;background:#FFD9C4;aspect-ratio:1"></div>
+                </div>
+              </div>
+            </div>
+
+            <span style="color:#C7BCAE;flex:none;align-self:center;margin-top:14px">→</span>
+
+            <div style="display:flex;flex-direction:column;gap:6px;flex:none;width:150px">
+              <span style="font:700 10.5px 'Pretendard Variable',sans-serif;color:#835151">② 바텀시트 선택</span>
+              <div style="width:150px;height:220px;border-radius:16px;background:rgba(43,33,24,0.35);display:flex;flex-direction:column;justify-content:flex-end">
+                <div style="background:#fff;border-radius:14px 14px 0 0;padding:10px;display:flex;flex-direction:column;gap:6px">
+                  <div style="width:22px;height:3px;border-radius:100px;background:#E7E1D8;margin:0 auto"></div>
+                  <div style="font:700 9.5px 'Pretendard Variable',sans-serif;color:#2B2118">분위기 (최대 2개)</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+                    <div style="border-radius:8px;background:#EAD7CE;aspect-ratio:1;border:2px solid #835151;position:relative"><span style="position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:#835151;color:#fff;font:700 6px sans-serif;display:flex;align-items:center;justify-content:center">✓</span></div>
+                    <div style="border-radius:8px;background:#F5F2EE;aspect-ratio:1"></div>
+                    <div style="border-radius:8px;background:#F5F2EE;aspect-ratio:1"></div>
+                    <div style="border-radius:8px;background:#F5F2EE;aspect-ratio:1"></div>
+                    <div style="border-radius:8px;background:#F5F2EE;aspect-ratio:1"></div>
+                    <div style="border-radius:8px;background:#F0CFDA;aspect-ratio:1;border:2px solid #F08FC0;position:relative"><span style="position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:#F08FC0;color:#fff;font:700 6px sans-serif;display:flex;align-items:center;justify-content:center">✓</span></div>
+                  </div>
+                  <div style="background:#835151;color:#fff;font:700 9px 'Pretendard Variable',sans-serif;text-align:center;padding:6px;border-radius:8px">적용하기</div>
+                </div>
+              </div>
+            </div>
+
+            <span style="color:#C7BCAE;flex:none;align-self:center;margin-top:14px">→</span>
+
+            <div style="display:flex;flex-direction:column;gap:6px;flex:none;width:150px">
+              <span style="font:700 10.5px 'Pretendard Variable',sans-serif;color:#835151">③ 배지 반영 + 결과 갱신</span>
+              <div style="width:150px;height:220px;border-radius:16px;background:#fff;border:1px solid rgba(43,33,24,0.08);padding:10px 10px 0;box-sizing:border-box;position:relative">
+                <div style="display:flex;gap:5px">
+                  <span style="display:flex;align-items:center;gap:3px;padding:5px 7px 5px 9px;border-radius:100px;background:#835151;color:#fff;font:700 9px 'Pretendard Variable',sans-serif;white-space:nowrap">분위기<span style="background:#fff;color:#835151;width:12px;height:12px;border-radius:50%;font:800 7px 'Pretendard Variable',sans-serif;display:flex;align-items:center;justify-content:center">2</span></span>
+                  <span style="padding:5px 9px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 9px 'Pretendard Variable',sans-serif;white-space:nowrap">가격대</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+                  <div style="border-radius:10px;background:#EAD7CE;aspect-ratio:1"></div>
+                  <div style="border-radius:10px;background:#F1EDE7;aspect-ratio:1"></div>
+                </div>
+                <div style="position:absolute;left:10px;right:10px;bottom:10px;background:#2B2118;color:#fff;font:800 9.5px 'Pretendard Variable',sans-serif;text-align:center;padding:8px;border-radius:10px">128개 결과 보기</div>
+              </div>
+            </div>
+
+            <span style="color:#C7BCAE;flex:none;align-self:center;margin-top:14px">→</span>
+
+            <div style="display:flex;flex-direction:column;gap:6px;flex:none;width:150px">
+              <span style="font:700 10.5px 'Pretendard Variable',sans-serif;color:#835151">④ 필터링된 목록</span>
+              <div style="width:150px;height:220px;border-radius:16px;background:#fff;border:1px solid rgba(43,33,24,0.08);padding:10px;box-sizing:border-box">
+                <div style="font:700 9.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:6px">128개 상품</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                  <div><div style="border-radius:10px;background:#EAD7CE;aspect-ratio:1"></div><div style="font:700 8px 'Pretendard Variable',sans-serif;color:#835151;margin-top:3px">39,000원</div></div>
+                  <div><div style="border-radius:10px;background:#FFD9C4;aspect-ratio:1"></div><div style="font:700 8px 'Pretendard Variable',sans-serif;color:#835151;margin-top:3px">58,000원</div></div>
+                  <div><div style="border-radius:10px;background:#F1EDE7;aspect-ratio:1"></div><div style="font:700 8px 'Pretendard Variable',sans-serif;color:#835151;margin-top:3px">328,000원</div></div>
+                  <div><div style="border-radius:10px;background:#FFE7DC;aspect-ratio:1"></div><div style="font:700 8px 'Pretendard Variable',sans-serif;color:#835151;margin-top:3px">45,000원</div></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+            <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column">
+              <div style="padding:60px 18px 0;flex:1;overflow:auto;display:flex;flex-direction:column">
+                <div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto">
+                  <span style="padding:8px 14px;border-radius:100px;background:#2B2118;color:#fff;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">침대</span>
+                  <span style="padding:8px 14px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">책상·의자</span>
+                  <span style="padding:8px 14px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">수납</span>
+                  <span style="padding:8px 14px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">조명</span>
+                  <span style="padding:8px 14px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">러그</span>
+                </div>
+                <div style="display:flex;gap:8px;background:#FFF3ED;border-radius:100px;padding:11px 16px;margin-bottom:12px">
+                  <span style="font:400 13px 'Pretendard Variable',sans-serif;color:#B5A79A">우리 방에 어울리는 침대 찾기</span>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px">
+                  <span style="display:flex;align-items:center;gap:5px;padding:8px 12px 8px 14px;border-radius:100px;background:#835151;color:#fff;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">분위기<span style="background:#fff;color:#835151;width:17px;height:17px;border-radius:50%;font:800 10px 'Pretendard Variable',sans-serif;display:flex;align-items:center;justify-content:center">2</span></span>
+                  <span style="padding:8px 14px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">가격대</span>
+                  <span style="display:flex;align-items:center;gap:5px;padding:8px 12px 8px 14px;border-radius:100px;background:#F08FC0;color:#fff;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">사이즈<span style="background:#fff;color:#F08FC0;width:17px;height:17px;border-radius:50%;font:800 10px 'Pretendard Variable',sans-serif;display:flex;align-items:center;justify-content:center">✓</span></span>
+                  <span style="padding:8px 14px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">배송</span>
+                </div>
+                <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-bottom:12px">
+                  <div><div style="border-radius:18px;background:#EAD7CE;aspect-ratio:1;position:relative"><span style="position:absolute;top:8px;right:8px;font:14px sans-serif">♡</span><span style="position:absolute;bottom:8px;left:8px;width:18px;height:18px;border-radius:50%;background:#03C75A;color:#fff;font:700 10px sans-serif;display:flex;align-items:center;justify-content:center">N</span></div><div style="font:700 12.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-top:6px">라운드 러그</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px"><span style="font:800 12.5px 'Pretendard Variable',sans-serif;color:#835151">39,000원</span><span style="background:#F5F2EE;color:#8A7A6C;font:700 8.5px 'Pretendard Variable',sans-serif;padding:2px 6px;border-radius:100px">추정 90×150</span></div></div>
+                  <div><div style="border-radius:18px;background:#FFD9C4;aspect-ratio:1;position:relative"><span style="position:absolute;top:8px;right:8px;font:14px sans-serif">♡</span><span style="position:absolute;bottom:8px;left:8px;width:18px;height:18px;border-radius:50%;background:#03C75A;color:#fff;font:700 10px sans-serif;display:flex;align-items:center;justify-content:center">N</span></div><div style="font:700 12.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-top:6px">우드 스탠드</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px"><span style="font:800 12.5px 'Pretendard Variable',sans-serif;color:#835151">58,000원</span><span style="background:#F2E3DC;color:#835151;font:700 8.5px 'Pretendard Variable',sans-serif;padding:2px 6px;border-radius:100px">실치수 31×31</span></div></div>
+                </div>
+              </div>
+              <div style="padding:0 18px 14px;background:#fff">
+                <div style="background:#2B2118;color:#fff;font:800 14px 'Pretendard Variable',sans-serif;text-align:center;padding:15px;border-radius:16px">128개 결과 보기</div>
+              </div>
+              <div style="display:flex;padding:10px 20px 28px;background:#fff;border-top:1px solid rgba(43,33,24,0.06)">
+                <div style="flex:1;text-align:center"><div style="font:16px sans-serif;opacity:0.4">🏠</div><div style="font:600 10.5px 'Pretendard Variable',sans-serif;color:#B5A79A;margin-top:3px">배치</div></div>
+                <div style="flex:1;text-align:center"><div style="font:16px sans-serif">🛋️</div><div style="font:700 10.5px 'Pretendard Variable',sans-serif;color:#835151;margin-top:3px">마켓</div></div>
+                <div style="flex:1;text-align:center"><div style="font:16px sans-serif;opacity:0.4">👤</div><div style="font:600 10.5px 'Pretendard Variable',sans-serif;color:#B5A79A;margin-top:3px">마이</div></div>
+              </div>
+            </div>
+          </x-import>
+        </div>
+
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:18px">
+        <span style="font:700 12px/1 monospace;background:#2B2118;color:#fff;padding:4px 10px;border-radius:8px">9</span>
+        <span style="font:700 15px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">👤 마이 탭 — 스타일·예산 태그 수정 / 배치함 / 설정</span>
+      </div>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+          <div style="width:100%;height:100%;background:#FFF8F3;display:flex;flex-direction:column">
+            <div style="flex:1;overflow:auto;padding:60px 22px 16px;display:flex;flex-direction:column;gap:18px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:56px;height:56px;border-radius:50%;background:#EAD7CE"></div>
+                <div style="flex:1"><div style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118">soomin.room</div><div style="font:400 12px 'Pretendard Variable',sans-serif;color:#9C8B7E">원룸 · 코지 우드 무드</div></div>
+                <span style="padding:8px 14px;border-radius:100px;background:#fff;color:#835151;font:700 12px 'Pretendard Variable',sans-serif">수정</span>
+              </div>
+              <div>
+                <div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">내 취향 태그</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <span style="padding:9px 14px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">코지 우드</span>
+                  <span style="padding:9px 14px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">파스텔 러블리</span>
+                  <span style="padding:9px 14px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">예산 150만원</span>
+                  <span style="padding:9px 14px;border-radius:100px;background:#fff;color:#B5A79A;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">＋ 편집</span>
+                </div>
+              </div>
+              <div>
+                <div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">배치함</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                  <div style="border-radius:18px;background:#FFD9C4;aspect-ratio:1"></div>
+                  <div style="border-radius:18px;background:#EAD7CE;aspect-ratio:1"></div>
+                </div>
+              </div>
+              <div style="background:#fff;border-radius:20px;overflow:hidden">
+                <div style="padding:15px 16px;border-bottom:1px solid rgba(43,33,24,0.06);font:600 13px 'Pretendard Variable',sans-serif;color:#2B2118;display:flex;justify-content:space-between">계정 관리 <span style="color:#B5A79A">→</span></div>
+                <div style="padding:15px 16px;border-bottom:1px solid rgba(43,33,24,0.06);font:600 13px 'Pretendard Variable',sans-serif;color:#2B2118;display:flex;justify-content:space-between">알림 설정 <span style="color:#B5A79A">→</span></div>
+                <div style="padding:15px 16px;font:600 13px 'Pretendard Variable',sans-serif;color:#2B2118;display:flex;justify-content:space-between">로그아웃 <span style="color:#B5A79A">→</span></div>
+              </div>
+            </div>
+            <div style="display:flex;padding:10px 20px 28px;background:#fff;border-top:1px solid rgba(43,33,24,0.06)">
+              <div style="flex:1;text-align:center"><div style="font:16px sans-serif;opacity:0.4">🏠</div><div style="font:600 10.5px 'Pretendard Variable',sans-serif;color:#B5A79A;margin-top:3px">배치</div></div>
+              <div style="flex:1;text-align:center"><div style="font:16px sans-serif;opacity:0.4">🛋️</div><div style="font:600 10.5px 'Pretendard Variable',sans-serif;color:#B5A79A;margin-top:3px">마켓</div></div>
+              <div style="flex:1;text-align:center"><div style="font:16px sans-serif">👤</div><div style="font:700 10.5px 'Pretendard Variable',sans-serif;color:#835151;margin-top:3px">마이</div></div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>
