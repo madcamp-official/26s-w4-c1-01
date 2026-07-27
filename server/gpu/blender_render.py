@@ -198,6 +198,8 @@ WALL = mat("wall", (0.90, 0.88, 0.83), rough=0.95)
 CEIL = mat("ceil", (0.96, 0.95, 0.93), rough=1.0)
 TRIM = mat("trim", (0.94, 0.93, 0.90), rough=0.6)  # 걸레받이/창틀 페인트
 FRAME = mat("frame", (0.20, 0.16, 0.12), rough=0.5)  # 창틀 목재
+DOORMAT = mat("door", (0.46, 0.31, 0.19), rough=0.55)  # 문짝 목재
+HANDLE = mat("handle", (0.62, 0.60, 0.55), rough=0.35, metal=0.9)  # 문 손잡이
 
 # hide: 카메라 쪽 벽/천장을 생략(코너 컷어웨이 — 방 안이 다 보이게). 예: ["near","left","ceil"]
 hide = set(S.get("hide", []))
@@ -224,39 +226,70 @@ if "left" not in hide:
 if "right" not in hide:
     box("bb_right", BB_T, D, BB_H, (W - BB_T / 2, D / 2, BB_H / 2), m=TRIM)
 
-# ---------- 창문(틀+창살+하늘 발광) : 좌측 벽 or far 벽 ----------
-win = S.get("window", {"wall": "far", "w": min(2.2, W * 0.6), "h": 1.4, "z": 1.25})
+# ---------- 개구부(창문·문) — 벽별 임의 위치. 2D 평면의 문/창을 렌더에 반영 ----------
+# 벽: far(y=D)/near(y=0)/left(x=0)/right(x=W). c=벽 따라 중심(far/near=x, left/right=y).
 _sky = PRE.get("sky")
 WM = window_sky_mat(_sky[0], _sky[1], PRE["win_s"]) if _sky else emission("window", PRE["win"], PRE["win_s"])
-ww, wh, wz = win["w"], win.get("h", 1.4), win.get("z", 1.25)
-fr = 0.05  # 틀 두께
+FR = 0.05  # 창틀 두께
 
 
-def build_window(wall):
-    if wall == "far":
-        yb = D - 0.02
-        plane("win_pane", ww, wh, (W / 2, yb, wz), rot=(math.radians(90), 0, 0), m=WM)
-        # 틀 4변
-        box("win_t", ww + 2 * fr, 0.06, fr, (W / 2, yb - 0.02, wz + wh / 2 + fr / 2), m=TRIM)
-        box("win_b", ww + 2 * fr, 0.06, fr, (W / 2, yb - 0.02, wz - wh / 2 - fr / 2), m=TRIM)
-        box("win_l", fr, 0.06, wh + 2 * fr, (W / 2 - ww / 2 - fr / 2, yb - 0.02, wz), m=TRIM)
-        box("win_r", fr, 0.06, wh + 2 * fr, (W / 2 + ww / 2 + fr / 2, yb - 0.02, wz), m=TRIM)
-        # 창살(십자)
-        box("win_mv", 0.03, 0.05, wh, (W / 2, yb - 0.025, wz), m=TRIM)
-        box("win_mh", ww, 0.05, 0.03, (W / 2, yb - 0.025, wz), m=TRIM)
-    else:  # left
-        xb = 0.02
-        plane("win_pane", wh, ww, (xb, D / 2, wz), rot=(0, math.radians(90), 0), m=WM)
-        box("win_t", 0.06, ww + 2 * fr, fr, (xb + 0.02, D / 2, wz + wh / 2 + fr / 2), m=TRIM)
-        box("win_b", 0.06, ww + 2 * fr, fr, (xb + 0.02, D / 2, wz - wh / 2 - fr / 2), m=TRIM)
-        box("win_l", 0.06, fr, wh + 2 * fr, (xb + 0.02, D / 2 - ww / 2 - fr / 2, wz), m=TRIM)
-        box("win_r", 0.06, fr, wh + 2 * fr, (xb + 0.02, D / 2 + ww / 2 + fr / 2, wz), m=TRIM)
-        box("win_mv", 0.05, 0.03, wh, (xb + 0.025, D / 2, wz), m=TRIM)
-        box("win_mh", 0.05, ww, 0.03, (xb + 0.025, D / 2, wz), m=TRIM)
+def build_window(wall, c, w, h, z):
+    if wall in ("far", "near"):
+        yb = (D - 0.02) if wall == "far" else 0.02
+        yf = yb + (-0.02 if wall == "far" else 0.02)   # 프레임/창살은 방 안쪽으로 살짝
+        plane("win_pane", w, h, (c, yb, z), rot=(math.radians(90), 0, 0), m=WM)
+        box("win_t", w + 2 * FR, 0.06, FR, (c, yf, z + h / 2 + FR / 2), m=TRIM)
+        box("win_b", w + 2 * FR, 0.06, FR, (c, yf, z - h / 2 - FR / 2), m=TRIM)
+        box("win_l", FR, 0.06, h + 2 * FR, (c - w / 2 - FR / 2, yf, z), m=TRIM)
+        box("win_r", FR, 0.06, h + 2 * FR, (c + w / 2 + FR / 2, yf, z), m=TRIM)
+        box("win_mv", 0.03, 0.05, h, (c, yf, z), m=TRIM)
+        box("win_mh", w, 0.05, 0.03, (c, yf, z), m=TRIM)
+    else:  # left / right
+        xb = 0.02 if wall == "left" else W - 0.02
+        xf = xb + (0.02 if wall == "left" else -0.02)
+        plane("win_pane", h, w, (xb, c, z), rot=(0, math.radians(90), 0), m=WM)
+        box("win_t", 0.06, w + 2 * FR, FR, (xf, c, z + h / 2 + FR / 2), m=TRIM)
+        box("win_b", 0.06, w + 2 * FR, FR, (xf, c, z - h / 2 - FR / 2), m=TRIM)
+        box("win_l", 0.06, FR, h + 2 * FR, (xf, c - w / 2 - FR / 2, z), m=TRIM)
+        box("win_r", 0.06, FR, h + 2 * FR, (xf, c + w / 2 + FR / 2, z), m=TRIM)
+        box("win_mv", 0.05, 0.03, h, (xf, c, z), m=TRIM)
+        box("win_mh", 0.05, w, 0.03, (xf, c, z), m=TRIM)
 
 
-if win.get("wall", "far") not in hide:  # 창이 있는 벽이 컷어웨이로 사라지면 창도 생략
-    build_window(win.get("wall", "far"))
+def build_door(wall, c, w):
+    dh = min(2.05, H - 0.06)   # 문 높이
+    fr, leaf = 0.06, 0.045     # 문틀 두께, 문짝 두께
+    if wall in ("far", "near"):
+        yb = (D - 0.03) if wall == "far" else 0.03
+        yh = yb + (-0.03 if wall == "far" else 0.03)  # 손잡이 방 안쪽
+        box("door_leaf", w, leaf, dh, (c, yb, dh / 2), m=DOORMAT)
+        box("door_top", w + 2 * fr, 0.08, fr, (c, yb, dh + fr / 2), m=FRAME)
+        box("door_jl", fr, 0.08, dh + fr, (c - w / 2 - fr / 2, yb, (dh + fr) / 2), m=FRAME)
+        box("door_jr", fr, 0.08, dh + fr, (c + w / 2 + fr / 2, yb, (dh + fr) / 2), m=FRAME)
+        box("door_hd", 0.035, 0.05, 0.10, (c + w / 2 - 0.09, yh, 1.02), m=HANDLE)
+    else:  # left / right
+        xb = 0.03 if wall == "left" else W - 0.03
+        xh = xb + (0.03 if wall == "left" else -0.03)
+        box("door_leaf", leaf, w, dh, (xb, c, dh / 2), m=DOORMAT)
+        box("door_top", 0.08, w + 2 * fr, fr, (xb, c, dh + fr / 2), m=FRAME)
+        box("door_jl", 0.08, fr, dh + fr, (xb, c - w / 2 - fr / 2, (dh + fr) / 2), m=FRAME)
+        box("door_jr", 0.08, fr, dh + fr, (xb, c + w / 2 + fr / 2, (dh + fr) / 2), m=FRAME)
+        box("door_hd", 0.05, 0.035, 0.10, (xh, c + w / 2 - 0.09, 1.02), m=HANDLE)
+
+
+_openings = S.get("openings")
+if _openings:
+    for o in _openings:
+        wl = o.get("wall")
+        if wl not in ("far", "near", "left", "right") or wl in hide:
+            continue                                    # 없는 벽/컷어웨이로 사라진 벽은 생략
+        c = o.get("pos", (W / 2 if wl in ("far", "near") else D / 2))
+        if o.get("kind") == "door":
+            build_door(wl, c, o.get("width", 0.9))
+        else:
+            build_window(wl, c, o.get("width", 1.4), o.get("h", 1.4), o.get("z", 1.25))
+elif "far" not in hide:
+    build_window("far", W / 2, min(2.2, W * 0.6), 1.4, 1.25)  # 기본: far 벽 중앙 창(기존 동작)
 
 # ---------- 러그(옵션) : 중앙 바닥에 부드러운 패브릭 ----------
 rug = S.get("rug")

@@ -89,7 +89,7 @@ export default function App() {
     if (!placeable.length) { alert('렌더할 3D 가구가 없어요. 가구를 먼저 담아 주세요.'); return; }
     setRenderBusy(true);
     try {
-      const r = await renderScene(room, items, cam3d.current, preset, view);
+      const r = await renderScene(room, items, cam3d.current, preset, view, openings);
       if (r?.status === 'OK' && r.image) setRenderImg(r.image);
       else if (r?.status === 'CLIENT') alert('렌더 서버(camp-3)가 아직 연결 안 됐어요. ./run.sh 로 터널을 켜 주세요.');
       else alert('렌더 실패: ' + (r?.reason || '알 수 없음'));

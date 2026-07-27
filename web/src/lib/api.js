@@ -43,11 +43,13 @@ export async function relightImage(dataUrl, strength = 0.3) {
 
 // 포토리얼 렌더 — 현재 3D 배치 → camp-3 Blender 사진. 반환: {status:'OK'|'CLIENT'|'ERROR', image}.
 // glb 있는 아이템만 보낸다(치수·위치는 미터·room 좌표 그대로 → 서버가 blender 좌표로 사용).
-export async function renderScene(room, items, cam3d, preset = 'day', view = null) {
+export async function renderScene(room, items, cam3d, preset = 'day', view = null, openings = []) {
   const W = room.widthM, D = room.depthM;
   const payload = {
     room: { w: W, d: D, h: 2.6 },
     preset,   // 시간대 조명: 'morning'|'day'|'sunset'|'night'
+    // 2D 평면의 문/창(m). 서버가 렌더 벽 좌표로 매핑해 창·문을 그 위치에 그린다.
+    openings: (openings || []).map((o) => ({ kind: o.kind, wall: o.wall, pos: o.pos, width: o.width })),
     items: items.filter((it) => it.glb).map((it) => ({
       glb: it.glb, x: it.cx, y: it.cy, rot: it.rotationDeg || 0,
     })),

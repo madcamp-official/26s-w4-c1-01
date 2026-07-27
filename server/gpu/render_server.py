@@ -54,11 +54,27 @@ def build_scene(p):
     else:
         cam, ahide = auto_camera(view or "wide", W, D, H)
         hide = p.get("hide") or ahide
-    win = p.get("window") or {"wall": "far", "w": min(2.2, W * 0.6), "h": 1.4, "z": 1.25}
+    # 2D 평면의 문/창(top/bottom/left/right) → 렌더 벽(far/near/left/right).
+    # 아이템과 동일한 깊이축 뒤집기: top(y0)→far(yD), bottom(yD)→near(y0). left/right는 벽 따라 위치(y)를 D-pos로.
+    WALLMAP = {"top": "far", "bottom": "near", "left": "left", "right": "right"}
+    openings = []
+    for o in p.get("openings", []):
+        rw = WALLMAP.get(o.get("wall"))
+        if not rw:
+            continue
+        if o.get("wall") in ("top", "bottom"):
+            pos = float(o.get("pos", W / 2))               # x축(뒤집지 않음)
+        else:
+            pos = D - float(o.get("pos", D / 2))           # 깊이축 뒤집기
+        width = float(o.get("width", 0.9))
+        if o.get("kind") == "door":
+            openings.append({"kind": "door", "wall": rw, "pos": pos, "width": width})
+        else:
+            openings.append({"kind": "window", "wall": rw, "pos": pos, "width": width, "h": 1.4, "z": 1.25})
     out = {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI,
            "preset": p.get("preset", "day"),           # 시간대 조명 프리셋(blender가 노출·창색·태양광 결정)
            "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1600)), "ry": int(p.get("ry", 900)),
-           "window": win, "camera": cam, "hide": hide, "items": items}
+           "openings": openings, "camera": cam, "hide": hide, "items": items}
     # 앱/하니스가 명시 오버라이드하면 통과(프리셋 기본값을 덮어씀).
     for k in ("hdri_strength", "exposure", "rug"):
         if k in p:
