@@ -3,7 +3,7 @@ import { consumeAuthHash, currentUser, logout } from './lib/auth.js';
 import { toPlacedItem, resolveDims, CATALOG } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
-import { fetchDims, layoutFurniture, renderScene, chatLayout } from './lib/api.js';
+import { fetchDims, layoutFurniture, renderScene, chatLayout, postCommunity } from './lib/api.js';
 import { parseCommand, hasPlaceHint } from './lib/chatcmd.js';
 
 import TabBar from './components/TabBar.jsx';
@@ -244,6 +244,16 @@ export default function App() {
     setMarketRecommend(items.find((it) => it.glb || it.buyUrl) || items[0] || null);
     setScreen('market');
   }
+  // 완성한 배치를 "방꾸 이야기"(홈 커뮤니티 세그먼트, design/커뮤니티.html 1c안)의 자랑(flex) 글로 공유.
+  // 새 입력 폼 없이 이미 갖고 있는 값(합성 사진·평수·견적·취향 스타일)만으로 글을 만든다.
+  async function shareToCommunity() {
+    if (!renderImg || !room) return { status: 'ERROR', reason: '공유할 완성 사진이 없어요' };
+    const sizeLabel = `${room.widthM.toFixed(1)}×${room.depthM.toFixed(1)}m`;
+    const styleLabel = (taste?.moods || [])[0];
+    const title = styleLabel ? `${sizeLabel} 원룸, ${styleLabel}로 꾸며봤어` : `${sizeLabel} 원룸 배치 완성!`;
+    const meta = estimate > 0 ? `${sizeLabel} · ${estimateIsEst ? '약 ' : ''}${estimate.toLocaleString()}원` : sizeLabel;
+    return postCommunity({ cat: 'flex', title, image: renderImg, meta });
+  }
   function navTab(t) {
     if (t === 'market') setVisitedMarket(true);
     setScreen(t);
@@ -293,6 +303,7 @@ export default function App() {
           timePreset={renderPreset} onTime={(p) => renderWith(p, renderView, 'time')}
           view={renderView} onView={(v) => renderWith(renderPreset, v, 'view')}
           onBack={() => setScreen('planner')} onRerender={() => setScreen('planner')} onFindSimilar={findSimilar}
+          onShare={shareToCommunity}
         />
       )}
 

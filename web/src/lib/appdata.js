@@ -46,3 +46,18 @@ export const MARKET_CATS = [
 ];
 
 export const MARKET_PRICES = ['~10만', '10~30', '30~50', '50~100', '100+'];
+
+// 홈 탭 "방꾸 이야기" — 커뮤니티는 별도 탭 없이 홈 내부 세그먼트 전환으로만 존재(design/커뮤니티.html 1c안).
+// 백엔드 저장소가 없어 정적 목업 데이터로 화면만 구현(§docs/프론트.md: 실 저장은 이번 범위 밖).
+export const COMMUNITY_CATS = [
+  { key: 'all', label: '전체' },
+  { key: 'flex', label: '자랑 🎀' },
+  { key: 'tip', label: '꿀팁 💡' },
+  { key: 'question', label: '질문 ❓' },
+];
+
+export const COMMUNITY_POSTS = [
+  { id: 'p1', cat: 'flex', badge: '🎀 자랑', author: '지은', photo: '#EAD7CE', title: '지은님의 원룸 완성! 러블리 파스텔로 꾸며봤어', likes: 128, comments: 12 },
+  { id: 'p2', cat: 'tip', badge: '💡 꿀팁', author: '유민', title: '원룸 4평인데 러그 대신 이거 쓰니까 훨씬 넓어보여 (사진 첨부)', likes: 84, comments: 21, saves: 15 },
+  { id: 'p3', cat: 'question', badge: '❓ 질문', author: '하늘', title: '북유럽 톤에 어울리는 커피잔 소품 추천 좀 해줘 ㅠㅠ', comments: 9, answering: true },
+];

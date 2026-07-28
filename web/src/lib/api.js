@@ -170,6 +170,34 @@ export async function fetchDims(url) {
   }
 }
 
+// 방꾸 이야기(커뮤니티) 피드 조회. 반환: { source: 'server'|'local', posts: [...] | null }.
+// posts:null이면 호출부가 로컬 목업(appdata.COMMUNITY_POSTS)으로 폴백해야 한다는 뜻(searchFurniture와 동일한 폴백 계약).
+export async function fetchCommunityFeed(cat = 'all') {
+  try {
+    const res = await fetch(`${API_BASE}/api/community/feed?cat=${encodeURIComponent(cat)}`, { signal: timeout(6000) });
+    if (!res.ok) throw new Error(`http ${res.status}`);
+    const data = await res.json();
+    if (data?.status === 'OK' && Array.isArray(data.posts)) return { source: 'server', posts: data.posts };
+    throw new Error(data?.reason || data?.status || 'feed error');
+  } catch (e) {
+    return { source: 'local', reason: String(e.message || e), posts: null };
+  }
+}
+
+// 방꾸 이야기 글쓰기. 반환: {status:'OK', post} | {status:'ERROR', reason}.
+export async function postCommunity({ cat, title, image, meta }) {
+  try {
+    const res = await fetch(`${API_BASE}/api/community/post`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cat, title, image, meta }), signal: timeout(20000),
+    });
+    if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}` };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', reason: String(e.message || e) };
+  }
+}
+
 function localSearch(q) {
   if (!q) return CATALOG;
   const low = q.toLowerCase();

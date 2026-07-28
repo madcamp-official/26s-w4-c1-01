@@ -1,12 +1,24 @@
 // 합성 결과 — camp-3 포토리얼 렌더를 After로, 업로드한 빈 방 사진을 Before로.
 // 렌더 서버 미연동/실패 시 빗금 플레이스홀더로 폴백(과잉약속 금지, 흐름 유지).
+import { useState } from 'react';
+
 const TIMES = [['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['night', '🌙']];
 const VIEWS = [['wide', '와이드'], ['cozy', '아늑'], ['me', '내 시점']];
 
 export default function CompositeResult({
   renderImg, renderBusy, renderTrigger, showBefore, onToggle, photo, estimate, estimateIsEst,
-  timePreset, onTime, view, onView, onBack, onRerender, onFindSimilar,
+  timePreset, onTime, view, onView, onBack, onRerender, onFindSimilar, onShare,
 }) {
+  const [shareState, setShareState] = useState('idle');   // idle | busy | done | error
+  async function handleShare() {
+    if (!onShare || shareState === 'busy') return;
+    setShareState('busy');
+    const r = await onShare();
+    setShareState(r?.status === 'OK' ? 'done' : 'error');
+    setTimeout(() => setShareState('idle'), 2200);
+  }
+  const shareLabel = { idle: '방꾸 이야기에 공유', busy: '공유 중…', done: '공유 완료 ✓', error: '실패, 다시' }[shareState];
+
   if (renderBusy && !renderImg) {
     return (
       <div className="vscreen loading">
@@ -67,6 +79,9 @@ export default function CompositeResult({
         </div>
         <div className="acts">
           <button className="sheet-btn sub" onClick={onRerender}>다시 배치</button>
+          {renderImg && (
+            <button className="sheet-btn sub" disabled={shareState === 'busy'} onClick={handleShare}>{shareLabel}</button>
+          )}
           <button className="sheet-btn main" onClick={onFindSimilar}>닮은 상품 찾기</button>
         </div>
       </div>
