@@ -55,13 +55,30 @@ function repairCandidate(items, room, openings = []) {
     return frontClearance(it, obs, W, D) >= need;
   };
   for (const it of order) {
+    const isBed = roles.get(it.id) === 'bed';
     if (!it._place) {                                // Gemini 위치가 있으면 유효한지 확인 후 유지
       const b = boxAt(it, it.cx, it.cy, it.rotationDeg);
       if (inRoom(b, W, D) && !overlapsOther(b, it) && frontOK(it)
-          && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))) { placed.push({ box: b, it }); continue; }
+          && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))
+          && (!isBed || bedInCorner({ ...it }, W, D))) { placed.push({ box: b, it }); continue; }   // 침대는 코너일 때만 유지(사용자 지시)
     }
-    // 누락(_place)이거나 Gemini 위치가 무효 → 원위치(누락은 방 중앙) 근처 유효 자리로 스냅.
     const ox = it._place ? (it.cx || W / 2) : it.cx, oy = it._place ? (it.cy || D / 2) : it.cy;
+    // 침대: 가장 가까운 코너로 스냅(사용자 지시). 실패 시 일반 보정으로 폴백.
+    if (isBed) {
+      const corners = bedCornerSlots(it, segs)
+        .sort((c1, c2) => Math.hypot(c1.cx - ox, c1.cy - oy) - Math.hypot(c2.cx - ox, c2.cy - oy));
+      let snapped = false;
+      for (const c of corners) {
+        const b = boxAt(it, c.cx, c.cy, c.rot);
+        if (inRoom(b, W, D) && !overlapsOther(b, it)
+            && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))) {
+          it.cx = c.cx; it.cy = c.cy; it.rotationDeg = c.rot; delete it._place;
+          placed.push({ box: b, it }); moved++; snapped = true; break;
+        }
+      }
+      if (snapped) continue;
+    }
+    // 누락(_place)이거나 위치가 무효 → 원위치(누락은 방 중앙) 근처 유효 자리로 스냅.
     const p = placeItemNear(it, ox, oy, placed, W, D, openings, segs);
     if (!p) return null;                             // 배치 실패 → 후보 폐기(로컬 폴백으로)
     it.cx = p.cx; it.cy = p.cy; it.rotationDeg = p.rot; delete it._place; placed.push({ box: p.box, it }); moved++;
@@ -142,6 +159,34 @@ function segSlots(it, seg) {
   for (let t = lo; t <= hi + 1e-9; t += STEP) out.push(horiz ? { cx: t, cy: fixed, rot } : { cx: fixed, cy: t, rot });
   return out;
 }
+// 침대 코너 슬롯 — 각 바운딩 세그먼트의 양 끝(=두 벽이 만나는 꼭짓점 자리). 사용자 지시: 침대는 코너 밀착.
+function bedCornerSlots(bed, segs) {
+  const out = [];
+  for (const sg of segs.filter((x) => x.src === 'bound')) {
+    const rot = FACE_ROT[sg.kind];
+    const { w, d } = effectiveFootprint(bed.wM, bed.dM, rot);
+    const horiz = sg.kind === 'top' || sg.kind === 'bottom';
+    const along = horiz ? w : d;
+    const lo = sg.a + along / 2 + MARGIN, hi = sg.b - along / 2 - MARGIN;
+    if (hi < lo - EPS) continue;
+    const fixed = sg.kind === 'top' ? sg.coord + d / 2 + MARGIN
+      : sg.kind === 'bottom' ? sg.coord - d / 2 - MARGIN
+      : sg.kind === 'left' ? sg.coord + w / 2 + MARGIN
+      : sg.coord - w / 2 - MARGIN;
+    for (const t of lo + 1e-9 < hi ? [lo, hi] : [lo]) {
+      out.push(horiz ? { cx: t, cy: fixed, rot, wall: sg.kind } : { cx: fixed, cy: t, rot, wall: sg.kind });
+    }
+  }
+  return out;
+}
+// 침대가 코너에 밀착했는가 — 서로 수직인 바운딩 벽 2면에 동시 근접(tol).
+function bedInCorner(bed, W, D, tol = 0.14) {
+  const b = itemAABB(bed);
+  const xTouch = b.left <= tol || b.right >= W - tol;
+  const yTouch = b.top <= tol || b.bottom >= D - tol;
+  return xTouch && yTouch;
+}
+
 // 바운딩 벽 이름으로 슬롯(경계 접촉 컷아웃이 잠식한 스팬은 세그먼트 도출에서 이미 제외됨).
 function wallSlots(it, wall, segs) {
   return segs.filter((sg) => sg.src === 'bound' && sg.wall === wall).flatMap((sg) => segSlots(it, sg));
@@ -290,10 +335,15 @@ function attempt(room, items, openings = [], relax = 1) {
   const tv = solids.find((it) => isTV(it) && roles.get(it.id) !== 'bed');
   const lamp = solids.find((it) => roles.get(it.id) === 'lamp');
 
-  // 1) 침대(최대 앵커) — 아무 벽(랜덤). 못 놓으면 폐기.
+  // 1) 침대(최대 앵커) — 코너(꼭짓점) 밀착 우선(사용자 지시), 안 되면 벽면 폴백. 못 놓으면 폐기.
   let bedWall = null;
   if (bed) {
-    for (const wall of shuffle(['top', 'bottom', 'left', 'right'])) { if (placeOnWall(bed, wall, placed, W, D, openings, segs)) { bedWall = wall; break; } }
+    for (const c of shuffle(bedCornerSlots(bed, segs))) {
+      if (commit(bed, c.cx, c.cy, c.rot, placed, W, D, openings)) { bedWall = c.wall; break; }
+    }
+    if (!bedWall) {
+      for (const wall of shuffle(['top', 'bottom', 'left', 'right'])) { if (placeOnWall(bed, wall, placed, W, D, openings, segs)) { bedWall = wall; break; } }
+    }
     if (!bedWall) return null;
     done.add(bed.id);
   }
@@ -357,7 +407,9 @@ export function generateLayouts(room, items, count = 3, tries = 400, openings = 
     v.circulation = circulationScore(solids, W, D, 0.1, room.cutouts).connected;
     v.fv = frontViolations(v.items, W, D, room.cutouts);                       // 앞면 여유 위반(컷아웃 벽체 포함)
     const rc = (v.rel.r1 ? 1 : 0) + (v.rel.r2 ? 1 : 0) + (v.rel.r3 ? 1 : 0);   // 만족한 관계 수
-    v.score = 10 * rc + 0.6 * v.wallRatio + 0.4 * v.circulation - 4 * v.fv;    // 관계 최우선, 앞면 막힘 강한 감점
+    const bedIt = v.items.find((it) => roleOf(it) === 'bed');
+    const corner = bedIt ? (bedInCorner(bedIt, W, D) ? 1 : 0) : 1;             // 침대 코너 밀착(사용자 지시)
+    v.score = 10 * rc + 0.6 * v.wallRatio + 0.4 * v.circulation - 4 * v.fv + 2 * corner;
   }
   // 앞면 위반 0인 후보가 하나라도 있으면 위반 배치는 아예 제외(hard 정책).
   const clean = valid.filter((v) => v.fv === 0);

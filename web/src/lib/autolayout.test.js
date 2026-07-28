@@ -440,3 +440,24 @@ test('L자 방 Phase2: 가구가 컷아웃 안쪽 면에도 밀착 가능 + 러�
     }
   }
 });
+
+test('침대 코너 밀착(사용자 지시): 로컬 엔진·Gemini 보정 모두 꼭짓점에 스냅', () => {
+  const room = { widthM: 3.2, depthM: 4.4 };
+  const items = [
+    { id: 'bed', cat: '침대', name: '퀸 침대', wM: 1.5, dM: 2.0, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'desk', cat: '책상', name: '책상', wM: 1.1, dM: 0.6, hM: 0.75, cx: 0, cy: 0, rotationDeg: 0 },
+  ];
+  const inCorner = (bed) => {
+    const b = itemAABB(bed);
+    return (b.left <= 0.14 || b.right >= 3.2 - 0.14) && (b.top <= 0.14 || b.bottom >= 4.4 - 0.14);
+  };
+  // 로컬 엔진: 모든 후보의 침대가 코너
+  for (const c of generateLayouts(room, items, 3, 600)) {
+    assert.ok(inCorner(c.items.find((x) => x.id === 'bed')), '로컬 후보 침대는 코너 밀착');
+  }
+  // Gemini 후보(방 한가운데 침대) → 보정이 가장 가까운 코너로 스냅
+  const bad = [{ strategy: 'x', items: [{ id: 'bed', cx: 160, cy: 220, rotation: 0 }, { id: 'desk', cx: 60, cy: 60, rotation: 0 }] }];
+  const out = validateCandidates(bad, room, items);
+  assert.ok(out.length >= 1, '보정 채택');
+  assert.ok(inCorner(out[0].items.find((x) => x.id === 'bed')), '보정된 침대도 코너');
+});
