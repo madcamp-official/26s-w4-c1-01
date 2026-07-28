@@ -65,6 +65,8 @@ export async function renderScene(room, items, cam3d, preset = 'day', view = nul
     preset,   // 시간대 조명: 'morning'|'day'|'sunset'|'night'
     // 2D 평면의 문/창(m). 서버가 렌더 벽 좌표로 매핑해 창·문을 그 위치에 그린다.
     openings: (openings || []).map((o) => ({ kind: o.kind, wall: o.wall, pos: o.pos, width: o.width })),
+    // 비직사각형 방: 컷아웃(m) — 렌더가 바닥부터 천장까지 벽체 박스로 세운다.
+    cutouts: (room.cutouts || []).map((c) => ({ x: c.x, y: c.y, w: c.w, d: c.d })),
     items: items.filter((it) => it.glb).map((it) => ({
       glb: it.glb, x: it.cx, y: it.cy, rot: (it.rotationDeg || 0) + (it.orient || 0),   // orient=모델 정면 보정각
     })),
@@ -98,6 +100,10 @@ export async function renderScene(room, items, cam3d, preset = 'day', view = nul
 export async function layoutFurniture(room, items, openings = []) {
   const payload = {
     room: { W: Math.round(room.widthM * 100), D: Math.round(room.depthM * 100) },
+    // 비직사각형 방: 배치금지 사각존(컷아웃, cm) — LLM에게 '가상 장애물'로 알림. 앱이 다시 기하 검증.
+    zones: (room.cutouts || []).map((c) => ({
+      x: Math.round(c.x * 100), y: Math.round(c.y * 100), w: Math.round(c.w * 100), d: Math.round(c.d * 100),
+    })),
     // 문/창을 cm로 전달(문=90° 스윙 앞을 비우고, 창은 가리지 말라고 LLM에 알림). 앱이 다시 기하 검증.
     openings: openings.map((o) => ({
       kind: o.kind, wall: o.wall, pos: Math.round((o.pos || 0) * 100),
@@ -124,6 +130,9 @@ export async function layoutFurniture(room, items, openings = []) {
 export async function chatLayout(room, openings, items, message, history) {
   const payload = {
     room: { W: Math.round(room.widthM * 100), D: Math.round(room.depthM * 100) },
+    zones: (room.cutouts || []).map((c) => ({
+      x: Math.round(c.x * 100), y: Math.round(c.y * 100), w: Math.round(c.w * 100), d: Math.round(c.d * 100),
+    })),
     openings: (openings || []).map((o) => ({
       kind: o.kind, wall: o.wall, pos: Math.round((o.pos || 0) * 100),
       width: Math.round((o.width || 0.9) * 100), ...(o.kind === 'door' ? { hinge: o.hinge || 'a' } : {}),

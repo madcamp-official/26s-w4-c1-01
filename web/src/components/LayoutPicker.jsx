@@ -25,6 +25,10 @@ function Mini({ room, items, width = 188 }) {
   return (
     <svg width={width} height={height} className="minimap">
       <rect x={0} y={0} width={width} height={height} fill="#f3efe7" />
+      {(room.cutouts || []).map((c, i) => (
+        <rect key={`cut${i}`} x={c.x * scale} y={c.y * scale} width={c.w * scale} height={c.d * scale}
+          fill="#ddd5c7" stroke="#8a8172" strokeWidth={1.2} />
+      ))}
       {rugs.map(draw)}
       {solids.map(draw)}
     </svg>

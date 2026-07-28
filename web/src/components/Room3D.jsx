@@ -111,6 +111,17 @@ function Openings3D({ room, openings }) {
   });
 }
 
+// 컷아웃(비직사각형 방) — 배치금지 구역을 바닥~천장 벽 박스로 세운다(바닥은 박스가 가림).
+function Cutouts3D({ room, H = 2.4 }) {
+  const W = room.widthM, D = room.depthM;
+  return (room.cutouts || []).map((c, i) => (
+    <mesh key={i} position={[c.x + c.w / 2 - W / 2, H / 2, c.y + c.d / 2 - D / 2]} castShadow>
+      <boxGeometry args={[c.w, H, c.d]} />
+      <meshStandardMaterial color="#efe9df" roughness={0.95} />
+    </mesh>
+  ));
+}
+
 // 방 — 바닥 + 뒤쪽 2벽(카메라가 안을 보도록 개방).
 function Shell({ W, D, H = 2.4 }) {
   return (
@@ -231,6 +242,7 @@ export default function Room3D({ room, items, selectedId, setSelectedId, onMove,
 
         <Suspense fallback={<Html center><div className="r3d-load">3D 불러오는 중…</div></Html>}>
           <Shell W={W} D={D} />
+          <Cutouts3D room={room} />
           <Openings3D room={room} openings={openings} />
           {items.map((it) => it.glb ? (
             <Piece

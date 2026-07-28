@@ -60,7 +60,7 @@ export default function App() {
   const cam3d = useRef(null);
 
   const val = useMemo(
-    () => (room ? validateLayout(items, room.widthM, room.depthM, openings) : { flags: [], ok: true, freeRatio: 0 }),
+    () => (room ? validateLayout(items, room.widthM, room.depthM, openings, room.cutouts) : { flags: [], ok: true, freeRatio: 0 }),
     [items, room, openings]
   );
   const sel = items.find((it) => it.id === selectedId);
@@ -72,7 +72,7 @@ export default function App() {
     if (!room) return;
     const d = resolveDims(cat);
     const probe = { wM: d.w / 100, dM: d.d / 100, rotationDeg: 0 };
-    const spot = findFreeSpot(probe, items, room.widthM, room.depthM) || { cx: room.widthM / 2, cy: room.depthM / 2 };
+    const spot = findFreeSpot(probe, items, room.widthM, room.depthM, 0.1, room.cutouts) || { cx: room.widthM / 2, cy: room.depthM / 2 };
     const it = toPlacedItem(cat, spot.cx, spot.cy);
     setItems((p) => [...p, it]);
     setSelectedId(it.id);
@@ -156,7 +156,7 @@ export default function App() {
       if (!catItem || !room) return null;
       const d = resolveDims(catItem);
       const probe = { wM: d.w / 100, dM: d.d / 100, rotationDeg: 0 };
-      const spot = findFreeSpot(probe, items, room.widthM, room.depthM) || { cx: room.widthM / 2, cy: room.depthM / 2 };
+      const spot = findFreeSpot(probe, items, room.widthM, room.depthM, 0.1, room.cutouts) || { cx: room.widthM / 2, cy: room.depthM / 2 };
       return [...items, toPlacedItem(catItem, spot.cx, spot.cy)];
     }
     if (cmd.op === 'remove') {
@@ -184,7 +184,7 @@ export default function App() {
       const cy = Number.isFinite(ni.cy) ? ni.cy / 100 : it.cy;
       return { ...it, cx, cy, rotationDeg: rot };
     });
-    const v = validateLayout(next.filter((it) => it.cat !== '러그'), room.widthM, room.depthM, openings);
+    const v = validateLayout(next.filter((it) => it.cat !== '러그'), room.widthM, room.depthM, openings, room.cutouts);
     return v.ok && !v.blockOpen ? next : null;
   }
   // 배치 도우미 제출 — 빠른 명령이면 로컬 적용, 아니면 LLM 재배치. 적용되면 결과 화면으로.

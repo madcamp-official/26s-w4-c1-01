@@ -1,5 +1,7 @@
 // 문·창문 편집기 — 2D 평면에 표시할 개구부를 추가/조정.
 // 문: 90° 스윙 부채꼴(접근 불가) · 창문: 벽 표시(가리면 안 됨). 좌표는 m, 벽 따라 중심 pos.
+import { openingOnCutout } from '../lib/geometry.js';
+
 const WALLS = [['top', '위'], ['bottom', '아래'], ['left', '왼쪽'], ['right', '오른쪽']];
 
 const uid = () => `op-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
@@ -21,6 +23,8 @@ export default function OpeningsBar({ room, openings, setOpenings }) {
     if (o.id !== id) return o;
     const next = { ...o, ...patch };
     next.pos = clampPos(next.pos, room, next.wall, next.width);   // 벽/폭 바뀌면 위치 재클램프
+    // 컷아웃이 잠식한 벽 구간(그 자리는 벽이 아님)에 놓이면 이전 값 유지
+    if (openingOnCutout(next, room.widthM, room.depthM, room.cutouts)) return o;
     return next;
   }));
   const remove = (id) => setOpenings((prev) => prev.filter((o) => o.id !== id));

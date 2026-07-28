@@ -70,6 +70,12 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
             )
           )}
 
+          {/* 컷아웃(비직사각형 방의 벽체/욕실) — 배치금지 구역을 벽색으로 */}
+          {(room.cutouts || []).map((c, i) => (
+            <Rect key={`cut${i}`} x={PAD + toPx(c.x)} y={PAD + toPx(c.y)} width={toPx(c.w)} height={toPx(c.d)}
+              fill="#e3ddd2" stroke="#8a8172" strokeWidth={2} cornerRadius={1} listening={false} />
+          ))}
+
           {/* 개구부: 문(90° 스윙 부채꼴=접근불가, 빨강) · 창문(벽 표시=가리면 안 됨, 파랑) */}
           {(openings || []).map((o) => {
             const isVert = o.wall === 'left' || o.wall === 'right';

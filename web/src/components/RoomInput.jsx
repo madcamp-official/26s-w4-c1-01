@@ -23,7 +23,9 @@ export default function RoomInput({ onBack, onNext, photo, onPhoto }) {
 
   function next() {
     if (tab === 'plan' && plan) {
-      onNext(roomFromMeasured({ widthM: plan.widthM, depthM: plan.depthM }), plan.openings);
+      const r = roomFromMeasured({ widthM: plan.widthM, depthM: plan.depthM });
+      r.cutouts = plan.cutouts || [];   // 비직사각형(L자) 도면의 배치금지 구역
+      onNext(r, plan.openings);
     } else {
       onNext(estimateRoom({ pyeong }), []);
     }
