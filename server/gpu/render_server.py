@@ -71,7 +71,15 @@ def build_scene(p):
             openings.append({"kind": "door", "wall": rw, "pos": pos, "width": width})
         else:
             openings.append({"kind": "window", "wall": rw, "pos": pos, "width": width, "h": 1.0, "z": 1.7})
-    out = {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI,
+    cutouts = []
+    for c in p.get("cutouts", []):
+        cw = float(c.get("w", 0)); cd = float(c.get("d", 0))
+        if cw <= 0 or cd <= 0:
+            continue
+        ccx = float(c.get("x", 0)) + cw / 2
+        ccy = float(c.get("y", 0)) + cd / 2
+        cutouts.append({"x": ccx, "y": D - ccy, "w": cw, "d": cd})   # 아이템과 동일한 깊이축 뒤집기
+    out = {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI, "cutouts": cutouts,
            "preset": p.get("preset", "day"),           # 시간대 조명 프리셋(blender가 노출·창색·태양광 결정)
            "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1600)), "ry": int(p.get("ry", 900)),
            "openings": openings, "camera": cam, "hide": hide, "items": items}

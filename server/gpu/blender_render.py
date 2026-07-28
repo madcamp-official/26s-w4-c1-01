@@ -227,6 +227,10 @@ if "left" not in hide:
 if "right" not in hide:
     box("bb_right", BB_T, D, BB_H, (W - BB_T / 2, D / 2, BB_H / 2), m=TRIM)
 
+# ---------- 컷아웃(비직사각형 방) — 배치금지 구역을 바닥~천장 벽체 박스로 ----------
+for _ci, _c in enumerate(S.get("cutouts", [])):
+    box(f"cut{_ci}", _c["w"], _c["d"], H, (_c["x"], _c["y"], H / 2), m=WALL)
+
 # ---------- 개구부(창문·문) — 벽별 임의 위치. 2D 평면의 문/창을 렌더에 반영 ----------
 # 벽: far(y=D)/near(y=0)/left(x=0)/right(x=W). c=벽 따라 중심(far/near=x, left/right=y).
 _sky = PRE.get("sky")
