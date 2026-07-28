@@ -571,3 +571,77 @@ async def auth_callback(provider: str, code: str = "", error: str = ""):
         return RedirectResponse(AUTH_BASE + "/#auth=" + _sign_token(user))
     except Exception as e:  # noqa: BLE001
         return RedirectResponse(AUTH_BASE + "/#auth_error=" + _uparse.quote(str(e)[:80]))
+
+
+# ── 커뮤니티(방꾸 이야기) — 홈 세그먼트 전환용(design/커뮤니티.html 1c안). 이 프로젝트 첫 영구 저장소라 SQLite 파일 하나로 가볍게.
+# 좋아요/댓글 집계는 다음 단계 — 지금은 글쓰기(POST)+피드 조회(GET)만. 서버 없거나 실패해도 프론트가 목업으로 폴백(정직 원칙 §8 fallback=MVP).
+import sqlite3
+import uuid as _uuid
+
+COMMUNITY_DB = os.getenv("COMMUNITY_DB", os.path.join(os.path.dirname(__file__), "community.db"))
+COMMUNITY_CATS = {"flex", "tip", "question"}
+
+
+def _community_conn():
+    conn = sqlite3.connect(COMMUNITY_DB)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS posts ("
+        "id TEXT PRIMARY KEY, cat TEXT NOT NULL, title TEXT NOT NULL, image TEXT, "
+        "author TEXT, meta TEXT, likes INTEGER DEFAULT 0, comments INTEGER DEFAULT 0, "
+        "saves INTEGER DEFAULT 0, created_at REAL NOT NULL)"
+    )
+    return conn
+
+
+class CommunityPostReq(BaseModel):
+    cat: str                        # 'flex'(자랑) | 'tip'(꿀팁) | 'question'(질문)
+    title: str
+    image: Optional[str] = None     # dataURL — 자랑(합성 결과 공유)만 채움
+    meta: Optional[str] = None      # 평수·견적 등 한 줄 부가정보(자유 텍스트)
+
+
+@app.post("/api/community/post")
+async def community_post(req: CommunityPostReq, request: Request):
+    if req.cat not in COMMUNITY_CATS:
+        return {"status": "ERROR", "reason": "invalid cat"}
+    title = req.title.strip()[:200]
+    if not title:
+        return {"status": "ERROR", "reason": "title required"}
+    tok = (request.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+    user = _verify_token(tok)
+    post = {
+        "id": _uuid.uuid4().hex[:12], "cat": req.cat, "title": title, "image": req.image,
+        "author": (user or {}).get("name") or "익명", "meta": req.meta,
+        "likes": 0, "comments": 0, "saves": 0, "created_at": _time.time(),
+    }
+    try:
+        conn = _community_conn()
+        conn.execute(
+            "INSERT INTO posts (id,cat,title,image,author,meta,likes,comments,saves,created_at) VALUES (?,?,?,?,?,?,0,0,0,?)",
+            (post["id"], post["cat"], post["title"], post["image"], post["author"], post["meta"], post["created_at"]),
+        )
+        conn.commit(); conn.close()
+        return {"status": "OK", "post": post}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "ERROR", "reason": str(e)[:150]}
+
+
+@app.get("/api/community/feed")
+async def community_feed(cat: str = "all"):
+    try:
+        conn = _community_conn()
+        q = "SELECT id,cat,title,image,author,meta,likes,comments,saves,created_at FROM posts"
+        args = ()
+        if cat and cat != "all":
+            q += " WHERE cat=?"; args = (cat,)
+        q += " ORDER BY created_at DESC LIMIT 50"
+        rows = conn.execute(q, args).fetchall()
+        conn.close()
+        posts = [
+            {"id": r[0], "cat": r[1], "title": r[2], "image": r[3], "author": r[4], "meta": r[5],
+             "likes": r[6], "comments": r[7], "saves": r[8], "created_at": r[9]}
+            for r in rows
+        ]
+        return {"status": "OK", "posts": posts}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "ERROR", "reason": str(e)[:150], "posts": []}

@@ -8,6 +8,7 @@ server/__pycache__/
 server/app/__pycache__/
 server/.venv/
 **/__pycache__/
+server/app/community.db
 
 # secrets
 .env
