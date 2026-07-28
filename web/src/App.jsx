@@ -53,6 +53,7 @@ export default function App() {
   const [renderBusy, setRenderBusy] = useState(false);
   const [renderPreset, setRenderPreset] = useState('day');
   const [renderView, setRenderView] = useState('wide');   // 'wide' | 'cozy' | 'me'(내 3D 시점) — 렌더 카메라 고정
+  const [renderTrigger, setRenderTrigger] = useState(null);   // 'time' | 'view' | null — 로딩 문구를 원인별로 구분하는 용도
   const [showBefore, setShowBefore] = useState(false);
 
   const [marketRecommend, setMarketRecommend] = useState(null);
@@ -135,15 +136,16 @@ export default function App() {
     }
   }
   // 시간대·각도를 함께 확정해 현재 배치로 렌더. 'me'=내 3D 시점(cam3d), 그 외=서버 프레이밍.
-  function renderWith(preset, viewMode) {
-    setRenderPreset(preset); setRenderView(viewMode);
+  // trigger는 로딩 문구 구분용(무엇이 바뀌어서 다시 찍는지) — 최초 렌더 등 구분 불필요할 땐 생략.
+  function renderWith(preset, viewMode, trigger = null) {
+    setRenderPreset(preset); setRenderView(viewMode); setRenderTrigger(trigger);
     doRenderItems(items, preset, viewMode);
   }
   // 배치를 바꾼 뒤 결과 화면으로(로딩 스피너 → 렌더 사진). 방금 만든 next 배치로 즉시 렌더.
   function goResultWith(next) {
     setItems(next); setSelectedId(null);
     setShowBefore(false); setRenderImg(null);
-    setRenderPreset('day'); setRenderView('wide');
+    setRenderPreset('day'); setRenderView('wide'); setRenderTrigger(null);
     setScreen('result');
     doRenderItems(next, 'day', 'wide');
   }
@@ -286,10 +288,10 @@ export default function App() {
 
       {screen === 'result' && (
         <CompositeResult
-          renderImg={renderImg} renderBusy={renderBusy} showBefore={showBefore}
+          renderImg={renderImg} renderBusy={renderBusy} renderTrigger={renderTrigger} showBefore={showBefore}
           onToggle={() => setShowBefore((v) => !v)} photo={roomPhoto} estimate={estimate} estimateIsEst={estimateIsEst}
-          timePreset={renderPreset} onTime={(p) => renderWith(p, renderView)}
-          view={renderView} onView={(v) => renderWith(renderPreset, v)}
+          timePreset={renderPreset} onTime={(p) => renderWith(p, renderView, 'time')}
+          view={renderView} onView={(v) => renderWith(renderPreset, v, 'view')}
           onBack={() => setScreen('planner')} onRerender={() => setScreen('planner')} onFindSimilar={findSimilar}
         />
       )}

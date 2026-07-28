@@ -36,6 +36,7 @@ export const PYEONGS = [
 
 // 마켓 카테고리 세그먼트 → 카탈로그 cat 판정.
 export const MARKET_CATS = [
+  { label: '전체', match: () => true },
   { label: '침대', match: (c) => c === '침대' },
   { label: '책상·의자', match: (c) => c === '책상' || c === '의자' || c === '테이블' },
   { label: '소파', match: (c) => c === '소파' },

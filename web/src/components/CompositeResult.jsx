@@ -4,7 +4,7 @@ const TIMES = [['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['nig
 const VIEWS = [['wide', '와이드'], ['cozy', '아늑'], ['me', '내 시점']];
 
 export default function CompositeResult({
-  renderImg, renderBusy, showBefore, onToggle, photo, estimate, estimateIsEst,
+  renderImg, renderBusy, renderTrigger, showBefore, onToggle, photo, estimate, estimateIsEst,
   timePreset, onTime, view, onView, onBack, onRerender, onFindSimilar,
 }) {
   if (renderBusy && !renderImg) {
@@ -30,7 +30,7 @@ export default function CompositeResult({
       </div>
 
       {renderBusy && renderImg && (
-        <div className="rerender-veil"><div className="spinner sm" /><span>새 조명으로 다시 찍는 중…</span></div>
+        <div className="rerender-veil"><div className="spinner sm" /><span>{renderTrigger === 'view' ? '새 각도로 다시 찍는 중…' : '새 조명으로 다시 찍는 중…'}</span></div>
       )}
 
       <div className="topbar">

@@ -74,10 +74,11 @@ export async function renderScene(room, items, cam3d, preset = 'day', view = nul
     payload.view = view;
   } else if (cam3d?.pos && cam3d?.target) {
     // 사용자의 현재 3D 시점을 렌더에 전달. three.js(x, y=up, z) → Blender(x+W/2, D/2−z, y) 손대칭 없는 변환.
+    // lens=35(표준 화각): 서버 wide 프리셋(lens=18, 광각)보다 뚜렷이 좁게 잡아 '내 시점'이 더 가깝게 느껴지도록.
     payload.camera = {
       pos: [cam3d.pos[0] + W / 2, D / 2 - cam3d.pos[2], cam3d.pos[1]],
       target: [cam3d.target[0] + W / 2, D / 2 - cam3d.target[2], cam3d.target[1]],
-      lens: 22,
+      lens: 35,
     };
   }
   try {
