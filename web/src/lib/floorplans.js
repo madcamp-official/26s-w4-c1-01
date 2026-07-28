@@ -90,6 +90,28 @@ export const FLOORPLANS = [
     desc: '가로로 넓은 방 — 침실+거실 구역 분리형',
   },
   {
+    id: 'fp-l55', name: 'L자 5.5평', pyeong: 5.5, widthM: 3.2, depthM: 4.6,
+    openings: [
+      { kind: 'door', wall: 'bottom', pos: 0.8, width: 0.9, hinge: 'a' },
+      { kind: 'window', wall: 'top', pos: 1.6, width: 1.6 },
+    ],
+    // 욕실이 방 우하단으로 파고든 진짜 L자 — cutouts는 배치금지(엔진)이자 욕실(도면)
+    cutouts: [{ x: 1.7, y: 3.2, w: 1.5, d: 1.4 }],
+    annex: { d: 1.4, kitchen: { x: 0, w: 1.2 }, entry: { x: 1.4, w: 0.9 } },
+    desc: '욕실이 방 안으로 파인 L자 — 실평면 그대로',
+  },
+  {
+    id: 'fp-l7', name: 'L자 7평', pyeong: 7, widthM: 3.5, depthM: 5.6,
+    openings: [
+      { kind: 'door', wall: 'bottom', pos: 2.6, width: 0.9, hinge: 'b' },
+      { kind: 'window', wall: 'top', pos: 1.75, width: 1.9 },
+      { kind: 'window', wall: 'right', pos: 1.4, width: 1.2 },
+    ],
+    cutouts: [{ x: 0, y: 4.2, w: 1.5, d: 1.4 }],   // 좌하단 욕실(좌벽에 접함)
+    annex: { d: 1.4, kitchen: { x: 1.7, w: 1.3 }, entry: { x: 0.2, w: 0.9 } },
+    desc: '좌하단 L자 + 창 2개 — 코너 활용형',
+  },
+  {
     id: 'fp-9o', name: '9평 오피스텔', pyeong: 9, widthM: 3.8, depthM: 6.3,
     openings: [
       { kind: 'door', wall: 'bottom', pos: 0.7, width: 0.95, hinge: 'a' },

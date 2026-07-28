@@ -11,6 +11,7 @@ const C = {
 };
 const T = 0.15;    // 외벽 두께(m)
 const T2 = 0.09;   // 내부 칸막이 두께(m)
+const EPS_M = 0.01;
 
 export function floorplanSvg(plan, targetW = 360) {
   const W = plan.widthM, D = plan.depthM;
@@ -42,30 +43,56 @@ export function floorplanSvg(plan, targetW = 360) {
   if (BAL) line(X(0) - px(T), Y(0) - px(T) / 2, X(W) + px(T), Y(0) - px(T) / 2, C.wall, px(T));
   line(X(0), Y(D) + px(T2) / 2, X(W), Y(D) + px(T2) / 2, C.wall, px(T2));
 
-  // ── 욕실(복도 구역 안) ──
+  // ── 욕실 렌더(타일+변기+세면대) — annex 욕실과 컷아웃 욕실이 공유 ──
+  const drawBathBox = (bx, by, bw, bh) => {
+    rect(bx, by, bw, bh, C.bath);
+    const step = px(0.36);
+    for (let gx = bx + step; gx < bx + bw; gx += step) line(gx, by, gx, by + bh, C.bathLine, 0.6);
+    for (let gy = by + step; gy < by + bh; gy += step) line(bx, gy, bx + bw, gy, C.bathLine, 0.6);
+    const tx = bx + bw - px(0.42), ty = by + px(0.16);
+    el.push(`<rect x="${r(tx)}" y="${r(ty)}" width="${r(px(0.34))}" height="${r(px(0.14))}" rx="2" fill="${C.fixture}" stroke="${C.fixtureLine}" stroke-width="1"/>`);
+    el.push(`<ellipse cx="${r(tx + px(0.17))}" cy="${r(ty + px(0.36))}" rx="${r(px(0.14))}" ry="${r(px(0.18))}" fill="${C.fixture}" stroke="${C.fixtureLine}" stroke-width="1"/>`);
+    el.push(`<ellipse cx="${r(bx + px(0.3))}" cy="${r(by + px(0.3))}" rx="${r(px(0.19))}" ry="${r(px(0.14))}" fill="${C.fixture}" stroke="${C.fixtureLine}" stroke-width="1"/>`);
+  };
+
+  // ── 욕실(복도 구역 안 — annex.bath 있는 도면) ──
   const b = AN.bath;
-  const bx = X(b.x), by = Y(D) + px(T2), bw = px(b.w), bh = px(AN.d) - px(T2);
-  rect(bx, by, bw, bh, C.bath);
-  // 타일 그리드
-  const step = px(0.36);
-  for (let gx = bx + step; gx < bx + bw; gx += step) line(gx, by, gx, by + bh, C.bathLine, 0.6);
-  for (let gy = by + step; gy < by + bh; gy += step) line(bx, gy, bx + bw, gy, C.bathLine, 0.6);
-  // 칸막이 벽(좌우)
-  line(bx - px(T2) / 2, by, bx - px(T2) / 2, by + bh, C.wall, px(T2));
-  line(bx + bw + px(T2) / 2, by, bx + bw + px(T2) / 2, by + bh, C.wall, px(T2));
-  // 변기(뒤 물탱크 + 좌변) & 세면대(타원)
-  const tx = bx + bw - px(0.42), ty = by + px(0.16);
-  el.push(`<rect x="${r(tx)}" y="${r(ty)}" width="${r(px(0.34))}" height="${r(px(0.14))}" rx="2" fill="${C.fixture}" stroke="${C.fixtureLine}" stroke-width="1"/>`);
-  el.push(`<ellipse cx="${r(tx + px(0.17))}" cy="${r(ty + px(0.36))}" rx="${r(px(0.14))}" ry="${r(px(0.18))}" fill="${C.fixture}" stroke="${C.fixtureLine}" stroke-width="1"/>`);
-  el.push(`<ellipse cx="${r(bx + px(0.3))}" cy="${r(by + px(0.3))}" rx="${r(px(0.19))}" ry="${r(px(0.14))}" fill="${C.fixture}" stroke="${C.fixtureLine}" stroke-width="1"/>`);
+  let bx, by, bw, bh;
+  if (b) {
+    bx = X(b.x); by = Y(D) + px(T2); bw = px(b.w); bh = px(AN.d) - px(T2);
+    drawBathBox(bx, by, bw, bh);
+    // 칸막이 벽(좌우)
+    line(bx - px(T2) / 2, by, bx - px(T2) / 2, by + bh, C.wall, px(T2));
+    line(bx + bw + px(T2) / 2, by, bx + bw + px(T2) / 2, by + bh, C.wall, px(T2));
+  }
   // 욕실 문(복도를 향한 쪽 칸막이에 개구부+호)
   const doorPos = plan.openings.find((o) => o.kind === 'door');
-  const bathDoorLeft = doorPos && doorPos.pos < b.x;           // 현관이 왼쪽이면 왼쪽 칸막이에 문
-  const bdx = bathDoorLeft ? bx - px(T2) / 2 : bx + bw + px(T2) / 2;
-  const bdy = by + bh / 2 - px(0.3);
-  line(bdx, bdy, bdx, bdy + px(0.6), C.paper, px(T2) + 1.2);   // 개구부
-  el.push(`<path d="M ${r(bdx)} ${r(bdy + px(0.6))} A ${r(px(0.6))} ${r(px(0.6))} 0 0 ${bathDoorLeft ? 1 : 0} ${r(bdx + (bathDoorLeft ? -px(0.6) : px(0.6)))} ${r(bdy)}" fill="none" stroke="${C.arc}" stroke-width="1" stroke-dasharray="3 2"/>`);
-  line(bdx, bdy, bdx + (bathDoorLeft ? -px(0.6) : px(0.6)), bdy, C.fixtureLine, 1.4);
+  if (b) {
+    const bathDoorLeft = doorPos && doorPos.pos < b.x;           // 현관이 왼쪽이면 왼쪽 칸막이에 문
+    const bdx = bathDoorLeft ? bx - px(T2) / 2 : bx + bw + px(T2) / 2;
+    const bdy = by + bh / 2 - px(0.3);
+    line(bdx, bdy, bdx, bdy + px(0.6), C.paper, px(T2) + 1.2);   // 개구부
+    el.push(`<path d="M ${r(bdx)} ${r(bdy + px(0.6))} A ${r(px(0.6))} ${r(px(0.6))} 0 0 ${bathDoorLeft ? 1 : 0} ${r(bdx + (bathDoorLeft ? -px(0.6) : px(0.6)))} ${r(bdy)}" fill="none" stroke="${C.arc}" stroke-width="1" stroke-dasharray="3 2"/>`);
+    line(bdx, bdy, bdx + (bathDoorLeft ? -px(0.6) : px(0.6)), bdy, C.fixtureLine, 1.4);
+  }
+
+  // ── 컷아웃(비직사각형 방) — 방 안으로 파인 욕실: L자의 본질 ──
+  for (const c of plan.cutouts || []) {
+    const cx0 = X(c.x), cy0 = Y(c.y), cw = px(c.w), ch = px(c.d);
+    drawBathBox(cx0, cy0, cw, ch);
+    // 방을 향한 면에 칸막이 벽(바운딩 벽과 공유하는 면은 제외)
+    if (c.y > EPS_M) line(cx0 - px(T2) / 2, cy0 - px(T2) / 2, cx0 + cw + px(T2) / 2, cy0 - px(T2) / 2, C.wall, px(T2));  // 윗면
+    if (c.x > EPS_M) line(cx0 - px(T2) / 2, cy0 - px(T2), cx0 - px(T2) / 2, cy0 + ch, C.wall, px(T2));                    // 좌면
+    if (c.x + c.w < W - EPS_M) line(cx0 + cw + px(T2) / 2, cy0 - px(T2), cx0 + cw + px(T2) / 2, cy0 + ch, C.wall, px(T2)); // 우면
+    // 아랫면이 방/복도 경계에 닿으면 그 벽을 통해 복도로 문(개구부+호)
+    if (Math.abs((c.y + c.d) - D) < EPS_M) {
+      const ddx = cx0 + cw / 2, ddw = px(0.62);
+      line(ddx - ddw / 2, Y(D) + px(T2) / 2, ddx + ddw / 2, Y(D) + px(T2) / 2, C.paper, px(T2) + 1.4);
+      el.push(`<path d="M ${r(ddx - ddw / 2)} ${r(Y(D) + ddw)} A ${r(ddw)} ${r(ddw)} 0 0 0 ${r(ddx + ddw / 2)} ${r(Y(D))}" fill="none" stroke="${C.arc}" stroke-width="1" stroke-dasharray="3 2"/>`);
+      line(ddx - ddw / 2, Y(D), ddx - ddw / 2, Y(D) + ddw, C.fixtureLine, 1.4);
+    }
+    text(cx0 + cw / 2, cy0 + ch / 2 + 4, '욕실', 9.5, C.label, 'text-anchor="middle" font-weight="700"');
+  }
 
   // ── 주방 카운터(복도 하단 벽면) ──
   const k = AN.kitchen;
@@ -125,7 +152,7 @@ export function floorplanSvg(plan, targetW = 360) {
   const roomLabelY = Y(D * 0.46);
   text(X(W / 2), roomLabelY, '방', 12.5, C.label, 'text-anchor="middle" font-weight="700"');
   text(X(W / 2), roomLabelY + 15, `${W.toFixed(1)} × ${D.toFixed(1)}m`, 10, C.dimText, 'text-anchor="middle"');
-  text(bx + bw / 2, by + bh / 2 + 4, '욕실', 9.5, C.label, 'text-anchor="middle" font-weight="700"');
+  if (b) text(bx + bw / 2, by + bh / 2 + 4, '욕실', 9.5, C.label, 'text-anchor="middle" font-weight="700"');
   if (k && k.w > 0) text(X(k.x) + px(k.w) / 2, Y(D) + px(T2) + px(0.6) + 10, '주방', 9, C.label, 'text-anchor="middle" font-weight="700"');
   text(ex + ew / 2, ey + px(0.3), '현관', 9, C.label, 'text-anchor="middle" font-weight="700"');
   if (BAL) text(X(W / 2), Y(-balD / 2 - T) + px(T) + 4, '발코니', 9.5, C.label, 'text-anchor="middle" font-weight="700"');
