@@ -2,7 +2,7 @@
 // 원칙: 배치할 때마다 겹침/방밖을 검증해 "유효한 자리"에만 놓는다. 한 가구라도 못 놓으면 그 배치는 폐기.
 // 가중치: 대부분의 가구는 벽에 밀착(벽 자리를 먼저 시도). 러그는 바닥 레이어(중앙, 충돌 제외).
 // 랜덤 변주로 서로 다른 유효 배치 여러 개를 만들고, 벽밀착률 높은 순 + 다양성으로 상위 N개를 고른다.
-import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore, openingBlocksAABB, pairOverlapOK, frontClearance, frontViolations, FRONT_NEED, cutAABBs, wallSegments, segmentHitsAABB, EPS } from './geometry.js';
+import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore, openingBlocksAABB, pairOverlapOK, frontClearance, frontViolations, FRONT_NEED, cutAABBs, wallSegments, segmentHitsAABB, aabbHitsDoorSwing, EPS } from './geometry.js';
 
 // LLM 후보(cm 좌표) → 우리 아이템으로 매핑 + 겹침/방밖 재검증(안전망). 유효한 배치만 반환.
 // LLM 산술은 틀릴 수 있으므로 여기서 반드시 재검사해 겹치는 후보를 폐기한다.
@@ -106,6 +106,14 @@ function repairCandidate(items, room, openings = []) {
     if (!p) return null;                             // 배치 실패 → 후보 폐기(로컬 폴백으로)
     it.cx = p.cx; it.cy = p.cy; it.rotationDeg = p.rot; delete it._place; placed.push({ box: p.box, it }); moved++;
   }
+  // 러그: 문 스윙 위면 가장 가까운 회피 자리로(가구 겹침은 허용 유지)
+  for (const it of res) {
+    if (roles.get(it.id) !== 'rug') continue;
+    const start = it._place ? { cx: W / 2, cy: D / 2 } : { cx: it.cx, cy: it.cy };
+    const spot = rugAvoidDoors(it, start.cx, start.cy, W, D, openings);
+    if (Math.abs(spot.cx - it.cx) > EPS || Math.abs(spot.cy - it.cy) > EPS) moved++;
+    it.cx = spot.cx; it.cy = spot.cy; it.rotationDeg = it.rotationDeg || 0;
+  }
   res.forEach((it) => delete it._place);           // 내부 플래그 정리(러그 등 미처리분 포함)
   return { items: res, moved };
 }
@@ -182,6 +190,26 @@ function segSlots(it, seg) {
   for (let t = lo; t <= hi + 1e-9; t += STEP) out.push(horiz ? { cx: t, cy: fixed, rot } : { cx: fixed, cy: t, rot });
   return out;
 }
+// 러그는 바닥 레이어라 가구 겹침은 허용하지만 '출입문 스윙'은 피한다(사용자 지시).
+// 시작점(보통 자유공간 무게중심)에서 문 스윙을 안 밟는 가장 가까운 자리로 축·대각 탐색.
+function rugAvoidDoors(rug, cx0, cy0, W, D, openings) {
+  const doors = (openings || []).filter((o) => o.kind === 'door');
+  const cl = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+  const ok = (cx, cy) => {
+    const b = boxAt(rug, cx, cy, 0);
+    return inRoom(b, W, D) && !doors.some((o) => aabbHitsDoorSwing(b, o, W, D));
+  };
+  const x0 = cl(cx0, rug.wM / 2, W - rug.wM / 2), y0 = cl(cy0, rug.dM / 2, D - rug.dM / 2);
+  if (ok(x0, y0)) return { cx: x0, cy: y0 };
+  for (let r = 0.1; r <= Math.max(W, D); r += 0.1) {
+    for (const [dx, dy] of [[0, -r], [0, r], [-r, 0], [r, 0], [-r, -r], [r, -r], [-r, r], [r, r]]) {
+      const cx = cl(x0 + dx, rug.wM / 2, W - rug.wM / 2), cy = cl(y0 + dy, rug.dM / 2, D - rug.dM / 2);
+      if (ok(cx, cy)) return { cx, cy };
+    }
+  }
+  return { cx: x0, cy: y0 };   // 피할 자리가 없으면 그대로(경고 플래그가 알림)
+}
+
 // 코너 슬롯 — 각 바운딩 세그먼트의 양 끝(=두 벽이 만나는 꼭짓점 자리).
 // 침대는 코너 강제(R0), 책상·테이블은 코너 선호(soft) — 사용자 지시.
 function cornerSlots(bed, segs) {
@@ -348,8 +376,8 @@ function attempt(room, items, openings = [], relax = 1) {
   const fcy = freeA > 0 ? (W * D * (D / 2) - cuts.reduce((sa, c) => sa + c.w * c.d * (c.top + c.bottom) / 2, 0)) / freeA : D / 2;
   res.filter((it) => roles.get(it.id) === 'rug').forEach((it) => {
     it.rotationDeg = 0;
-    it.cx = Math.min(Math.max(fcx, it.wM / 2), W - it.wM / 2);
-    it.cy = Math.min(Math.max(fcy, it.dM / 2), D - it.dM / 2);
+    const spot = rugAvoidDoors(it, fcx, fcy, W, D, openings);   // 출입문 스윙 회피(사용자 지시)
+    it.cx = spot.cx; it.cy = spot.cy;
   });
   const solids = res.filter((it) => roles.get(it.id) !== 'rug');
   const placed = [...cuts];

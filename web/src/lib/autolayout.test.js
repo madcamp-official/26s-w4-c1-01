@@ -502,3 +502,25 @@ test('크기순 코너 채우기: 침대·옷장이 서로 다른 코너에, 수
   assert.ok(out.length >= 1);
   assert.ok(inCorner(out[0].items.find((x) => x.id === 'wr')), '벽중간 옷장 → 코너 스냅');
 });
+
+test('러그는 출입문 스윙을 밟지 않음(로컬 엔진 + Gemini 보정)', () => {
+  const room = { widthM: 3.0, depthM: 4.0 };
+  const door = { kind: 'door', wall: 'bottom', pos: 1.5, width: 0.9, hinge: 'a' };
+  const items = [
+    { id: 'bed', cat: '침대', name: '침대', wM: 1.4, dM: 2.0, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'rug', cat: '러그', name: '러그', wM: 2.0, dM: 2.6, hM: 0.02, cx: 0, cy: 0, rotationDeg: 0 },
+  ];
+  for (const c of generateLayouts(room, items, 3, 500, [door])) {
+    const rug = c.items.find((x) => x.cat === '러그');
+    assert.equal(aabbHitsDoorSwing(itemAABB(rug), door, 3.0, 4.0), false, '로컬: 러그가 문 스윙 회피');
+  }
+  // Gemini가 러그를 문 바로 앞에 깐 후보 → 보정이 밀어냄
+  const cand = [{ strategy: 'x', items: [
+    { id: 'bed', cx: 70, cy: 100, rotation: 0 },
+    { id: 'rug', cx: 150, cy: 360, rotation: 0 },
+  ] }];
+  const out = validateCandidates(cand, room, items, [door]);
+  assert.ok(out.length >= 1);
+  const rug = out[0].items.find((x) => x.cat === '러그');
+  assert.equal(aabbHitsDoorSwing(itemAABB(rug), door, 3.0, 4.0), false, '보정: 러그 문 회피');
+});
