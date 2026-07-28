@@ -51,16 +51,6 @@ export const FLOORPLANS = [
     desc: '정사각에 가까운 방 — 배치 자유도가 높음',
   },
   {
-    id: 'fp-65', name: '6.5평 복도형', pyeong: 6.5, widthM: 2.7, depthM: 6.4,
-    openings: [
-      { kind: 'door', wall: 'bottom', pos: 0.6, width: 0.85, hinge: 'a' },
-      { kind: 'window', wall: 'top', pos: 1.35, width: 1.4 },
-      { kind: 'window', wall: 'right', pos: 1.2, width: 1.1 },
-    ],
-    annex: { d: 1.6, bath: { x: 1.2, w: 1.4 }, kitchen: { x: 0, w: 1.1 }, entry: { x: 0.12, w: 0.85 } },
-    desc: '길쭉한 복도형 — 구역 나누기 좋은 타입',
-  },
-  {
     id: 'fp-7b', name: '7평 발코니형', pyeong: 7, widthM: 3.3, depthM: 5.3,
     openings: [
       { kind: 'door', wall: 'bottom', pos: 0.65, width: 0.9, hinge: 'a' },
@@ -112,13 +102,32 @@ export const FLOORPLANS = [
     desc: '좌하단 L자 + 창 2개 — 코너 활용형',
   },
   {
-    id: 'fp-9o', name: '9평 오피스텔', pyeong: 9, widthM: 3.8, depthM: 6.3,
+    id: 'fp-6w', name: '6평 가로형', pyeong: 6, widthM: 4.3, depthM: 3.4,
+    openings: [
+      { kind: 'door', wall: 'bottom', pos: 1.95, width: 0.9, hinge: 'a' },
+      { kind: 'window', wall: 'top', pos: 2.15, width: 2.0 },
+    ],
+    annex: { d: 1.5, bath: { x: 2.7, w: 1.5 }, kitchen: { x: 0, w: 1.3 }, entry: { x: 1.5, w: 0.9 } },
+    desc: '가로가 더 긴 와이드형 — 좌우 구역 나누기 좋음',
+  },
+  {
+    id: 'fp-75w', name: '7.5평 가로형', pyeong: 7.5, widthM: 4.8, depthM: 4.0,
+    openings: [
+      { kind: 'door', wall: 'bottom', pos: 2.1, width: 0.95, hinge: 'a' },
+      { kind: 'window', wall: 'top', pos: 2.4, width: 2.2 },
+      { kind: 'window', wall: 'left', pos: 1.5, width: 1.2 },
+    ],
+    annex: { d: 1.6, bath: { x: 3.1, w: 1.6 }, kitchen: { x: 0, w: 1.4 }, entry: { x: 1.65, w: 0.95 } },
+    desc: '넓은 가로형 + 창 2개 — 거실감 있는 원룸',
+  },
+  {
+    id: 'fp-9o', name: '9평 오피스텔', pyeong: 9, widthM: 4.0, depthM: 5.6,
     openings: [
       { kind: 'door', wall: 'bottom', pos: 0.7, width: 0.95, hinge: 'a' },
-      { kind: 'window', wall: 'top', pos: 1.9, width: 2.4 },
-      { kind: 'window', wall: 'right', pos: 1.6, width: 1.2 },
+      { kind: 'window', wall: 'top', pos: 2.0, width: 2.4 },
+      { kind: 'window', wall: 'right', pos: 1.5, width: 1.2 },
     ],
-    annex: { d: 1.9, bath: { x: 1.8, w: 1.8 }, kitchen: { x: 0, w: 1.5 }, entry: { x: 0.15, w: 0.95 } },
+    annex: { d: 1.8, bath: { x: 2.0, w: 1.8 }, kitchen: { x: 0, w: 1.5 }, entry: { x: 0.15, w: 0.95 } },
     balcony: { d: 1.0 },
     desc: '신축 오피스텔 — 통창 + 보조창 + 발코니',
   },
