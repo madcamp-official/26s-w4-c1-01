@@ -191,6 +191,9 @@ export function frontViolations(items, roomWM, roomDM, cutouts = []) {
 export function pairOverlapOK(a, b) {
   if (!a || !b) return false;
   if (a.cat === '러그' || b.cat === '러그') return true;
+  // 탁상 조명(elevM 있음)은 올려둔 책상/테이블과의 겹침이 정상(위에 놓인 것)
+  const onTop = (l, surf) => l.cat === '조명' && l.elevM != null && (surf.cat === '책상' || surf.cat === '테이블');
+  if (onTop(a, b) || onTop(b, a)) return true;
   const chair = a.cat === '의자' ? a : (b.cat === '의자' ? b : null);
   const surf = (a.cat === '책상' || a.cat === '테이블') ? a : ((b.cat === '책상' || b.cat === '테이블') ? b : null);
   if (chair && surf && chair !== surf) return deskChairComposed(chair, surf);

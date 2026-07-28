@@ -348,7 +348,7 @@ if PRE.get("lamp", 0) > 0:  # 실내 천장등(밤 위주)
 
 
 # ---------- 가구 배치 ----------
-def place(path, x, y, rotdeg):
+def place(path, x, y, rotdeg, elev=0):
     before = set(bpy.data.objects)
     try:
         bpy.ops.import_scene.gltf(filepath=path)
@@ -378,11 +378,11 @@ def place(path, x, y, rotdeg):
     obj.rotation_mode = 'XYZ'
     # three.js(Room3D, rot=-θ, Y-up) → Blender(Z-up) 손대칭 없는 변환: 깊이축 뒤집기(D-cy)와 짝 → rot=-θ
     obj.rotation_euler = (0, 0, math.radians(-rotdeg))
-    obj.location = (x, y, obj.dimensions.z / 2 + 0.002)
+    obj.location = (x, y, obj.dimensions.z / 2 + 0.002 + elev)   # elev: 책상 위 조명 등
 
 
 for it in S["items"]:
-    place(it["glb"], it["x"], it["y"], it.get("rot", 0))
+    place(it["glb"], it["x"], it["y"], it.get("rot", 0), it.get("elev", 0))
 
 # ---------- 카메라 ----------
 cam_d = bpy.data.cameras.new("cam"); cam = bpy.data.objects.new("cam", cam_d)

@@ -69,6 +69,7 @@ export async function renderScene(room, items, cam3d, preset = 'day', view = nul
     cutouts: (room.cutouts || []).map((c) => ({ x: c.x, y: c.y, w: c.w, d: c.d })),
     items: items.filter((it) => it.glb).map((it) => ({
       glb: it.glb, x: it.cx, y: it.cy, rot: (it.rotationDeg || 0) + (it.orient || 0),   // orient=모델 정면 보정각
+      ...(it.elevM ? { elev: it.elevM } : {}),   // 탁상 조명 등 '가구 위' 배치 높이(m)
     })),
   };
   if (view) {

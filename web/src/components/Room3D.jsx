@@ -38,7 +38,7 @@ function Piece({ item, W, D, selected, flagged, onSelect, onDragStart }) {
 
   return (
     <group
-      position={[x, 0, z]}
+      position={[x, item.elevM || 0, z]}
       rotation={[0, rot, 0]}
       onPointerDown={(e) => { e.stopPropagation(); onSelect(item.id); onDragStart(item.id); }}
       onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'grab'; }}
@@ -256,7 +256,7 @@ export default function Room3D({ room, items, selectedId, setSelectedId, onMove,
             />
           ) : (
             // glb 없는 아이템(시드/네이버)은 실치수 박스로 폴백
-            <group key={it.id} position={toWorld(it.cx, it.cy, W, D)} rotation={[0, (-(it.rotationDeg || 0) * Math.PI) / 180, 0]}
+            <group key={it.id} position={[toWorld(it.cx, it.cy, W, D)[0], it.elevM || 0, toWorld(it.cx, it.cy, W, D)[2]]} rotation={[0, (-(it.rotationDeg || 0) * Math.PI) / 180, 0]}
               onPointerDown={(e) => { e.stopPropagation(); setSelectedId(it.id); setDragId(it.id); }}>
               <mesh position={[0, it.hM / 2, 0]} castShadow>
                 <boxGeometry args={[it.wM, it.hM, it.dM]} />

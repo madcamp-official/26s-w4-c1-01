@@ -38,7 +38,8 @@ def build_scene(p):
             continue
         # 깊이축 뒤집기(blender_y = D - cy): three.js→Blender 손대칭 방지(렌더가 3D의 거울상이 되지 않게).
         items.append({"glb": path, "x": float(it.get("x", W / 2)),
-                      "y": D - float(it.get("y", D / 2)), "rot": int(it.get("rot", 0))})
+                      "y": D - float(it.get("y", D / 2)), "rot": int(it.get("rot", 0)),
+                      "elev": float(it.get("elev", 0))})
     # 카메라 결정 우선순위:
     #  1) view("wide"/"cozy") 지정 → 자동 다각도(카메라 무시)  2) 사용자 3D 시점(camera)  3) 기본 = wide 자동
     view = p.get("view")

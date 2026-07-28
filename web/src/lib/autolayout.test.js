@@ -524,3 +524,43 @@ test('러그는 출입문 스윙을 밟지 않음(로컬 엔진 + Gemini 보정)
   const rug = out[0].items.find((x) => x.cat === '러그');
   assert.equal(aabbHitsDoorSwing(itemAABB(rug), door, 3.0, 4.0), false, '보정: 러그 문 회피');
 });
+
+test('테이블도 책상처럼 의자와 세트(R2) — 마주봄·인접', () => {
+  const room = { widthM: 3.4, depthM: 4.0 };
+  const items = [
+    { id: 'tbl', cat: '테이블', name: '식탁', wM: 1.1, dM: 0.7, hM: 0.74, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'chair', cat: '의자', name: '의자', wM: 0.5, dM: 0.5, hM: 0.9, cx: 0, cy: 0, rotationDeg: 0 },
+  ];
+  const c = generateLayouts(room, items, 1, 600)[0];
+  assert.ok(c, '배치됨');
+  const t = c.items.find((x) => x.id === 'tbl'), ch = c.items.find((x) => x.id === 'chair');
+  assert.equal((t.rotationDeg + 180) % 360, ch.rotationDeg, '의자가 테이블 마주봄');
+  assert.ok(Math.hypot(t.cx - ch.cx, t.cy - ch.cy) < 1.2, '세트로 인접');
+});
+
+test('낮은 조명(h<70cm)은 책상 위 코너쪽 + elevM, 플로어 스탠드는 기존 R3', () => {
+  const room = { widthM: 3.2, depthM: 4.2 };
+  const mk2 = (id, cat, w, d, h) => ({ id, cat, name: cat, wM: w, dM: d, hM: h, cx: 0, cy: 0, rotationDeg: 0 });
+  // 탁상 스탠드(45cm) + 책상 → 책상 위
+  const c1 = generateLayouts(room, [mk2('desk', '책상', 1.2, 0.6, 0.74), mk2('lamp', '조명', 0.25, 0.25, 0.45)], 1, 600)[0];
+  const d1 = c1.items.find((x) => x.id === 'desk'), l1 = c1.items.find((x) => x.id === 'lamp');
+  const db = itemAABB(d1), lb = itemAABB(l1);
+  assert.ok(lb.left >= db.left - 1e-6 && lb.right <= db.right + 1e-6 && lb.top >= db.top - 1e-6 && lb.bottom <= db.bottom + 1e-6, '조명이 책상 발자국 안');
+  assert.ok(Math.abs((l1.elevM || 0) - d1.hM) < 1e-6, 'elevM = 책상 높이');
+  const v1 = validateLayout(c1.items, room.widthM, room.depthM);
+  assert.ok(v1.ok, '조명-책상 겹침은 위에 올린 것이라 유효');
+  // 플로어 스탠드(150cm) + 침대 → 기존 침대헤드 규칙(바닥, elev 없음)
+  const c2 = generateLayouts(room, [mk2('bed', '침대', 1.5, 2.0, 0.5), mk2('lamp', '조명', 0.3, 0.3, 1.5)], 1, 600)[0];
+  const l2 = c2.items.find((x) => x.id === 'lamp');
+  assert.ok(!l2.elevM, '플로어 스탠드는 바닥');
+  // Gemini 보정: 바닥에 둔 탁상 스탠드 → 책상 위로
+  const items3 = [mk2('desk', '책상', 1.2, 0.6, 0.74), mk2('lamp', '조명', 0.25, 0.25, 0.45)];
+  const cand = [{ strategy: 'x', items: [
+    { id: 'desk', cx: 65, cy: 35, rotation: 0 },
+    { id: 'lamp', cx: 250, cy: 300, rotation: 0 },
+  ] }];
+  const out = validateCandidates(cand, room, items3);
+  assert.ok(out.length >= 1);
+  const lr = out[0].items.find((x) => x.id === 'lamp');
+  assert.ok(lr.elevM > 0, '보정: 조명이 책상 위로');
+});
