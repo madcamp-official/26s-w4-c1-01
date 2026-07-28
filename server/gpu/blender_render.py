@@ -394,6 +394,21 @@ tgt = cd.get("target", [W / 2, D * 0.62, 0.55])
 d = mathutils.Vector(tgt) - mathutils.Vector(cam.location)
 cam.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler()
 
+# fit: 방 지오메트리(보이는 코너들)에 맞춰 타이트 프레이밍 — 잉여 배경 최소화, 방이 프레임을 채움.
+# 컷어웨이로 숨는 near/left 벽의 '천장 코너'는 제외(빈 공간까지 여백으로 잡지 않게).
+if cd.get("fit"):
+    pts = [(0, 0, 0), (W, 0, 0), (0, D, 0), (W, D, 0),          # 바닥 4코너
+           (0, D, H), (W, D, H), (W, 0, H)]                      # 보이는 벽 상단 코너(far·right)
+    flat = [c for pt in pts for c in pt]
+    try:
+        dg = bpy.context.evaluated_depsgraph_get()
+        loc, _sc = cam.camera_fit_coords(dg, flat)
+        # 5% 여백: 시선 방향 반대로 살짝 후퇴
+        view = (mathutils.Vector(tgt) - loc)
+        cam.location = loc - view.normalized() * (view.length * 0.05)
+    except Exception as e:
+        print("fit fail", e)
+
 sc.render.filepath = out_path
 bpy.ops.render.render(write_still=True)
 print("RENDERED", out_path)

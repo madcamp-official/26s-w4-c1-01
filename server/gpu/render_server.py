@@ -20,10 +20,10 @@ def auto_camera(view, W, D, H):
     cx, cy = W * 0.5, D * 0.5
     if view == "cozy":
         cam = {"pos": [-W * 0.28, -D * 0.30, H * 0.46], "target": [cx * 1.08, cy * 1.02, 0.45], "lens": 30}
-    else:  # wide (기본) — 방 전체가 여백과 함께 들어오게 코너 밖으로 더 물러남(더 낮은 렌즈mm=더 광각, cozy·내 시점과 뚜렷이 구분)
+    else:  # wide (기본) — 초기 위치는 대략, 최종 프레이밍은 blender의 camera_fit_coords가 방 코너에 맞춤
         b = 0.85 + 0.42 * max(W, D)
         cam = {"pos": [-b * 0.80, -b * 0.80, min(1.65 + 0.42 * H, H * 1.0)],
-               "target": [cx, cy * 0.93, 0.4], "lens": 18}
+               "target": [cx, cy * 0.93, 0.4], "lens": 21, "fit": True}
     return cam, ["near", "left", "ceil"]
 
 
