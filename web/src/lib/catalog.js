@@ -27,12 +27,40 @@ const SEED = [
 ];
 
 // ABO 카탈로그에는 판매가가 없다 → 카테고리·크기 기반 추정가(KRW)를 채워 견적·가격필터가 동작하게.
-// 만원 단위 반올림, priceEst=true로 '추정가'임을 표시(정직 원칙 — UI가 추정임을 밝힘).
+// 면적만으로는 동일 카테고리 내 동치수 상품(예: 소파 5종 동일 w×d)이 전부 같은 값으로 수렴해
+// 분산이 사라지는 문제가 있었음 → 소재/스타일 키워드 배율 + 상품별 결정적 지터를 곱해 분산을 되살림.
+// 천원 단위 반올림, priceEst=true로 '추정가'임을 표시(정직 원칙 — UI가 추정임을 밝힘).
 const PRICE_MODEL = { '침대': [250000, 8], '소파': [180000, 10], '책상': [90000, 6], '의자': [60000, 8], '수납': [80000, 6], '조명': [45000, 15], '러그': [30000, 1.2], '테이블': [50000, 8] };
+
+// 소재/스타일 신호 → 가격 배율(프리미엄 소재는 웃돈, 저가 신호는 할인). 이름에 여러 개 매치되면 첫 매치만 적용.
+const MATERIAL_MULT = [
+  [/leather/i, 1.35],
+  [/marble/i, 1.3],
+  [/velvet|tufted/i, 1.2],
+  [/solid (wood|pine|oak)|walnut|teak|brass/i, 1.15],
+  [/rattan|wicker/i, 1.1],
+  [/metal|industrial/i, 0.95],
+  [/basic|budget/i, 0.85],
+];
+function materialMult(name) {
+  const n = name || '';
+  for (const [re, m] of MATERIAL_MULT) if (re.test(n)) return m;
+  return 1;
+}
+
+// id/name을 시드로 한 결정적 해시(0~1) — 같은 상품은 항상 같은 지터(재렌더/새로고침에도 안정).
+function hash01(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (Math.imul(h, 31) + seed.charCodeAt(i)) | 0;
+  return ((h >>> 0) % 10000) / 10000;
+}
+
 function estimatePrice(it) {
   const [base, k] = PRICE_MODEL[it.cat] || [50000, 5];
   const area = ((it.w || 60) * (it.d || 60)) / 100;          // cm²/100
-  return Math.max(10000, Math.round((base + area * k * 100) / 10000) * 10000);
+  const raw = base + area * k * 100;
+  const jitter = 0.85 + hash01(String(it.id || it.name || '')) * 0.3; // 상품별 ±15%
+  return Math.max(10000, Math.round((raw * materialMult(it.name) * jitter) / 1000) * 1000);
 }
 const withPrice = (list) => list.map((it) => (typeof it.price === 'number' ? it : { ...it, price: estimatePrice(it), priceEst: true }));
 
