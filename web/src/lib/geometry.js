@@ -44,6 +44,35 @@ export function outOfBounds(aabb, roomWM, roomDM) {
   return aabb.left < -EPS || aabb.top < -EPS || aabb.right > roomWM + EPS || aabb.bottom > roomDM + EPS;
 }
 
+// ── 비직사각형(직교 L/T/ㄷ자) 방 — '바운딩 사각형 + 컷아웃' 모델 ──
+// cutouts: [{x, y, w, d}] (m, 방 좌표계) — 방 안으로 파인 벽체/욕실 등 배치금지 구역.
+// 컷아웃도 축정렬 사각형이라 기존 AABB 체계(위 3~4행 전제)가 그대로 유효하다:
+// 컷아웃 = '움직일 수 없는 가구'로 환원되어 aabbOverlap 하나로 모든 판정이 성립.
+export function cutAABBs(roomOrCutouts) {
+  const cuts = Array.isArray(roomOrCutouts) ? roomOrCutouts : (roomOrCutouts?.cutouts || []);
+  return cuts.map((c) => ({ left: c.x, top: c.y, right: c.x + c.w, bottom: c.y + c.d, w: c.w, d: c.d }));
+}
+
+// 방밖 + 컷아웃 침범을 한 번에 — outOfBounds의 컷아웃 인지 버전.
+export function outOfRoom(aabb, roomWM, roomDM, cutouts = []) {
+  if (outOfBounds(aabb, roomWM, roomDM)) return true;
+  return cutAABBs(cutouts).some((c) => aabbOverlap(aabb, c));
+}
+
+// 개구부(외곽 벽 위 문/창)의 스팬이 경계에 닿은 컷아웃에 잠식됐는가 — 그 자리는 벽이 아니라 컷아웃 몸체.
+export function openingOnCutout(o, roomWM, roomDM, cutouts = []) {
+  const w = o.width || 0.9, a = o.pos - w / 2, b = o.pos + w / 2;
+  for (const c of cutAABBs(cutouts)) {
+    const eats =
+      (o.wall === 'top' && c.top <= EPS && a < c.right - EPS && b > c.left + EPS) ||
+      (o.wall === 'bottom' && c.bottom >= roomDM - EPS && a < c.right - EPS && b > c.left + EPS) ||
+      (o.wall === 'left' && c.left <= EPS && a < c.bottom - EPS && b > c.top + EPS) ||
+      (o.wall === 'right' && c.right >= roomWM - EPS && a < c.bottom - EPS && b > c.top + EPS);
+    if (eats) return true;
+  }
+  return false;
+}
+
 // 가구 정면 단위벡터(rot0=앞면+y 규칙). 회전에 따른 앞면 방향.
 const FRONT_DIR = { 0: [0, 1], 90: [-1, 0], 180: [0, -1], 270: [1, 0] };
 const snap4 = (r) => (((Math.round((r || 0) / 90) * 90) % 360) + 360) % 360;
@@ -86,15 +115,17 @@ export function frontClearance(it, obstacles, roomWM, roomDM) {
 }
 
 // 배치 전체에서 앞면 여유 위반 개수. 책상의 짝 의자(구도)는 책상 앞을 막은 것으로 치지 않는다.
-export function frontViolations(items, roomWM, roomDM) {
+// cutouts: 컷아웃 벽체도 앞면을 막는 장애물로 침(frontClearance 루프가 그대로 처리).
+export function frontViolations(items, roomWM, roomDM, cutouts = []) {
   const solids = items.filter((i) => i.cat !== '러그');
+  const cuts = cutAABBs(cutouts);
   let v = 0;
   for (const it of solids) {
     const need = FRONT_NEED[it.cat];
     if (!need) continue;
     const others = solids.filter((o) => o !== it
       && !((it.cat === '책상' || it.cat === '테이블') && o.cat === '의자' && deskChairComposed(o, it)));
-    if (frontClearance(it, others.map(itemAABB), roomWM, roomDM) + EPS < need) v++;
+    if (frontClearance(it, [...others.map(itemAABB), ...cuts], roomWM, roomDM) + EPS < need) v++;
   }
   return v;
 }
@@ -111,11 +142,14 @@ export function pairOverlapOK(a, b) {
 
 // 배치 전체 검증 → 각 아이템의 문제 플래그와 남은 바닥면적.
 // openings: 문/창 배열(있으면 각 가구가 문 스윙/창을 가리는지 blockOpen 플래그).
-export function validateLayout(items, roomWM, roomDM, openings = []) {
+// cutouts: 비직사각형 방의 배치금지 구역 — 침범하면 방밖(out)과 동일하게 무효.
+export function validateLayout(items, roomWM, roomDM, openings = [], cutouts = []) {
   const boxes = items.map(itemAABB);
+  const cuts = cutAABBs(cutouts);
   const flags = items.map(() => ({ overlap: false, out: false, blockOpen: false }));
   for (let i = 0; i < boxes.length; i++) {
     if (outOfBounds(boxes[i], roomWM, roomDM)) flags[i].out = true;
+    else if (items[i].cat !== '러그' && cuts.some((c) => aabbOverlap(boxes[i], c))) flags[i].out = true;   // 컷아웃 침범(러그는 바닥 레이어 예외)
     for (const o of openings) {
       if (openingBlocksAABB(boxes[i], o, roomWM, roomDM, items[i].hM)) { flags[i].blockOpen = true; break; }
     }
@@ -126,7 +160,7 @@ export function validateLayout(items, roomWM, roomDM, openings = []) {
       }
     }
   }
-  const roomArea = roomWM * roomDM;
+  const roomArea = roomWM * roomDM - cuts.reduce((s, c) => s + c.w * c.d, 0);   // 실면적 = 바운딩 − 컷아웃
   const usedArea = boxes.reduce((s, b) => s + b.w * b.d, 0);
   const anyProblem = flags.some((f) => f.overlap || f.out);
   return {
@@ -199,10 +233,10 @@ export function openingBlocksAABB(aabb, o, roomWM, roomDM, itemH) {
 
 // 동선 점수 — 바닥을 격자로 보고 '빈 칸'이 하나로 이어지는 정도(connected: 1이면 빈 공간이 통짜, 걷기 좋음).
 // 가구가 바닥을 여러 섬으로 쪼개면 낮아진다. 순수 함수 → 결정론적 테스트 가능.
-export function circulationScore(items, roomWM, roomDM, cell = 0.1) {
+export function circulationScore(items, roomWM, roomDM, cell = 0.1, cutouts = []) {
   const nx = Math.max(1, Math.round(roomWM / cell));
   const ny = Math.max(1, Math.round(roomDM / cell));
-  const boxes = items.map(itemAABB);
+  const boxes = [...items.map(itemAABB), ...cutAABBs(cutouts)];   // 컷아웃 = 걷을 수 없는 벽체(연결성 자동 차단)
   const occ = new Uint8Array(nx * ny);
   for (let gy = 0; gy < ny; gy++) {
     for (let gx = 0; gx < nx; gx++) {
@@ -235,9 +269,9 @@ export function circulationScore(items, roomWM, roomDM, cell = 0.1) {
 }
 
 // 겹치지 않는 초기 배치 지점 찾기(간단 그리드 탐색) — "다중 배치 자동 정리"의 씨앗.
-export function findFreeSpot(newItem, placed, roomWM, roomDM, step = 0.1) {
+export function findFreeSpot(newItem, placed, roomWM, roomDM, step = 0.1, cutouts = []) {
   const { w, d } = effectiveFootprint(newItem.wM, newItem.dM, newItem.rotationDeg || 0);
-  const boxes = placed.map(itemAABB);
+  const boxes = [...placed.map(itemAABB), ...cutAABBs(cutouts)];   // 컷아웃도 회피
   for (let cy = d / 2; cy <= roomDM - d / 2 + EPS; cy += step) {
     for (let cx = w / 2; cx <= roomWM - w / 2 + EPS; cx += step) {
       const cand = { left: cx - w / 2, right: cx + w / 2, top: cy - d / 2, bottom: cy + d / 2 };

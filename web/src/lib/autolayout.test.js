@@ -2,7 +2,7 @@
 // 핵심: generateLayouts가 내놓는 모든 후보는 '겹침 0 + 방밖 0'이어야 한다(사용자 요구: 겹치면 기각).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB, WINDOW_SILL_M, pairOverlapOK, deskChairComposed, frontClearance, frontViolations } from './geometry.js';
+import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB, WINDOW_SILL_M, pairOverlapOK, deskChairComposed, frontClearance, frontViolations, outOfRoom, openingOnCutout, findFreeSpot } from './geometry.js';
 import { generateLayouts, validateCandidates } from './autolayout.js';
 
 // 결정론적 PRNG(가구셋 생성용) — 레이아웃 내부 랜덤과 무관하게 '입력'만 재현 가능하게.
@@ -341,4 +341,35 @@ test('validateCandidates: 앞면 막힌 Gemini 후보는 품질 게이트로 폐
   const out = validateCandidates(bad, room, items);
   // 게이트: 그대로 채택되면 안 됨 — 폐기되거나, 보정으로 위반이 해소돼야 함
   for (const c of out) assert.equal(frontViolations(c.items, 3.0, 4.0), 0, '채택 후보는 앞면 위반 0');
+});
+
+// ── 비직사각형(컷아웃) 방 ──
+test('컷아웃: outOfRoom·validateLayout·circulation·findFreeSpot이 컷아웃을 벽으로 취급', () => {
+  const cut = [{ x: 1.8, y: 2.8, w: 1.2, d: 1.2 }];   // 우하단 코너로 파인 욕실(L자)
+  // 컷아웃 위 가구 → 방밖 취급
+  const onCut = { cat: '수납', wM: 0.8, dM: 0.5, hM: 1.8, cx: 2.3, cy: 3.3, rotationDeg: 0 };
+  assert.equal(outOfRoom(itemAABB(onCut), 3.0, 4.0, cut), true, '컷아웃 침범 = 방밖');
+  const v = validateLayout([onCut], 3.0, 4.0, [], cut);
+  assert.ok(v.flags[0].out && !v.ok, 'validateLayout도 out 플래그');
+  // 실면적 = 바운딩 − 컷아웃
+  assert.ok(Math.abs(v.roomArea - (12 - 1.44)) < 1e-9, '면적에서 컷아웃 차감');
+  // 빈 방이어도 컷아웃이 동선 차단·freeRatio 반영
+  const c = circulationScore([], 3.0, 4.0, 0.1, cut);
+  assert.ok(c.freeRatio < 1 && c.freeRatio > 0.8, '컷아웃 셀은 걷기 불가');
+  // findFreeSpot이 컷아웃을 피해서 자리 잡음
+  const spot = findFreeSpot({ wM: 1.0, dM: 1.0, rotationDeg: 0 }, [], 3.0, 4.0, 0.1, cut);
+  assert.ok(spot, '자리 찾음');
+  const sb = itemAABB({ wM: 1.0, dM: 1.0, cx: spot.cx, cy: spot.cy, rotationDeg: 0 });
+  assert.equal(outOfRoom(sb, 3.0, 4.0, cut), false, '찾은 자리는 컷아웃 밖');
+});
+
+test('컷아웃: frontClearance가 컷아웃 벽체에 막힘 + openingOnCutout 판정', () => {
+  const cut = [{ x: 1.8, y: 2.8, w: 1.2, d: 1.2 }];
+  // 수납이 컷아웃을 정면(+y)으로 45cm 앞에 둠 → 앞면 여유 부족(need 0.55)
+  const dresser = { cat: '수납', wM: 1.0, dM: 0.5, hM: 1.8, cx: 2.3, cy: 2.1, rotationDeg: 0 };
+  assert.equal(frontViolations([dresser], 3.0, 4.0, cut), 1, '컷아웃이 서랍장 앞을 막음');
+  // bottom 벽의 컷아웃 잠식 구간(1.8~3.0)에 문 → 무효, 빈 구간(0~1.8)은 유효
+  assert.equal(openingOnCutout({ wall: 'bottom', pos: 2.4, width: 0.9 }, 3.0, 4.0, cut), true);
+  assert.equal(openingOnCutout({ wall: 'bottom', pos: 0.8, width: 0.9 }, 3.0, 4.0, cut), false);
+  assert.equal(openingOnCutout({ wall: 'top', pos: 2.4, width: 0.9 }, 3.0, 4.0, cut), false, '반대 벽은 무관');
 });
