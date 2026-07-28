@@ -35,14 +35,15 @@ export const PYEONGS = [
 ];
 
 // 마켓 카테고리 세그먼트 → 카탈로그 cat 판정.
+// kw: 검색 실행 시 이 카테고리를 검색어에 섞어 보내는 힌트(네이버쇼핑 결과를 카테고리로 좁힘).
 export const MARKET_CATS = [
-  { label: '전체', match: () => true },
-  { label: '침대', match: (c) => c === '침대' },
-  { label: '책상·의자', match: (c) => c === '책상' || c === '의자' || c === '테이블' },
-  { label: '소파', match: (c) => c === '소파' },
-  { label: '수납', match: (c) => c === '수납' },
-  { label: '조명', match: (c) => c === '조명' },
-  { label: '러그', match: (c) => c === '러그' },
+  { label: '전체', match: () => true, kw: '' },
+  { label: '침대', match: (c) => c === '침대', kw: '침대' },
+  { label: '책상·의자', match: (c) => c === '책상' || c === '의자' || c === '테이블', kw: '책상 의자' },
+  { label: '소파', match: (c) => c === '소파', kw: '소파' },
+  { label: '수납', match: (c) => c === '수납', kw: '수납장' },
+  { label: '조명', match: (c) => c === '조명', kw: '조명' },
+  { label: '러그', match: (c) => c === '러그', kw: '러그' },
 ];
 
 export const MARKET_PRICES = ['~10만', '10~30', '30~50', '50~100', '100+'];

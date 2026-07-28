@@ -19,6 +19,7 @@ export default function MarketTab({ recommendItem, onConsumeRecommend }) {
   const [moods, setMoods] = useState([]);
   const [price, setPrice] = useState(null);
   const [sizeOnly, setSizeOnly] = useState(false);
+  const [sort, setSort] = useState(null);          // null | 'asc' | 'desc' — 가격순 정렬
   const reqId = useRef(0);   // 진행 중 원격요청 토큰 — 사용자가 그 사이 카테고리/검색을 바꾸면 늦게 온 응답을 무시.
 
   // 결과 화면에서 넘어온 추천 요청 처리(1회).
@@ -38,7 +39,9 @@ export default function MarketTab({ recommendItem, onConsumeRecommend }) {
     setQuery(q);
     if (!q.trim()) { setRemote(null); return; }
     setBusy(true);
-    const r = await searchFurniture(q);
+    // 선택된 카테고리 힌트를 검색어에 섞어 보내 네이버쇼핑 결과가 카테고리에서 벗어나지 않게 함.
+    const kw = MARKET_CATS[cat].kw;
+    const r = await searchFurniture(kw ? `${kw} ${q}` : q);
     if (my === reqId.current) { setRemote(r); setBusy(false); }
   }
 
@@ -52,8 +55,22 @@ export default function MarketTab({ recommendItem, onConsumeRecommend }) {
       list = list.filter((it) => typeof it.price === 'number' && it.price >= lo && it.price < hi);
     }
     if (sizeOnly) list = list.filter((it) => deriveSize(it) !== '대형');
+    if (sort) {
+      const dir = sort === 'asc' ? 1 : -1;
+      list = [...list].sort((a, b) => {
+        const pa = typeof a.price === 'number' ? a.price : null;
+        const pb = typeof b.price === 'number' ? b.price : null;
+        if (pa === null && pb === null) return 0;
+        if (pa === null) return 1;     // 가격 없는 항목은 정렬 방향 상관없이 항상 맨 뒤
+        if (pb === null) return -1;
+        return (pa - pb) * dir;
+      });
+    }
     return list;
-  }, [remote, cat, styleWanted, price, sizeOnly]);
+  }, [remote, cat, styleWanted, price, sizeOnly, sort]);
+
+  function toggleSort() { setSort((s) => (s === null ? 'asc' : s === 'asc' ? 'desc' : null)); }
+  const sortLabel = sort === 'asc' ? '가격 낮은순 ▲' : sort === 'desc' ? '가격 높은순 ▼' : '가격순';
 
   const source = remote?.source;
   const chip = (active, count) => `fpill${active ? ' on' : ''}`;
@@ -63,7 +80,7 @@ export default function MarketTab({ recommendItem, onConsumeRecommend }) {
       <div className="body">
         <div className="catseg">
           {MARKET_CATS.map((c, i) => (
-            <button key={c.label} className={`fpill catpill ${!remote && cat === i ? 'on' : ''}`} onClick={() => pickCategory(i)}>{c.label}</button>
+            <button key={c.label} className={`fpill catpill ${cat === i ? 'on' : ''}`} onClick={() => pickCategory(i)}>{c.label}</button>
           ))}
         </div>
 
@@ -77,6 +94,7 @@ export default function MarketTab({ recommendItem, onConsumeRecommend }) {
         <div className="chiprow">
           <button className={chip(moods.length)} onClick={() => setSheet('mood')}>분위기{moods.length ? <span className="cnt">{moods.length}</span> : null}</button>
           <button className={chip(!!price)} onClick={() => setSheet('price')}>가격대</button>
+          <button className={chip(!!sort)} onClick={toggleSort}>{sortLabel}</button>
           <button className={chip(sizeOnly)} onClick={() => setSizeOnly((v) => !v)}>우리 방에 맞는 것만</button>
         </div>
 

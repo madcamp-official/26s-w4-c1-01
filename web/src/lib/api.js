@@ -201,8 +201,12 @@ export async function postCommunity({ cat, title, image, meta }) {
 
 function localSearch(q) {
   if (!q) return CATALOG;
-  const low = q.toLowerCase();
-  const hit = CATALOG.filter((c) => c.name.toLowerCase().includes(low) || c.cat.toLowerCase().includes(low));
+  // 카테고리 힌트 + 사용자 검색어가 함께 올 수 있어(예: "침대 원목") 단어 단위 AND 매칭.
+  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const hit = CATALOG.filter((c) => {
+    const hay = `${c.name} ${c.cat}`.toLowerCase();
+    return terms.every((t) => hay.includes(t));
+  });
   return hit.length ? hit : CATALOG;
 }
 
