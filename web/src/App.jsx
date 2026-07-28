@@ -35,7 +35,7 @@ export default function App() {
   const [authError] = useState(bootAuth?.error || null);
   const [taste, setTaste] = useState(null);           // {moods, budget, pet}
   const [tasteDone, setTasteDone] = useState(false);
-  const [visitedMarket, setVisitedMarket] = useState(false);
+  const [furnitureBought, setFurnitureBought] = useState(false);   // 마켓 탭 방문이 아니라 실제 구매링크 클릭 시에만 true
   const [roomsDone, setRoomsDone] = useState(0);
   const [roomCounted, setRoomCounted] = useState(false);   // 현재 방을 '완성한 방'에 이미 셌는지(재배치 중복 방지)
 
@@ -246,7 +246,6 @@ export default function App() {
     renderWith('day', 'wide');   // 항상 같은 와이드 앵글로 시작 → 매번 같은 뷰(일관성)
   }
   function findSimilar() {
-    setVisitedMarket(true);
     setMarketRecommend(items.find((it) => it.glb || it.buyUrl) || items[0] || null);
     setScreen('market');
   }
@@ -261,11 +260,17 @@ export default function App() {
     return postCommunity({ cat: 'flex', title, image: renderImg, meta });
   }
   function navTab(t) {
-    if (t === 'market') setVisitedMarket(true);
     setScreen(t);
   }
 
-  const stamps = { taste: tasteDone, room: !!room, layout: items.length > 0, buy: visitedMarket };
+  // 도장은 왼쪽부터 순서대로만 켜져야 함(취향→방→배치→구매) — 이전 단계가 안 됐으면 뒤 단계는 실제로 달성됐어도 표시 안 함.
+  const rawStamps = { taste: tasteDone, room: !!room, layout: items.length > 0, buy: furnitureBought };
+  const stamps = {};
+  let stampChain = true;
+  for (const k of ['taste', 'room', 'layout', 'buy']) {
+    stampChain = stampChain && rawStamps[k];
+    stamps[k] = stampChain;
+  }
   const showTab = TAB_SCREENS.includes(screen);
 
   return (
@@ -314,7 +319,7 @@ export default function App() {
       )}
 
       {screen === 'market' && (
-        <MarketTab recommendItem={marketRecommend} onConsumeRecommend={() => setMarketRecommend(null)} />
+        <MarketTab recommendItem={marketRecommend} onConsumeRecommend={() => setMarketRecommend(null)} onBuyClick={() => setFurnitureBought(true)} />
       )}
 
       {screen === 'mypage' && (

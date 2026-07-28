@@ -64,12 +64,17 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
             <div className="panel-card">
               <div className="h-sec">나의 방꾸 도장</div>
               <div className="stamprow">
-                {STAMP_STEPS.map((s) => (
-                  <div key={s.key} className={`stamp ${stamps[s.key] ? 'done' : ''}`}>
-                    <div className="dot">{stamps[s.key] ? '✓' : ''}</div>
-                    <span className="lbl">{s.label}</span>
-                  </div>
-                ))}
+                {STAMP_STEPS.map((s, i) => {
+                  const done = stamps[s.key];
+                  // 순서상 아직 안 된 단계 중 가장 앞(=다음 할 일)만 강조 — stamps는 이미 왼쪽부터 순서 보장된 값.
+                  const isNext = !done && STAMP_STEPS.slice(0, i).every((p) => stamps[p.key]);
+                  return (
+                    <div key={s.key} className={`stamp ${done ? 'done' : ''} ${isNext ? 'next' : ''}`}>
+                      <div className="dot">{done ? '✓' : ''}</div>
+                      <span className="lbl">{s.label}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

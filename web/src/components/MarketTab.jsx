@@ -1,23 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CATALOG, deriveStyle, deriveSize, accuracyMeta } from '../lib/catalog.js';
 import { searchFurniture, recommendSimilar } from '../lib/api.js';
-import { MARKET_CATS, MARKET_PRICES, MOODS, MOOD_BG, MOOD_TO_STYLE } from '../lib/appdata.js';
+import { MARKET_CATS, MOODS, MOOD_BG, MOOD_TO_STYLE } from '../lib/appdata.js';
 
-const PRICE_RANGE = {
-  '~10만': [0, 100000], '10~30': [100000, 300000], '30~50': [300000, 500000],
-  '50~100': [500000, 1000000], '100+': [1000000, Infinity],
-};
-
-// 마켓 — 카테고리 세그먼트 + 검색(네이버) + 필터(분위기/가격/사이즈) + 상품 2열 그리드.
+// 마켓 — 카테고리 세그먼트 + 검색(네이버) + 필터(분위기/가격순/사이즈) + 상품 2열 그리드.
 // 결과에서 '닮은 상품 찾기'로 진입하면 배치한 가구로 recommendSimilar 실행(네이버 실상품).
-export default function MarketTab({ recommendItem, onConsumeRecommend }) {
+export default function MarketTab({ recommendItem, onConsumeRecommend, onBuyClick }) {
   const [cat, setCat] = useState(0);
   const [query, setQuery] = useState('');
   const [remote, setRemote] = useState(null);      // {source, items} — 검색/추천 결과
   const [busy, setBusy] = useState(false);
-  const [sheet, setSheet] = useState(null);        // 'mood' | 'price'
+  const [sheet, setSheet] = useState(null);        // 'mood'
   const [moods, setMoods] = useState([]);
-  const [price, setPrice] = useState(null);
   const [sizeOnly, setSizeOnly] = useState(false);
   const [sort, setSort] = useState(null);          // null | 'asc' | 'desc' — 가격순 정렬
   const reqId = useRef(0);   // 진행 중 원격요청 토큰 — 사용자가 그 사이 카테고리/검색을 바꾸면 늦게 온 응답을 무시.
@@ -50,10 +44,6 @@ export default function MarketTab({ recommendItem, onConsumeRecommend }) {
   const items = useMemo(() => {
     let list = remote ? remote.items : CATALOG.filter((c) => MARKET_CATS[cat].match(c.cat));
     if (styleWanted.size) list = list.filter((it) => styleWanted.has(deriveStyle(it)));
-    if (price && PRICE_RANGE[price]) {
-      const [lo, hi] = PRICE_RANGE[price];
-      list = list.filter((it) => typeof it.price === 'number' && it.price >= lo && it.price < hi);
-    }
     if (sizeOnly) list = list.filter((it) => deriveSize(it) !== '대형');
     if (sort) {
       const dir = sort === 'asc' ? 1 : -1;
@@ -67,10 +57,7 @@ export default function MarketTab({ recommendItem, onConsumeRecommend }) {
       });
     }
     return list;
-  }, [remote, cat, styleWanted, price, sizeOnly, sort]);
-
-  function toggleSort() { setSort((s) => (s === null ? 'asc' : s === 'asc' ? 'desc' : null)); }
-  const sortLabel = sort === 'asc' ? '가격 낮은순 ▲' : sort === 'desc' ? '가격 높은순 ▼' : '가격순';
+  }, [remote, cat, styleWanted, sizeOnly, sort]);
 
   const source = remote?.source;
   const chip = (active, count) => `fpill${active ? ' on' : ''}`;
@@ -78,24 +65,29 @@ export default function MarketTab({ recommendItem, onConsumeRecommend }) {
   return (
     <div className="market">
       <div className="body">
-        <div className="catseg">
-          {MARKET_CATS.map((c, i) => (
-            <button key={c.label} className={`fpill catpill ${cat === i ? 'on' : ''}`} onClick={() => pickCategory(i)}>{c.label}</button>
-          ))}
-        </div>
+        <div className="market-head">
+          <div className="catseg">
+            {MARKET_CATS.map((c, i) => (
+              <button key={c.label} className={`fpill catpill ${cat === i ? 'on' : ''}`} onClick={() => pickCategory(i)}>{c.label}</button>
+            ))}
+          </div>
 
-        <div className="search-fake">
-          <span>🔎</span>
-          <input value={query} placeholder="가구 이름으로 네이버에서 찾기" onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') runSearch(query); }} />
-          {query && <button className="tlink" style={{ padding: 0 }} onClick={() => { reqId.current++; setQuery(''); setRemote(null); setBusy(false); }}>지우기</button>}
-        </div>
+          <div className="search-fake">
+            <span>🔎</span>
+            <input value={query} placeholder="가구 이름으로 네이버에서 찾기" onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') runSearch(query); }} />
+            {query && <button className="tlink" style={{ padding: 0 }} onClick={() => { reqId.current++; setQuery(''); setRemote(null); setBusy(false); }}>지우기</button>}
+          </div>
 
-        <div className="chiprow">
-          <button className={chip(moods.length)} onClick={() => setSheet('mood')}>분위기{moods.length ? <span className="cnt">{moods.length}</span> : null}</button>
-          <button className={chip(!!price)} onClick={() => setSheet('price')}>가격대</button>
-          <button className={chip(!!sort)} onClick={toggleSort}>{sortLabel}</button>
-          <button className={chip(sizeOnly)} onClick={() => setSizeOnly((v) => !v)}>우리 방에 맞는 것만</button>
+          <div className="chiprow">
+            <button className={chip(moods.length)} onClick={() => setSheet('mood')}>분위기{moods.length ? <span className="cnt">{moods.length}</span> : null}</button>
+            <button className={chip(sizeOnly)} onClick={() => setSizeOnly((v) => !v)}>우리 방에 맞는 것만</button>
+            <select className={`fpill sortsel ${sort ? 'on' : ''}`} value={sort || ''} onChange={(e) => setSort(e.target.value || null)}>
+              <option value="">가격순</option>
+              <option value="asc">낮은 가격순</option>
+              <option value="desc">높은 가격순</option>
+            </select>
+          </div>
         </div>
 
         {busy ? (
@@ -120,7 +112,7 @@ export default function MarketTab({ recommendItem, onConsumeRecommend }) {
                 </>
               );
               return it.buyUrl
-                ? <a key={it.id || i} className="pcard" href={it.buyUrl} target="_blank" rel="noreferrer">{card}</a>
+                ? <a key={it.id || i} className="pcard" href={it.buyUrl} target="_blank" rel="noreferrer" onClick={() => onBuyClick?.(it)}>{card}</a>
                 : <div key={it.id || i} className="pcard">{card}</div>;
             })}
           </div>
@@ -152,20 +144,6 @@ export default function MarketTab({ recommendItem, onConsumeRecommend }) {
         </div>
       )}
 
-      {sheet === 'price' && (
-        <div className="sheet-back" onClick={() => setSheet(null)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="sheet-grab" />
-            <div className="stitle">가격대는 어느 정도가 좋아?</div>
-            <div className="pillrow eq">
-              {MARKET_PRICES.map((p) => (
-                <button key={p} className={`pill ${price === p ? 'on' : ''}`} onClick={() => setPrice(price === p ? null : p)}>{p}</button>
-              ))}
-            </div>
-            <button className="cta" onClick={() => setSheet(null)}>적용하기</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

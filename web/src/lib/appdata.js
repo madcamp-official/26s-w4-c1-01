@@ -46,8 +46,6 @@ export const MARKET_CATS = [
   { label: '러그', match: (c) => c === '러그', kw: '러그' },
 ];
 
-export const MARKET_PRICES = ['~10만', '10~30', '30~50', '50~100', '100+'];
-
 // 홈 탭 "방꾸 이야기" — 커뮤니티는 별도 탭 없이 홈 내부 세그먼트 전환으로만 존재(design/커뮤니티.html 1c안).
 // 백엔드 저장소가 없어 정적 목업 데이터로 화면만 구현(§docs/프론트.md: 실 저장은 이번 범위 밖).
 export const COMMUNITY_CATS = [
