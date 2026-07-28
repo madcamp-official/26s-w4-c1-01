@@ -59,6 +59,63 @@ export function outOfRoom(aabb, roomWM, roomDM, cutouts = []) {
   return cutAABBs(cutouts).some((c) => aabbOverlap(aabb, c));
 }
 
+// ── 벽 세그먼트(Phase 2) — 비직사각형 방의 '실제 벽면' 목록 ──
+// 바운딩 4벽에서 경계 접촉 컷아웃이 잠식한 스팬을 빼고, 컷아웃의 방 안쪽 면을 벽으로 추가한다.
+// kind: 가구 밀착 방향 의미('top'=가구가 선분 아래(+y)쪽에 등붙임 … 기존 FACE_ROT 의미 그대로).
+// 반환: [{kind, coord(벽 선의 x또는y), a, b(벽 따라 스팬), len, src:'bound'|'cut', wall(바운딩 원래 이름)}]
+export function wallSegments(room) {
+  const W = room.widthM, D = room.depthM;
+  const cuts = cutAABBs(room.cutouts);
+  const segs = [];
+  const MIN = 0.35;   // 이보다 짧은 벽 조각은 배치 의미 없음
+  const subtract = (L, spans) => {
+    let list = [[0, L]];
+    for (const [a, b] of spans) {
+      list = list.flatMap(([s, e]) => {
+        const out = [];
+        if (a > s + EPS) out.push([s, Math.min(a, e)]);
+        if (b < e - EPS) out.push([Math.max(b, s), e]);
+        return out;
+      });
+    }
+    return list.filter(([s, e]) => e - s >= MIN);
+  };
+  const eats = {
+    top: cuts.filter((c) => c.top <= EPS).map((c) => [c.left, c.right]),
+    bottom: cuts.filter((c) => c.bottom >= D - EPS).map((c) => [c.left, c.right]),
+    left: cuts.filter((c) => c.left <= EPS).map((c) => [c.top, c.bottom]),
+    right: cuts.filter((c) => c.right >= W - EPS).map((c) => [c.top, c.bottom]),
+  };
+  const coordOf = { top: 0, bottom: D, left: 0, right: W };
+  for (const wall of ['top', 'bottom', 'left', 'right']) {
+    const L = wall === 'left' || wall === 'right' ? D : W;
+    for (const [a, b] of subtract(L, eats[wall])) {
+      segs.push({ kind: wall, coord: coordOf[wall], a, b, len: b - a, src: 'bound', wall });
+    }
+  }
+  // 컷아웃의 방 안쪽 면 — 의미가 반대인 kind로 매핑(윗면=아래벽처럼 가구가 위에 등붙임 등)
+  for (const c of cuts) {
+    if (c.top > EPS && c.w >= MIN) segs.push({ kind: 'bottom', coord: c.top, a: c.left, b: c.right, len: c.w, src: 'cut' });
+    if (c.bottom < D - EPS && c.w >= MIN) segs.push({ kind: 'top', coord: c.bottom, a: c.left, b: c.right, len: c.w, src: 'cut' });
+    if (c.left > EPS && c.d >= MIN) segs.push({ kind: 'right', coord: c.left, a: c.top, b: c.bottom, len: c.d, src: 'cut' });
+    if (c.right < W - EPS && c.d >= MIN) segs.push({ kind: 'left', coord: c.right, a: c.top, b: c.bottom, len: c.d, src: 'cut' });
+  }
+  return segs;
+}
+
+// 선분(p1→p2)이 AABB를 통과하는가 — R1 시선(침대↔TV)이 컷아웃 벽체에 막히는지 검사(slab 클리핑).
+export function segmentHitsAABB(x1, y1, x2, y2, b) {
+  const dx = x2 - x1, dy = y2 - y1;
+  let t0 = 0, t1 = 1;
+  for (const [p, q] of [[-dx, x1 - b.left], [dx, b.right - x1], [-dy, y1 - b.top], [dy, b.bottom - y1]]) {
+    if (Math.abs(p) < EPS) { if (q < 0) return false; continue; }
+    const t = q / p;
+    if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+    else { if (t < t0) return false; if (t < t1) t1 = t; }
+  }
+  return t1 - t0 > EPS;   // 유효 구간이 남으면 통과(=막힘)
+}
+
 // 개구부(외곽 벽 위 문/창)의 스팬이 경계에 닿은 컷아웃에 잠식됐는가 — 그 자리는 벽이 아니라 컷아웃 몸체.
 export function openingOnCutout(o, roomWM, roomDM, cutouts = []) {
   const w = o.width || 0.9, a = o.pos - w / 2, b = o.pos + w / 2;

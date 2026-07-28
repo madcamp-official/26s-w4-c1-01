@@ -2,7 +2,7 @@
 // 핵심: generateLayouts가 내놓는 모든 후보는 '겹침 0 + 방밖 0'이어야 한다(사용자 요구: 겹치면 기각).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB, WINDOW_SILL_M, pairOverlapOK, deskChairComposed, frontClearance, frontViolations, outOfRoom, openingOnCutout, findFreeSpot } from './geometry.js';
+import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB, WINDOW_SILL_M, pairOverlapOK, deskChairComposed, frontClearance, frontViolations, outOfRoom, openingOnCutout, findFreeSpot, wallSegments, segmentHitsAABB } from './geometry.js';
 import { generateLayouts, validateCandidates } from './autolayout.js';
 
 // 결정론적 PRNG(가구셋 생성용) — 레이아웃 내부 랜덤과 무관하게 '입력'만 재현 가능하게.
@@ -402,5 +402,50 @@ test('validateCandidates: 컷아웃 위 Gemini 후보는 보정으로 밀어냄'
   for (const c of out) {
     const it = c.items.find((x) => x.id === 'wr');
     assert.equal(outOfRoom(itemAABB(it), 3.0, 4.0, room.cutouts), false, '보정 후 컷아웃 밖');
+  }
+});
+
+// ── Phase 2: 벽 세그먼트·시선·러그 ──
+test('wallSegments: 경계 잠식 분할 + 컷아웃 안쪽 면의 kind 매핑', () => {
+  const room = { widthM: 3.2, depthM: 4.6, cutouts: [{ x: 1.7, y: 3.2, w: 1.5, d: 1.4 }] };  // 우하단, bottom·right 접촉
+  const segs = wallSegments(room);
+  // bottom 벽은 컷아웃(1.7~3.2)이 잠식 → [0,1.7] 한 조각만
+  const bottoms = segs.filter((s) => s.src === 'bound' && s.wall === 'bottom');
+  assert.equal(bottoms.length, 1);
+  assert.ok(Math.abs(bottoms[0].a - 0) < 1e-9 && Math.abs(bottoms[0].b - 1.7) < 1e-9, 'bottom 잔여 스팬 [0,1.7]');
+  // right 벽도 잠식 → [0,3.2]
+  const rights = segs.filter((s) => s.src === 'bound' && s.wall === 'right');
+  assert.equal(rights.length, 1);
+  assert.ok(Math.abs(rights[0].b - 3.2) < 1e-9, 'right 잔여 스팬 [0,3.2]');
+  // 컷아웃 안쪽 면: 윗면(kind=bottom, coord=3.2) + 좌면(kind=right, coord=1.7). bottom/right 접촉면은 벽 아님
+  const cutSegs = segs.filter((s) => s.src === 'cut');
+  assert.equal(cutSegs.length, 2, '방을 향한 면 2개만');
+  assert.ok(cutSegs.some((s) => s.kind === 'bottom' && Math.abs(s.coord - 3.2) < 1e-9), '컷아웃 윗면 = 아래벽 의미');
+  assert.ok(cutSegs.some((s) => s.kind === 'right' && Math.abs(s.coord - 1.7) < 1e-9), '컷아웃 좌면 = 오른벽 의미');
+});
+
+test('segmentHitsAABB: 시선 차단 판정', () => {
+  const box = { left: 1, top: 1, right: 2, bottom: 2 };
+  assert.equal(segmentHitsAABB(0, 1.5, 3, 1.5, box), true, '박스 관통');
+  assert.equal(segmentHitsAABB(0, 0.5, 3, 0.5, box), false, '박스 위로 지나감');
+  assert.equal(segmentHitsAABB(0, 0, 0.9, 0.9, box), false, '박스 앞에서 끝남');
+});
+
+test('L자 방 Phase2: 가구가 컷아웃 안쪽 면에도 밀착 가능 + 러그가 벽체를 피함', () => {
+  const room = { widthM: 3.2, depthM: 4.6, cutouts: [{ x: 1.7, y: 3.2, w: 1.5, d: 1.4 }] };
+  const items = [
+    { id: 'bed', cat: '침대', name: '퀸 침대', wM: 1.5, dM: 2.0, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'shelf', cat: '수납', name: '책장', wM: 0.8, dM: 0.3, hM: 1.8, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'rug', cat: '러그', name: '러그', wM: 1.6, dM: 1.2, hM: 0.02, cx: 0, cy: 0, rotationDeg: 0 },
+  ];
+  const cands = generateLayouts(room, items, 3, 800);
+  assert.ok(cands.length >= 1);
+  for (const c of cands) {
+    const rug = c.items.find((x) => x.cat === '러그');
+    // 러그 중심이 자유공간 무게중심 쪽(컷아웃 반대편)으로 밀렸는지 — 컷아웃 중심(2.45,3.9)과 거리 확보
+    assert.ok(rug.cx < 2.0 && rug.cy < 3.4, `러그가 벽체 쪽으로 안 쏠림 (${rug.cx.toFixed(2)},${rug.cy.toFixed(2)})`);
+    for (const it of c.items.filter((x) => x.cat !== '러그')) {
+      assert.equal(outOfRoom(itemAABB(it), room.widthM, room.depthM, room.cutouts), false, '침범 0 유지');
+    }
   }
 });

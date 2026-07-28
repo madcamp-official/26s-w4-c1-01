@@ -2,7 +2,7 @@
 // 원칙: 배치할 때마다 겹침/방밖을 검증해 "유효한 자리"에만 놓는다. 한 가구라도 못 놓으면 그 배치는 폐기.
 // 가중치: 대부분의 가구는 벽에 밀착(벽 자리를 먼저 시도). 러그는 바닥 레이어(중앙, 충돌 제외).
 // 랜덤 변주로 서로 다른 유효 배치 여러 개를 만들고, 벽밀착률 높은 순 + 다양성으로 상위 N개를 고른다.
-import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore, openingBlocksAABB, pairOverlapOK, frontClearance, frontViolations, FRONT_NEED, cutAABBs, EPS } from './geometry.js';
+import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore, openingBlocksAABB, pairOverlapOK, frontClearance, frontViolations, FRONT_NEED, cutAABBs, wallSegments, segmentHitsAABB, EPS } from './geometry.js';
 
 // LLM 후보(cm 좌표) → 우리 아이템으로 매핑 + 겹침/방밖 재검증(안전망). 유효한 배치만 반환.
 // LLM 산술은 틀릴 수 있으므로 여기서 반드시 재검사해 겹치는 후보를 폐기한다.
@@ -24,10 +24,8 @@ export function validateCandidates(candidates, room, items, openings = []) {
     // (LLM 후보를 무조건 살리다 배치 품질이 떨어지는 문제 방지 — 미달이면 로컬 엔진이 채움)
     if (frontViolations(rep.items, W, D, room.cutouts) > 0) continue;
     const nonRug = rep.items.filter((it) => it.cat !== '러그');
-    const touch = nonRug.filter((it) => {
-      const b = itemAABB(it);
-      return b.left < EDGE || b.top < EDGE || b.right > W - EDGE || b.bottom > D - EDGE;
-    }).length;
+    const segsW = wallSegments(room);
+    const touch = nonRug.filter((it) => touchesSeg(itemAABB(it), segsW, EDGE)).length;
     out.push({
       items: rep.items,
       wallRatio: nonRug.length ? touch / nonRug.length : 1,
@@ -47,6 +45,7 @@ function repairCandidate(items, room, openings = []) {
   const order = [...solids.filter((it) => ANCHOR.has(roles.get(it.id))), ...solids.filter((it) => !ANCHOR.has(roles.get(it.id)))];
   // 컷아웃(비직사각형 방의 벽체)을 '고정 가구'로 시딩 — 유지/재배치 검사가 자동으로 회피.
   const placed = cutAABBs(room.cutouts).map((box) => ({ box, it: { cat: '벽체' } }));
+  const segs = wallSegments(room);   // Phase2: 컷아웃 안쪽 면 포함 실제 벽면
   const overlapsOther = (b, it) => placed.some((p) => aabbOverlap(b, p.box) && !pairOverlapOK(it, p.it));
   let moved = 0;
   const frontOK = (it) => {
@@ -63,7 +62,7 @@ function repairCandidate(items, room, openings = []) {
     }
     // 누락(_place)이거나 Gemini 위치가 무효 → 원위치(누락은 방 중앙) 근처 유효 자리로 스냅.
     const ox = it._place ? (it.cx || W / 2) : it.cx, oy = it._place ? (it.cy || D / 2) : it.cy;
-    const p = placeItemNear(it, ox, oy, placed, W, D, openings);
+    const p = placeItemNear(it, ox, oy, placed, W, D, openings, segs);
     if (!p) return null;                             // 배치 실패 → 후보 폐기(로컬 폴백으로)
     it.cx = p.cx; it.cy = p.cy; it.rotationDeg = p.rot; delete it._place; placed.push({ box: p.box, it }); moved++;
   }
@@ -72,14 +71,14 @@ function repairCandidate(items, room, openings = []) {
 }
 // 원위치(ox,oy)에 가장 가까운 유효 자리(벽 우선 → 내부). placed=[{box,it}]. 없으면 null.
 // FRONT_NEED 가구는 앞면 여유가 확보되는 자리만(구도 짝꿍은 장애물로 안 침).
-function placeItemNear(it, ox, oy, placed, W, D, openings) {
+function placeItemNear(it, ox, oy, placed, W, D, openings, segs) {
   const need = FRONT_NEED[it.cat] || 0;
   const free = (b, c) => inRoom(b, W, D)
     && !placed.some((p) => aabbOverlap(b, p.box) && !pairOverlapOK(it, p.it))
     && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))
     && (!need || frontClearance({ ...it, cx: c.cx, cy: c.cy, rotationDeg: c.rot },
       placed.filter((p) => !pairOverlapOK(it, p.it)).map((p) => p.box), W, D) >= need);
-  const cands = [...wallCandidates(it, W, D), ...interiorCandidates(it, W, D)]
+  const cands = [...wallCandidates(it, segs), ...interiorCandidates(it, W, D)]
     .sort((a, b) => Math.hypot(a.cx - ox, a.cy - oy) - Math.hypot(b.cx - ox, b.cy - oy));
   for (const c of cands) {
     const b = boxAt(it, c.cx, c.cy, c.rot);
@@ -127,21 +126,40 @@ function boxAt(it, cx, cy, rot) {
 }
 const inRoom = (b, W, D) => b.left >= -EPS && b.top >= -EPS && b.right <= W + EPS && b.bottom <= D + EPS;
 
-// 한 벽의 밀착 슬롯 좌표들(앞면 방 안쪽). rot=FACE_ROT[wall].
-function wallSlots(it, wall, W, D) {
-  const rot = FACE_ROT[wall];
+// 세그먼트 하나 위의 밀착 슬롯들(앞면 방 안쪽). Phase2: 컷아웃 안쪽 면도 벽으로 쓴다.
+function segSlots(it, seg) {
+  const rot = FACE_ROT[seg.kind];
   const { w, d } = effectiveFootprint(it.wM, it.dM, rot);
+  const horiz = seg.kind === 'top' || seg.kind === 'bottom';
+  const along = horiz ? w : d;                       // 벽 따라 놓이는 길이
+  const lo = seg.a + along / 2 + MARGIN, hi = seg.b - along / 2 - MARGIN;
+  if (hi < lo - EPS) return [];
+  const fixed = seg.kind === 'top' ? seg.coord + d / 2 + MARGIN
+    : seg.kind === 'bottom' ? seg.coord - d / 2 - MARGIN
+    : seg.kind === 'left' ? seg.coord + w / 2 + MARGIN
+    : seg.coord - w / 2 - MARGIN;
   const out = [];
-  if (w > W - 2 * MARGIN || d > D - 2 * MARGIN) return out;
-  if (wall === 'bottom') { const cy = D - d / 2 - MARGIN; for (let cx = w / 2 + MARGIN; cx <= W - w / 2 - MARGIN + 1e-9; cx += STEP) out.push({ cx, cy, rot }); }
-  else if (wall === 'top') { const cy = d / 2 + MARGIN; for (let cx = w / 2 + MARGIN; cx <= W - w / 2 - MARGIN + 1e-9; cx += STEP) out.push({ cx, cy, rot }); }
-  else if (wall === 'left') { const cx = w / 2 + MARGIN; for (let cy = d / 2 + MARGIN; cy <= D - d / 2 - MARGIN + 1e-9; cy += STEP) out.push({ cx, cy, rot }); }
-  else { const cx = W - w / 2 - MARGIN; for (let cy = d / 2 + MARGIN; cy <= D - d / 2 - MARGIN + 1e-9; cy += STEP) out.push({ cx, cy, rot }); }
+  for (let t = lo; t <= hi + 1e-9; t += STEP) out.push(horiz ? { cx: t, cy: fixed, rot } : { cx: fixed, cy: t, rot });
   return out;
 }
-// 벽 밀착 후보(모든 벽, 앞면 방 안쪽).
-function wallCandidates(it, W, D) {
-  return ['bottom', 'top', 'left', 'right'].flatMap((wall) => wallSlots(it, wall, W, D));
+// 바운딩 벽 이름으로 슬롯(경계 접촉 컷아웃이 잠식한 스팬은 세그먼트 도출에서 이미 제외됨).
+function wallSlots(it, wall, segs) {
+  return segs.filter((sg) => sg.src === 'bound' && sg.wall === wall).flatMap((sg) => segSlots(it, sg));
+}
+// 벽 밀착 후보 — 바운딩 벽 + 컷아웃 안쪽 면 전부.
+function wallCandidates(it, segs) {
+  return segs.flatMap((sg) => segSlots(it, sg));
+}
+// 박스가 어떤 벽 세그먼트에든 밀착해 있는가(wallRatio용).
+function touchesSeg(box, segs, tol = MARGIN + 0.05) {
+  return segs.some((sg) => {
+    if (sg.kind === 'top' || sg.kind === 'bottom') {
+      const edge = sg.kind === 'top' ? box.top : box.bottom;
+      return Math.abs(edge - sg.coord) <= tol && box.right > sg.a + EPS && box.left < sg.b - EPS;
+    }
+    const edge = sg.kind === 'left' ? box.left : box.right;
+    return Math.abs(edge - sg.coord) <= tol && box.bottom > sg.a + EPS && box.top < sg.b - EPS;
+  });
 }
 // 내부(벽 안 됨) 후보
 function interiorCandidates(it, W, D) {
@@ -158,12 +176,12 @@ function interiorCandidates(it, W, D) {
 // 겹치지 않고 개구부(문 스윙/창)도 안 가리는 첫 자리(벽 먼저, 없으면 내부). 없으면 null.
 // FRONT_NEED 가구(수납/책상/소파 등)는 앞면 여유공간까지 확보되는 자리만 허용(hard).
 // relax(0~1): 좁은 방 폴백 — 여유 요구를 비율로 완화(1=전체, 0=검사 안 함).
-function placeItem(it, placedBoxes, W, D, openings, relax = 1) {
+function placeItem(it, placedBoxes, W, D, openings, segs, relax = 1) {
   const need = (FRONT_NEED[it.cat] || 0) * relax;
-  const free = (b, c) => placedBoxes.every((pb) => !aabbOverlap(b, pb))
+  const free = (b, c) => inRoom(b, W, D) && placedBoxes.every((pb) => !aabbOverlap(b, pb))
     && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))
     && (!need || frontClearance({ ...it, cx: c.cx, cy: c.cy, rotationDeg: c.rot }, placedBoxes, W, D) >= need);
-  for (const c of shuffle(wallCandidates(it, W, D))) {
+  for (const c of shuffle(wallCandidates(it, segs))) {
     const b = boxAt(it, c.cx, c.cy, c.rot);
     if (free(b, c)) return { ...c, box: b, onWall: true };
   }
@@ -183,24 +201,28 @@ function commit(it, cx, cy, rot, placed, W, D, openings) {
   return true;
 }
 // 한 벽에 밀착 배치(랜덤 슬롯). 성공 시 그 벽 반환.
-function placeOnWall(it, wall, placed, W, D, openings) {
-  for (const c of shuffle(wallSlots(it, wall, W, D))) if (commit(it, c.cx, c.cy, c.rot, placed, W, D, openings)) return wall;
+function placeOnWall(it, wall, placed, W, D, openings, segs) {
+  for (const c of shuffle(wallSlots(it, wall, segs))) if (commit(it, c.cx, c.cy, c.rot, placed, W, D, openings)) return wall;
   return null;
 }
 // R1: TV장을 침대 반대편 벽에, 침대 중심축에 최대한 정렬해 마주보게.
-function placeTVFacingBed(tv, bed, bedWall, placed, W, D, openings) {
+function placeTVFacingBed(tv, bed, bedWall, placed, W, D, openings, segs, cuts) {
   const wall = OPP[bedWall];
   const horiz = wall === 'top' || wall === 'bottom';
   const target = horiz ? bed.cx : bed.cy;
-  const slots = wallSlots(tv, wall, W, D).sort((a, b) =>
+  const slots = wallSlots(tv, wall, segs).sort((a, b) =>
     Math.abs((horiz ? a.cx : a.cy) - target) - Math.abs((horiz ? b.cx : b.cy) - target));
-  for (const c of slots) if (commit(tv, c.cx, c.cy, c.rot, placed, W, D, openings)) return true;
+  for (const c of slots) {
+    // Phase2: 침대↔TV 시선이 컷아웃 벽체에 막히면 그 자리는 '마주봄'이 아님
+    if ((cuts || []).some((cb) => segmentHitsAABB(bed.cx, bed.cy, c.cx, c.cy, cb))) continue;
+    if (commit(tv, c.cx, c.cy, c.rot, placed, W, D, openings)) return true;
+  }
   return false;
 }
 // R2: 책상을 벽에, 의자를 책상 앞면 앞에 마주보게(세트). 의자까지 놓여야 성공.
-function placeDeskChair(desk, chair, placed, W, D, openings) {
+function placeDeskChair(desk, chair, placed, W, D, openings, segs) {
   for (const wall of shuffle(['top', 'bottom', 'left', 'right'])) {
-    for (const c of shuffle(wallSlots(desk, wall, W, D))) {
+    for (const c of shuffle(wallSlots(desk, wall, segs))) {
       const deskBox = boxAt(desk, c.cx, c.cy, c.rot);
       const deskFree = placed.every((pb) => !aabbOverlap(deskBox, pb)) && !openings.some((o) => openingBlocksAABB(deskBox, o, W, D, desk.hM));
       if (!inRoom(deskBox, W, D) || !deskFree) continue;
@@ -245,9 +267,18 @@ function placeLampAtBedHead(lamp, bed, bedWall, placed, W, D, openings) {
 function attempt(room, items, openings = [], relax = 1) {
   const W = room.widthM, D = room.depthM;
   const cuts = cutAABBs(room.cutouts);   // 컷아웃 = 처음부터 놓여 있는 벽체
+  const segs = wallSegments(room);       // Phase2: 실제 벽면(컷아웃 안쪽 면 포함)
   const res = items.map((it) => ({ ...it }));
   const roles = new Map(res.map((it) => [it.id, roleOf(it)]));
-  res.filter((it) => roles.get(it.id) === 'rug').forEach((it) => { it.rotationDeg = 0; it.cx = W / 2; it.cy = D / 2; });
+  // 러그: 컷아웃을 뺀 자유공간의 무게중심에(클램프) — L자 방에서 러그가 벽체에 얹히는 것 완화
+  const freeA = W * D - cuts.reduce((sa, c) => sa + c.w * c.d, 0);
+  const fcx = freeA > 0 ? (W * D * (W / 2) - cuts.reduce((sa, c) => sa + c.w * c.d * (c.left + c.right) / 2, 0)) / freeA : W / 2;
+  const fcy = freeA > 0 ? (W * D * (D / 2) - cuts.reduce((sa, c) => sa + c.w * c.d * (c.top + c.bottom) / 2, 0)) / freeA : D / 2;
+  res.filter((it) => roles.get(it.id) === 'rug').forEach((it) => {
+    it.rotationDeg = 0;
+    it.cx = Math.min(Math.max(fcx, it.wM / 2), W - it.wM / 2);
+    it.cy = Math.min(Math.max(fcy, it.dM / 2), D - it.dM / 2);
+  });
   const solids = res.filter((it) => roles.get(it.id) !== 'rug');
   const placed = [...cuts];
   const done = new Set();
@@ -262,15 +293,15 @@ function attempt(room, items, openings = [], relax = 1) {
   // 1) 침대(최대 앵커) — 아무 벽(랜덤). 못 놓으면 폐기.
   let bedWall = null;
   if (bed) {
-    for (const wall of shuffle(['top', 'bottom', 'left', 'right'])) { if (placeOnWall(bed, wall, placed, W, D, openings)) { bedWall = wall; break; } }
+    for (const wall of shuffle(['top', 'bottom', 'left', 'right'])) { if (placeOnWall(bed, wall, placed, W, D, openings, segs)) { bedWall = wall; break; } }
     if (!bedWall) return null;
     done.add(bed.id);
   }
   // 2) R1: TV장 ↔ 침대 정면
-  if (tv && bed && bedWall) { rel.r1 = placeTVFacingBed(tv, bed, bedWall, placed, W, D, openings); if (rel.r1) done.add(tv.id); }
+  if (tv && bed && bedWall) { rel.r1 = placeTVFacingBed(tv, bed, bedWall, placed, W, D, openings, segs, cuts); if (rel.r1) done.add(tv.id); }
   // 3) R2: 책상+의자 세트
   if (desk) {
-    const set = placeDeskChair(desk, chair, placed, W, D, openings);
+    const set = placeDeskChair(desk, chair, placed, W, D, openings, segs);
     if (!set) return null;                              // 책상(+의자) 못 놓으면 폐기
     done.add(desk.id); if (chair && set.chair) { done.add(chair.id); rel.r2 = true; }
   }
@@ -282,13 +313,13 @@ function attempt(room, items, openings = [], relax = 1) {
   const anchors = shuffle(remaining.filter((it) => ANCHOR.has(roles.get(it.id))));
   const rest = shuffle(remaining.filter((it) => !ANCHOR.has(roles.get(it.id))));
   for (const it of [...anchors, ...rest]) {
-    const p = placeItem(it, placed, W, D, openings, relax);
+    const p = placeItem(it, placed, W, D, openings, segs, relax);
     if (!p) return null;
     it.cx = p.cx; it.cy = p.cy; it.rotationDeg = p.rot; placed.push(p.box);
   }
 
-  // 벽 밀착 비율(랭킹용)
-  const touch = solids.filter((it) => { const b = itemAABB(it); return b.left < MARGIN + EPS || b.top < MARGIN + EPS || b.right > W - MARGIN - EPS || b.bottom > D - MARGIN - EPS; }).length;
+  // 벽 밀착 비율(랭킹용) — 컷아웃 안쪽 면 밀착도 벽 밀착으로 인정(Phase2)
+  const touch = solids.filter((it) => touchesSeg(itemAABB(it), segs)).length;
   return { items: res, wallRatio: solids.length ? touch / solids.length : 1, rel };
 }
 
