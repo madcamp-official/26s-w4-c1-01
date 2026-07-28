@@ -29,9 +29,9 @@ export default function LayoutChat({ items, onSubmit }) {
 
   return (
     <div className="chatpanel">
-      <div className="chat-head">💬 배치 도우미 <span>문장을 고르거나 입력하면 도면에 바로 반영돼요</span></div>
+      <div className="chat-head">💬 배치 도우미 <span>문장을 고르거나 입력하면 반영하고 결과를 보여줘요</span></div>
       <div className="chat-msgs" ref={scrollRef}>
-        {msgs.length === 0 && <div className="chat-hint">자주 쓰는 문장을 눌러 바로 넣어보세요 👇 (삭제·추가·크기·이동)</div>}
+        {msgs.length === 0 && <div className="chat-hint">✨ 자주 쓰는 문장을 눌러 바로 넣어보세요</div>}
         {msgs.map((m, i) => <div key={i} className={'chat-msg ' + m.role}>{m.text}</div>)}
         {busy && <div className="chat-msg assistant busy">반영하는 중…</div>}
       </div>

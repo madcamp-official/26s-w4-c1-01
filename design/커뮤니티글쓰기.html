@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css">
+<style>body{margin:0;background:#F0EEE9;font-family:'Pretendard Variable',-apple-system,sans-serif}</style>
+</helmet>
+<div style="padding:48px 56px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
+
+  <div style="width:300px">
+    <div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118;background:#fff;display:inline-block;padding:6px 14px;border-radius:100px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,0.06);white-space:nowrap">① 방꾸 이야기 + 글쓰기</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="320,694">
+      <div style="width:100%;height:100%;background:#FFF8F3;display:flex;flex-direction:column">
+        <div style="padding:50px 18px 10px;display:flex;align-items:center;justify-content:space-between">
+          <span style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">방꾸 이야기</span>
+          <span style="background:#835151;color:#fff;font:700 11px 'Pretendard Variable',sans-serif;padding:8px 12px;border-radius:100px;white-space:nowrap">＋ 글쓰기</span>
+        </div>
+        <div style="padding:0 18px;display:flex;gap:5px;margin-bottom:10px">
+          <span style="padding:6px 11px;border-radius:100px;background:#835151;color:#fff;font:700 10.5px 'Pretendard Variable',sans-serif;white-space:nowrap">전체</span>
+          <span style="padding:6px 11px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 10.5px 'Pretendard Variable',sans-serif;white-space:nowrap">자랑🎀</span>
+          <span style="padding:6px 11px;border-radius:100px;background:#F5F2EE;color:#8A7A6C;font:700 10.5px 'Pretendard Variable',sans-serif;white-space:nowrap">꿀팁💡</span>
+        </div>
+        <div style="flex:1;padding:0 18px;display:flex;flex-direction:column;gap:10px">
+          <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 6px 14px rgba(43,33,24,0.06)">
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><span style="background:#F2E3DC;color:#835151;font:700 9.5px 'Pretendard Variable',sans-serif;padding:2px 8px;border-radius:100px;white-space:nowrap">🎀 자랑</span><span style="font:400 10px 'Pretendard Variable',sans-serif;color:#9C8B7E;white-space:nowrap">나 (본인)</span></div>
+            <div style="font:700 12px 'Pretendard Variable',sans-serif;color:#2B2118">내 원룸 완성! 파스텔로 꾸며봤어</div>
+            <div style="font:400 10.5px 'Pretendard Variable',sans-serif;color:#9C8B7E;margin-top:4px">❤️ 12 · 댓글 3</div>
+          </div>
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+  <div style="width:300px">
+    <div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118;background:#fff;display:inline-block;padding:6px 14px;border-radius:100px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,0.06);white-space:nowrap">② 카테고리 선택 → 작성</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="320,694">
+      <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column;padding:50px 18px 20px;box-sizing:border-box">
+        <div style="font:700 12px 'Pretendard Variable',sans-serif;color:#9C8B7E;margin-bottom:8px;white-space:nowrap">← 뒤로</div>
+        <div style="font:800 17px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:12px">어떤 이야기야?</div>
+        <div style="display:flex;gap:6px;margin-bottom:14px">
+          <span style="flex:1;text-align:center;background:#835151;color:#fff;font:700 11px 'Pretendard Variable',sans-serif;padding:9px;border-radius:100px;white-space:nowrap">🎀 자랑</span>
+          <span style="flex:1;text-align:center;background:#F5F2EE;color:#8A7A6C;font:700 11px 'Pretendard Variable',sans-serif;padding:9px;border-radius:100px;white-space:nowrap">💡 꿀팁</span>
+          <span style="flex:1;text-align:center;background:#F5F2EE;color:#8A7A6C;font:700 11px 'Pretendard Variable',sans-serif;padding:9px;border-radius:100px;white-space:nowrap">❓ 질문</span>
+        </div>
+        <div style="background:#F5F2EE;border-radius:14px;height:90px;display:flex;align-items:center;justify-content:center;margin-bottom:10px"><span style="font:700 11px 'Pretendard Variable',sans-serif;color:#B5A79A;white-space:nowrap">＋ 배치 사진 첨부</span></div>
+        <div style="flex:1;background:#F5F2EE;border-radius:14px;padding:10px"><span style="font:400 11.5px 'Pretendard Variable',sans-serif;color:#B5A79A">내용을 적어줘...</span></div>
+        <div style="background:#835151;color:#fff;font:800 13px 'Pretendard Variable',sans-serif;text-align:center;padding:12px;border-radius:100px;margin-top:12px;white-space:nowrap">올리기</div>
+      </div>
+    </x-import>
+  </div>
+
+  <div style="width:300px">
+    <div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118;background:#fff;display:inline-block;padding:6px 14px;border-radius:100px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,0.06);white-space:nowrap">③ 상세 + 댓글</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="320,694">
+      <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column">
+        <div style="height:140px;background:#EAD7CE;position:relative;flex:none">
+          <span style="position:absolute;top:50px;left:14px;background:rgba(255,255,255,0.9);border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font:12px sans-serif">←</span>
+        </div>
+        <div style="padding:14px 16px;flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px">
+          <div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+              <span style="background:#F2E3DC;color:#835151;font:700 9.5px 'Pretendard Variable',sans-serif;padding:2px 8px;border-radius:100px;white-space:nowrap">🎀 자랑</span>
+              <span style="font:400 10.5px 'Pretendard Variable',sans-serif;color:#9C8B7E">지은</span>
+            </div>
+            <div style="font:700 13.5px 'Pretendard Variable',sans-serif;color:#2B2118">내 원룸 완성! 파스텔로 꾸며봤어</div>
+            <div style="font:400 11.5px 'Pretendard Variable',sans-serif;color:#8A7A6C;line-height:1.5;margin-top:4px">드디어 다 채웠어 ㅠㅠ 너무 맘에 들어 🩷</div>
+          </div>
+          <div style="height:1px;background:#F0EAE2"></div>
+          <div style="font:700 12px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">댓글 2개</div>
+          <div style="display:flex;gap:8px">
+            <span style="width:26px;height:26px;border-radius:50%;background:#E3CCC2;flex:none"></span>
+            <div><div style="font:700 11px 'Pretendard Variable',sans-serif;color:#2B2118">서준</div><div style="font:400 11.5px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-top:2px">조명 어디서 샀어?!</div></div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <span style="width:26px;height:26px;border-radius:50%;background:#F0D9E0;flex:none"></span>
+            <div><div style="font:700 11px 'Pretendard Variable',sans-serif;color:#2B2118">하니</div><div style="font:400 11.5px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-top:2px">색감 넘 예뻐요💗</div></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;padding:10px 16px 22px;border-top:1px solid rgba(43,33,24,0.06);flex:none">
+          <span style="flex:1;background:#F5F2EE;border-radius:100px;padding:9px 14px;font:400 12px 'Pretendard Variable',sans-serif;color:#B5A79A">댓글을 남겨줘</span>
+          <span style="background:#835151;color:#fff;font:700 11.5px 'Pretendard Variable',sans-serif;padding:9px 14px;border-radius:100px;white-space:nowrap">등록</span>
+        </div>
+      </div>
+    </x-import>
+    <div style="font:400 11.5px/1.6 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-top:8px">글쓴이(지은)와 본문을 위에, 구분선 아래에 "댓글 2개"로 개수 명시 + 댓글마다 아바타로 작성자 구분.</div>
+  </div>
+
+  <div style="width:300px">
+    <div style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118;background:#fff;display:inline-block;padding:6px 14px;border-radius:100px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,0.06);white-space:nowrap">④ 내 글 수정/삭제</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="320,694">
+      <div style="width:100%;height:100%;background:#fff;display:flex;flex-direction:column">
+        <div style="height:140px;background:#EAD7CE;position:relative;flex:none">
+          <span style="position:absolute;top:50px;left:14px;background:rgba(255,255,255,0.9);border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font:12px sans-serif">←</span>
+        </div>
+        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <span style="background:#F2E3DC;color:#835151;font:700 9.5px 'Pretendard Variable',sans-serif;padding:2px 8px;border-radius:100px;white-space:nowrap">🎀 자랑</span>
+                <span style="font:400 10.5px 'Pretendard Variable',sans-serif;color:#9C8B7E;white-space:nowrap">나 (본인 글)</span>
+              </div>
+              <div style="font:700 13.5px 'Pretendard Variable',sans-serif;color:#2B2118">내 원룸 완성! 파스텔로 꾸며봤어</div>
+            </div>
+            <div style="display:flex;gap:6px;flex:none">
+              <span style="background:#F5F2EE;color:#2B2118;font:700 11px 'Pretendard Variable',sans-serif;padding:7px 12px;border-radius:100px;white-space:nowrap">수정</span>
+              <span style="background:#FBEAEA;color:#C96A6A;font:700 11px 'Pretendard Variable',sans-serif;padding:7px 12px;border-radius:100px;white-space:nowrap">삭제</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </x-import>
+    <div style="font:400 11.5px/1.6 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-top:8px">"⋯" 메뉴 대신 내 글엔 "나(본인 글)" 표시 + 수정/삭제 버튼을 본문 옆에 바로 노출. 한 번 더 열지 않아도 바로 눌러 처리 가능. 남의 글엔 이 자리에 "신고" 버튼 하나만 노출.</div>
+  </div>
+
+</div>
+
+</x-dc>
+</body>
+</html>

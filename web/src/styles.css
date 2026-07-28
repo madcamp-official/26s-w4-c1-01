@@ -129,23 +129,37 @@ input[type="number"], input[type="text"], select {
 .preset-row .btn.sm { padding: 6px 10px; font-size: 16px; line-height: 1; }
 .btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-/* 문·창문 편집기 */
+/* 문·창문 편집기 — 카드 캐러셀(design/UI수정.html "C안" 채택): 한 번에 1개만 크게 보여 슬라이더·입력이 커지고 명확함. */
 .openbar { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: #fff; }
 .openbar-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .openbar-title { font-weight: 700; font-size: 14px; }
 .openbar-hint { color: var(--muted); font-size: 12px; }
-.openbar-add { margin-left: auto; display: inline-flex; gap: 6px; }
-.openlist { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.openrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
-.openrow select, .openrow input[type=number] { padding: 5px 7px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); font-size: 13px; }
-.openrow input[type=number] { width: 62px; }
+.openbar-count { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .op-badge { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
 .op-badge.door { background: rgba(204,91,82,.14); color: #b64b43; }
 .op-badge.window { background: rgba(59,127,181,.14); color: #2f6a97; }
-.op-field { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
-.op-field input[type=range] { width: 110px; }
 .op-num { font-variant-numeric: tabular-nums; color: var(--ink); min-width: 30px; }
-.op-del { color: var(--bad); font-weight: 700; }
+
+.opencard { margin-top: 10px; background: var(--bg2); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.opencard-top { display: flex; align-items: center; justify-content: space-between; }
+.opencard-del { width: 26px; height: 26px; border-radius: 50%; border: 0; background: #fff; color: var(--muted); font-size: 14px; line-height: 1; }
+.opencard-row { display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 11px; padding: 9px 12px; font-size: 13px; }
+.opencard-lbl { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.opencard-row select { flex: 1; text-align: right; border: 0; background: transparent; font-weight: 700; color: var(--ink); font-size: 13px; }
+.opencard-row.op-slide input[type=range] { flex: 1; min-width: 0; }
+.opencard-row.op-slide .op-num { font-weight: 700; }
+.opencard-row.op-slide input[type=number] { width: 46px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); font-size: 13px; }
+.opencard-hinge { border: 1px solid var(--line); background: #fff; border-radius: 11px; padding: 10px; font-weight: 700; font-size: 13px; color: var(--ink); }
+
+.opencard-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 8px; }
+.opencard-nav button { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--ink); font-size: 14px; line-height: 1; }
+.opencard-nav button:disabled { opacity: .35; }
+.opencard-dots { display: flex; gap: 5px; }
+.opencard-dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--line); }
+.opencard-dots span.on { background: var(--accent); }
+
+.opencard-add { display: flex; gap: 8px; margin-top: 10px; }
+.opencard-add .btn { flex: 1; border-radius: var(--r-pill); text-align: center; font-weight: 700; }
 
 /* 가구 필터 (분위기/사이즈/종류) */
 .filterbar { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
@@ -181,8 +195,10 @@ input[type="number"], input[type="text"], select {
 .chat-msg.busy { color: var(--muted); font-style: italic; }
 /* 자주 쓰는 문장 칩 — 스크롤로 숨겨지던 마지막 칩 발견성 문제 때문에 스크롤 대신 줄바꿈으로 전부 노출. */
 .chat-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 0; }
-.chat-chip { flex: none; border: 1px solid var(--line); background: var(--bg2); color: var(--accent); font-weight: 700; font-size: 12px; padding: 7px 12px; border-radius: var(--r-pill); white-space: nowrap; }
-.chat-chip:hover { border-color: var(--accent); }
+/* 칩 테두리를 accent 톤으로, 배경을 살짝 더 진하게 — 시각적 위계와 눌림 신호 강화(design/UI수정.html "D안"). */
+.chat-chip { flex: none; border: 1px solid var(--accent-2); background: #FBE7D9; color: var(--accent); font-weight: 700; font-size: 12px; padding: 7px 12px; border-radius: var(--r-pill); white-space: nowrap; }
+.chat-chip:hover { border-color: var(--accent); background: #F8DCC8; }
+.chat-chip:active { background: var(--accent-2); color: #fff; }
 .chat-chip:disabled { opacity: .5; }
 .chat-input { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
 .chat-input input { flex: 1; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; font-size: 14px; background: #fff; color: var(--ink); }
