@@ -1,15 +1,32 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Stage, Layer, Rect, Line, Group, Text } from 'react-konva';
-import { effectiveFootprint } from '../lib/geometry.js';
+import { Stage, Layer, Rect, Line, Group, Text, Circle, Shape, Image as KImage } from 'react-konva';
+import { effectiveFootprint, doorSwing } from '../lib/geometry.js';
+import { accuracyMeta } from '../lib/catalog.js';
 
 const PAD = 16;
 const MAX_H = 470;
 
 // 축척 2D 탑다운 플래너. 배치·스케일·맞음판정은 전부 미터 좌표계 기하(lib/geometry)로 결정.
 // 회전은 90도 스냅이라 시각적 rect 회전과 effectiveFootprint 스왑이 일치한다.
-export default function Planner({ room, items, setItems, selectedId, setSelectedId, flags }) {
+export default function Planner({ room, items, setItems, selectedId, setSelectedId, flags, openings = [] }) {
   const wrapRef = useRef(null);
   const [wrapW, setWrapW] = useState(600);
+  const imgCache = useRef({});
+  const [, setImgTick] = useState(0);
+  // 제품 썸네일 로더(탑다운 타일 위 오버레이). 로드되면 리렌더.
+  function getImg(src) {
+    if (!src) return null;
+    let e = imgCache.current[src];
+    if (!e) {
+      const im = new window.Image();
+      e = { im, ok: false };
+      imgCache.current[src] = e;
+      im.onload = () => { e.ok = true; setImgTick((t) => t + 1); };
+      im.onerror = () => { e.ok = 'err'; };
+      im.src = src;
+    }
+    return e.ok === true ? e.im : null;
+  }
 
   useLayoutEffect(() => {
     const el = wrapRef.current;
@@ -53,10 +70,53 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
             )
           )}
 
+          {/* 개구부: 문(90° 스윙 부채꼴=접근불가, 빨강) · 창문(벽 표시=가리면 안 됨, 파랑) */}
+          {(openings || []).map((o) => {
+            const isVert = o.wall === 'left' || o.wall === 'right';
+            const wallLen = isVert ? room.depthM : room.widthM;
+            const w = o.width ?? (o.kind === 'door' ? 0.9 : 1.2);
+            const p = Math.min(Math.max(o.pos ?? wallLen / 2, w / 2), wallLen - w / 2);
+            const a = p - w / 2, b = p + w / 2;
+            const P = (mx, my) => [PAD + toPx(mx), PAD + toPx(my)];
+            const ends = {
+              top: [P(a, 0), P(b, 0)], bottom: [P(a, room.depthM), P(b, room.depthM)],
+              left: [P(0, a), P(0, b)], right: [P(room.widthM, a), P(room.widthM, b)],
+            }[o.wall];
+            const [e1, e2] = ends;
+            if (o.kind === 'door') {
+              const { hinge, R } = doorSwing({ ...o, pos: p, width: w }, room.widthM, room.depthM);
+              const hx = PAD + toPx(hinge.x), hy = PAD + toPx(hinge.y), Rp = toPx(R);
+              const into = { top: [0, 1], bottom: [0, -1], left: [1, 0], right: [-1, 0] }[o.wall];
+              const hb = o.hinge === 'b';
+              const along = isVert ? [0, hb ? -1 : 1] : [hb ? -1 : 1, 0];
+              const a1 = Math.atan2(along[1], along[0]);
+              const a2 = Math.atan2(into[1], into[0]);
+              let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+              const acw = d < 0;
+              const leaf = [hx + into[0] * Rp, hy + into[1] * Rp];
+              return (
+                <Group key={o.id} listening={false}>
+                  <Shape sceneFunc={(ctx, sh) => { ctx.beginPath(); ctx.moveTo(hx, hy); ctx.arc(hx, hy, Rp, a1, a2, acw); ctx.closePath(); ctx.fillStrokeShape(sh); }}
+                    fill="rgba(204,91,82,0.12)" stroke="#cc5b52" strokeWidth={1} dash={[4, 3]} />
+                  <Line points={[e1[0], e1[1], e2[0], e2[1]]} stroke="#cc5b52" strokeWidth={4} />
+                  <Line points={[hx, hy, leaf[0], leaf[1]]} stroke="#cc5b52" strokeWidth={2} />
+                </Group>
+              );
+            }
+            const off = 5;
+            const n = { top: [0, off], bottom: [0, -off], left: [off, 0], right: [-off, 0] }[o.wall];
+            return (
+              <Group key={o.id} listening={false}>
+                <Line points={[e1[0], e1[1], e2[0], e2[1]]} stroke="#3b7fb5" strokeWidth={5} />
+                <Line points={[e1[0] + n[0], e1[1] + n[1], e2[0] + n[0], e2[1] + n[1]]} stroke="#7db8e0" strokeWidth={2} />
+              </Group>
+            );
+          })}
+
           {items.map((it, idx) => {
             const fp = effectiveFootprint(it.wM, it.dM, it.rotationDeg || 0);
             const flag = flags[idx] || {};
-            const stroke = flag.overlap ? '#cc5b52' : flag.out ? '#d98a3a' : selectedId === it.id ? '#3f6a3a' : '#6f8f6a';
+            const stroke = flag.overlap ? '#cc5b52' : (flag.out || flag.blockOpen) ? '#d98a3a' : selectedId === it.id ? '#3f6a3a' : '#6f8f6a';
             const w = toPx(it.wM), h = toPx(it.dM);
             return (
               <Group
@@ -81,8 +141,17 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                   strokeWidth={selectedId === it.id ? 3 : 2}
                   cornerRadius={3}
                 />
+                {(() => {
+                  const im = getImg(it.image);
+                  if (!im) return null;
+                  const asp = im.naturalWidth / im.naturalHeight || 1;
+                  let iw = w * 0.74, ih = iw / asp;
+                  const maxh = h * 0.74;
+                  if (ih > maxh) { ih = maxh; iw = ih * asp; }
+                  return <KImage image={im} width={iw} height={ih} offsetX={iw / 2} offsetY={ih / 2} listening={false} opacity={0.95} />;
+                })()}
                 <Text
-                  text={`${it.name}\n${Math.round(it.wM * 100)}×${Math.round(it.dM * 100)}`}
+                  text={`${it.name}\n${Math.round(it.wM * 100)}×${Math.round(it.dM * 100)} · ${accuracyMeta(it.dimAccuracy).short}`}
                   fontSize={11}
                   fill="#3a352e"
                   align="center"
@@ -91,6 +160,8 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                   offsetY={6}
                   listening={false}
                 />
+                {/* 치수 신뢰도 점 (좌상단) */}
+                <Circle x={-w / 2 + 6} y={-h / 2 + 6} radius={4} fill={accuracyMeta(it.dimAccuracy).hex} listening={false} />
               </Group>
             );
           })}

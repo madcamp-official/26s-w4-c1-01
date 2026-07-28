@@ -1,0 +1,4 @@
+가구 이미지·치수 출처: Amazon Berkeley Objects (ABO)
+https://amazon-berkeley-objects.s3.amazonaws.com/index.html
+라이선스: CC BY-NC 4.0 (비상업). 배경 제거(rembg)는 데모 목적 가공.
+상업화 시 이미지층은 Poly Haven(CC0) 등으로 교체 필요.

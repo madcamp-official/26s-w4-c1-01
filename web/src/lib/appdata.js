@@ -1,0 +1,47 @@
+// ywlee 디자인 공용 상수 — 무드/예산/평수/마켓 카테고리.
+// 무드 그라디언트는 프로토타입(design/방꾸-프로토타입.html)의 관찰값 그대로.
+
+export const MOODS = ['포근한 북유럽', '시크한 인더스트리얼', '화사한 내추럴', '모던', '빈티지 레트로', '러블리 파스텔'];
+
+// 무드 썸네일(실사 대체) 빗금 스와치
+export const MOOD_BG = {
+  '포근한 북유럽': 'repeating-linear-gradient(45deg,#E8DCCB,#E8DCCB 7px,#F2E9DD 7px,#F2E9DD 14px)',
+  '시크한 인더스트리얼': 'repeating-linear-gradient(45deg,#B8B2A8,#B8B2A8 7px,#CFCAC1 7px,#CFCAC1 14px)',
+  '화사한 내추럴': 'repeating-linear-gradient(45deg,#C7D4B8,#C7D4B8 7px,#DDE6D2 7px,#DDE6D2 14px)',
+  '모던': 'repeating-linear-gradient(45deg,#C9CDD1,#C9CDD1 7px,#E2E5E7 7px,#E2E5E7 14px)',
+  '빈티지 레트로': 'repeating-linear-gradient(45deg,#D9B679,#D9B679 7px,#E7CE9C 7px,#E7CE9C 14px)',
+  '러블리 파스텔': 'repeating-linear-gradient(45deg,#F0CFDA,#F0CFDA 7px,#F8E4EA 7px,#F8E4EA 14px)',
+};
+
+// 무드 → 카탈로그 스타일 매핑(catalog.deriveStyle 값과 대응). 필터 실현용.
+export const MOOD_TO_STYLE = {
+  '포근한 북유럽': ['북유럽', '내추럴'],
+  '시크한 인더스트리얼': ['인더스트리얼'],
+  '화사한 내추럴': ['내추럴', '북유럽'],
+  '모던': ['모던', '미드센추리'],
+  '빈티지 레트로': ['클래식', '미드센추리'],
+  '러블리 파스텔': ['내추럴', '클래식'],
+};
+
+export const BUDGETS = ['10만원 이하', '10~30만원', '30~50만원', '50~100만원', '100만원+'];
+
+// 온보딩 평수 옵션(라벨→평수). estimateRoom으로 실제 치수 계산.
+export const PYEONGS = [
+  { label: '4평', pyeong: 4 },
+  { label: '5평', pyeong: 5 },
+  { label: '6.5평', pyeong: 6.5 },
+  { label: '8평', pyeong: 8 },
+  { label: '10평+', pyeong: 10 },
+];
+
+// 마켓 카테고리 세그먼트 → 카탈로그 cat 판정.
+export const MARKET_CATS = [
+  { label: '침대', match: (c) => c === '침대' },
+  { label: '책상·의자', match: (c) => c === '책상' || c === '의자' || c === '테이블' },
+  { label: '소파', match: (c) => c === '소파' },
+  { label: '수납', match: (c) => c === '수납' },
+  { label: '조명', match: (c) => c === '조명' },
+  { label: '러그', match: (c) => c === '러그' },
+];
+
+export const MARKET_PRICES = ['~10만', '10~30', '30~50', '50~100', '100+'];

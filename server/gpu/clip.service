@@ -1,0 +1,18 @@
+# camp-3 CLIP 임베딩 서비스(CPU) systemd 유닛 — 닮은꼴 매칭용. 재부팅에도 자동 기동.
+# 설치:
+#   scp server/gpu/clip_server.py root@172.10.5.71:/root/clip_server.py
+#   scp server/gpu/clip.service   root@172.10.5.71:/etc/systemd/system/clip.service
+#   ssh root@172.10.5.71 'systemctl daemon-reload && systemctl enable --now clip'
+[Unit]
+Description=bangkku CLIP embedding server (CPU)
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u /root/clip_server.py
+Environment=CLIP_DEVICE=cpu
+WorkingDirectory=/root
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -12,3 +12,7 @@ server/.venv/
 # secrets
 .env
 server/.env
+
+# SSH 키 — 절대 커밋 금지
+*.pem
+camp3_*

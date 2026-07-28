@@ -1,0 +1,34 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'org.madcamp.bangkku'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "org.madcamp.bangkku"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+        // 앱이 로드할 배포 URL — 터널 개통 후 도메인 확정되면 여기만 바꾸면 됨
+        buildConfigField "String", "APP_URL", '"https://bangkku.madcamp-kaist.org"'
+    }
+    buildFeatures { buildConfig true }
+    buildTypes {
+        release { minifyEnabled false }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.webkit:webkit:1.11.0'
+}

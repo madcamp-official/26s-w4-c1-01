@@ -1,0 +1,17 @@
+# camp-3(3090) 리라이팅 서버 systemd 유닛. 재부팅에도 자동 기동.
+# 설치:
+#   scp server/gpu/relight_server.py root@172.10.5.71:/root/relight_server.py
+#   scp server/gpu/relight.service   root@172.10.5.71:/etc/systemd/system/relight.service
+#   ssh root@172.10.5.71 'systemctl daemon-reload && systemctl enable --now relight'
+[Unit]
+Description=bangkku relight server (SD1.5 img2img)
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /root/relight_server.py
+WorkingDirectory=/root
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
