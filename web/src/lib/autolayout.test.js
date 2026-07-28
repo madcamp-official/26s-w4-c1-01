@@ -106,23 +106,14 @@ test('openingZones: 벽별 존 좌표', () => {
   assert.deepEqual(zl, { left: 0, right: 0.6, top: 1.5, bottom: 2.5 });
 });
 
-test('generateLayouts: 창문은 창턱보다 높은 가구만 회피(낮은 가구는 창 앞 허용)', () => {
+test('창문은 배치를 제약하지 않음(문 스윙만 hard) — 사용자 정책', () => {
   const room = { widthM: 3.0, depthM: 4.0 };
-  const items = [
-    { id: 'bed', cat: '침대', name: '침대', wM: 1.6, dM: 2.0, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 },
-    { id: 'desk', cat: '책상', name: '책상', wM: 1.2, dM: 0.6, hM: 0.75, cx: 0, cy: 0, rotationDeg: 0 },
-    { id: 'shelf', cat: '수납', name: '책장', wM: 0.8, dM: 0.3, hM: 1.8, cx: 0, cy: 0, rotationDeg: 0 },
-  ];
-  const openings = [{ kind: 'window', wall: 'bottom', pos: 1.5, width: 0.9, clearance: 0.7 }];
-  const cands = generateLayouts(room, items, 3, 500, openings);
-  assert.ok(cands.length >= 1, '창문이 있어도 배치는 가능해야');
-  const zones = openingZones(openings, 3.0, 4.0);
-  for (const c of cands) {
-    // 창턱(1.1m)보다 높은 가구(책장 1.8m)만 창 앞을 비워야 함. 낮은 침대·책상은 창 앞 허용.
-    for (const it of c.items.filter((x) => x.hM > WINDOW_SILL_M)) {
-      for (const z of zones) assert.ok(!aabbOverlap(itemAABB(it), z), `키큰 ${it.id}가 창을 가리면 안 됨`);
-    }
-  }
+  // 키 큰 책장이 창문 바로 앞에 있어도 blockOpen 아님
+  const shelf = { id: 'shelf', cat: '수납', name: '책장', wM: 0.8, dM: 0.3, hM: 1.8, cx: 1.5, cy: 3.8, rotationDeg: 180 };
+  const win = [{ kind: 'window', wall: 'bottom', pos: 1.5, width: 0.9 }];
+  const v = validateLayout([shelf], 3.0, 4.0, win);
+  assert.equal(v.blockOpen, false, '창 앞 키큰 가구도 허용');
+  assert.ok(v.ok);
 });
 
 test('doorSwing: 벽별 부채꼴 박스·힌지', () => {

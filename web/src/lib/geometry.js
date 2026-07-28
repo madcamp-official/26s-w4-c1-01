@@ -282,10 +282,9 @@ export const WINDOW_SILL_M = 1.1;
 export function openingBlocksAABB(aabb, o, roomWM, roomDM, itemH) {
   if (!o || !o.wall) return false;
   if (o.kind === 'door') return aabbHitsDoorSwing(aabb, o, roomWM, roomDM);   // 문 스윙은 높이 무관 항상 회피
-  // 창문: 창턱보다 높은 가구(옷장·키큰 책장 등)만 창을 가림. 낮은 가구는 창 앞 허용.
-  if (itemH != null && itemH <= WINDOW_SILL_M) return false;
-  const z = openingZones([{ wall: o.wall, pos: o.pos, width: o.width, clearance: o.clearance ?? 0.4 }], roomWM, roomDM)[0];
-  return z ? aabbOverlap(aabb, z) : false;
+  // 창문: 배치 제약 없음 — 창턱을 1.2m로 높여 가구가 창을 가리는 문제를 해소했으므로
+  // 창 앞 배치를 막지 않는다(사용자 결정). 문 스윙만 hard 제약으로 유지.
+  return false;
 }
 
 // 동선 점수 — 바닥을 격자로 보고 '빈 칸'이 하나로 이어지는 정도(connected: 1이면 빈 공간이 통짜, 걷기 좋음).

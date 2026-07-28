@@ -19,8 +19,7 @@ export default function LayoutChat({ items, onSubmit }) {
     setBusy(true);
     try {
       const res = await onSubmit(m, msgs.slice(-8));
-      // 적용되면 결과 화면으로 이동(이 컴포넌트 언마운트) → 답변은 '미적용'일 때만 표시.
-      if (!res?.applied) setMsgs((x) => [...x, { role: 'assistant', text: res?.reply || '반영하기 어려워요.' }]);
+      setMsgs((x) => [...x, { role: 'assistant', text: res?.reply || (res?.applied ? '반영했어! ✏️' : '반영하기 어려워요.') }]);
     } catch {
       setMsgs((x) => [...x, { role: 'assistant', text: '문제가 생겼어요. 다시 시도해 주세요.' }]);
     } finally {
@@ -30,7 +29,7 @@ export default function LayoutChat({ items, onSubmit }) {
 
   return (
     <div className="chatpanel">
-      <div className="chat-head">💬 배치 도우미 <span>문장을 고르거나 입력하면 반영하고 결과를 보여줘요</span></div>
+      <div className="chat-head">💬 배치 도우미 <span>문장을 고르거나 입력하면 도면에 바로 반영돼요</span></div>
       <div className="chat-msgs" ref={scrollRef}>
         {msgs.length === 0 && <div className="chat-hint">자주 쓰는 문장을 눌러 바로 넣어보세요 👇 (삭제·추가·크기·이동)</div>}
         {msgs.map((m, i) => <div key={i} className={'chat-msg ' + m.role}>{m.text}</div>)}

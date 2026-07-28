@@ -58,7 +58,7 @@ for n in list(nt.nodes): nt.nodes.remove(n)
 env = nt.nodes.new("ShaderNodeTexEnvironment")
 env.image = bpy.data.images.load(S["hdri"])
 bg_hdri = nt.nodes.new("ShaderNodeBackground")
-bg_hdri.inputs["Strength"].default_value = S.get("hdri_strength", PRE["hdri"])
+bg_hdri.inputs["Strength"].default_value = S.get("hdri_strength", PRE["hdri"] * (0.62 if any(o.get("kind") == "window" for o in S.get("openings", [])) else 1.0))
 nt.links.new(env.outputs["Color"], bg_hdri.inputs["Color"])
 bg_white = nt.nodes.new("ShaderNodeBackground")
 # 카메라 배경은 프리셋 무드 색(bg) — 아침 웜화이트/낮 화이트/노을 주황빛/밤 어두운 남색.
@@ -307,13 +307,38 @@ if rug:
     plane("rug_border", rw + 0.12, rd + 0.12, (rx, ry, 0.004), m=RB)
 
 # ---------- 태양광 / 실내등 ----------
+# 그림자의 원천은 '창문': ① 태양 방위를 가장 큰 창의 안쪽 방향으로 정렬(+20° 사선), 고도는 창을
+# 통과할 수 있게 ≤35°로 클램프. ② 각 창 안쪽에 창 크기 AREA 키라이트(포탈식) — 실내 그림자를 만든다.
 sun = PRE.get("sun")
+_wins = [o for o in S.get("openings", []) if o.get("kind") == "window"]
+_AZ = {"far": 180, "near": 0, "left": 270, "right": 90}   # 빛의 수평 진행방향 = 창 안쪽 법선
 if sun:
     col, energy, alt, az = sun
+    if _wins:
+        _wmax = max(_wins, key=lambda o: o.get("width", 0))
+        az = _AZ.get(_wmax.get("wall"), az) + 20
+        alt = min(alt, 35)
     sd = bpy.data.lights.new("sun", 'SUN'); so = bpy.data.objects.new("sun", sd)
     sc.collection.objects.link(so)
     sd.energy = energy; sd.color = col; sd.angle = math.radians(2.5)  # 부드러운 그림자 경계
     so.rotation_euler = (math.radians(90 - alt), 0, math.radians(az))
+    # 창문 키라이트(실내 직사광·그림자 담당) — 벽이 태양을 막으므로 창 안쪽에서 직접 쏜다
+    for _wi, _o in enumerate(_wins):
+        _ww, _wh = _o.get("width", 1.2), _o.get("h", 1.0)
+        _wz = _o.get("z", 1.7)
+        _wl = bpy.data.lights.new(f"winlight{_wi}", 'AREA'); _wo = bpy.data.objects.new(f"winlight{_wi}", _wl)
+        sc.collection.objects.link(_wo)
+        _wl.shape = 'RECTANGLE'; _wl.size = _ww; _wl.size_y = _wh
+        _wl.energy = 260 * energy; _wl.color = col   # 실내 키라이트 — 그림자가 창에서 나오도록 환경광 대비 우위
+        _off = 0.07
+        if _o["wall"] == "far":
+            _wo.location = (_o["pos"], D - _off, _wz); _wo.rotation_euler = (math.radians(90), 0, math.radians(180))
+        elif _o["wall"] == "near":
+            _wo.location = (_o["pos"], _off, _wz); _wo.rotation_euler = (math.radians(90), 0, 0)
+        elif _o["wall"] == "left":
+            _wo.location = (_off, _o["pos"], _wz); _wo.rotation_euler = (math.radians(90), 0, math.radians(-90))
+        else:
+            _wo.location = (W - _off, _o["pos"], _wz); _wo.rotation_euler = (math.radians(90), 0, math.radians(90))
 if PRE.get("lamp", 0) > 0:  # 실내 천장등(밤 위주)
     ld = bpy.data.lights.new("lamp", 'AREA'); lo = bpy.data.objects.new("lamp", ld)
     sc.collection.objects.link(lo)

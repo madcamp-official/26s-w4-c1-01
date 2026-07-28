@@ -141,14 +141,6 @@ export default function App() {
     setRenderPreset(preset); setRenderView(viewMode); setRenderTrigger(trigger);
     doRenderItems(items, preset, viewMode);
   }
-  // 배치를 바꾼 뒤 결과 화면으로(로딩 스피너 → 렌더 사진). 방금 만든 next 배치로 즉시 렌더.
-  function goResultWith(next) {
-    setItems(next); setSelectedId(null);
-    setShowBefore(false); setRenderImg(null);
-    setRenderPreset('day'); setRenderView('wide'); setRenderTrigger(null);
-    setScreen('result');
-    doRenderItems(next, 'day', 'wide');
-  }
   // 빠른 명령(추가/삭제/크기)을 로컬로 적용 → 새 배치 배열 반환(불가하면 null).
   function applyChatCommand(cmd) {
     if (cmd.op === 'add') {
@@ -205,18 +197,18 @@ export default function App() {
         const added = next[next.length - 1];
         const r = await chatLayout(room, openings, next, `${text} — 방금 추가한 '${added.name}'(id: ${added.id})의 위치를 이 문장대로 조정해줘.`, history);
         const moved = r?.decision === 'apply' ? applyLLMPositions(next, r.items) : null;
-        goResultWith(moved || next);
-        return { applied: true };
+        setItems(moved || next); setSelectedId(null);   // 도면(플래너)에만 반영 — 사진은 '방 채우기' 눌렀을 때
+        return { applied: true, reply: '반영했어! 도면에서 위치 확인해봐 ✏️' };
       }
-      goResultWith(next);
-      return { applied: true };
+      setItems(next); setSelectedId(null);
+      return { applied: true, reply: cmd.op === 'add' ? '도면에 추가했어 ✏️ 위치는 드래그로 조정해봐' : '반영했어! 도면에서 확인해봐 ✏️' };
     }
     // 자연어 → LLM 재배치(기존 위치 재검증 후에만 반영)
     const r = await chatLayout(room, openings, items, text, history);
     if (r.decision === 'apply') {
       const next = applyLLMPositions(items, r.items);
-      if (next) { goResultWith(next); return { applied: true }; }
-      return { applied: false, reply: (r.reason || '') + ' — 다만 겹치거나 문·창을 가려서 반영하진 않았어요. 🚫' };
+      if (next) { setItems(next); setSelectedId(null); return { applied: true, reply: (r.reason || '재배치했어') + ' ✅ (도면에 반영)' }; }
+      return { applied: false, reply: (r.reason || '') + ' — 다만 겹치거나 문을 막아서 반영하진 않았어요. 🚫' };
     }
     return { applied: false, reply: r.reason || '그 요청은 반영하기 어려워요.' };
   }
