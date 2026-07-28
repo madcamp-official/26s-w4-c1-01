@@ -2,7 +2,7 @@
 // 핵심: generateLayouts가 내놓는 모든 후보는 '겹침 0 + 방밖 0'이어야 한다(사용자 요구: 겹치면 기각).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB, WINDOW_SILL_M, pairOverlapOK, deskChairComposed, frontClearance, frontViolations, outOfRoom, openingOnCutout, findFreeSpot, wallSegments, segmentHitsAABB } from './geometry.js';
+import { validateLayout, circulationScore, itemAABB, openingZones, aabbOverlap, doorSwing, aabbHitsDoorSwing, openingBlocksAABB, WINDOW_SILL_M, pairOverlapOK, deskChairComposed, frontClearance, frontViolations, outOfRoom, openingOnCutout, findFreeSpot, wallSegments, segmentHitsAABB, clampCenterToRoom } from './geometry.js';
 import { generateLayouts, validateCandidates } from './autolayout.js';
 
 // 결정론적 PRNG(가구셋 생성용) — 레이아웃 내부 랜덤과 무관하게 '입력'만 재현 가능하게.
@@ -563,4 +563,41 @@ test('낮은 조명(h<70cm)은 책상 위 코너쪽 + elevM, 플로어 스탠드
   assert.ok(out.length >= 1);
   const lr = out[0].items.find((x) => x.id === 'lamp');
   assert.ok(lr.elevM > 0, '보정: 조명이 책상 위로');
+});
+
+test('조명 2개(큰+작은): 작은 건 책상 위, 큰 건 침대 헤드 옆 — 버그 재현·수정 검증', () => {
+  const room = { widthM: 3.4, depthM: 4.4 };
+  const mk3 = (id, cat, w, d, h) => ({ id, cat, name: cat, wM: w, dM: d, hM: h, cx: 0, cy: 0, rotationDeg: 0 });
+  const items = [
+    mk3('bed', '침대', 1.5, 2.0, 0.5),
+    mk3('desk', '책상', 1.2, 0.6, 0.74),
+    mk3('chair', '의자', 0.5, 0.5, 0.9),
+    mk3('small', '조명', 0.25, 0.25, 0.45),   // 탁상 스탠드
+    mk3('big', '조명', 0.3, 0.3, 1.5),         // 플로어 스탠드
+  ];
+  const c = generateLayouts(room, items, 1, 800)[0];
+  assert.ok(c, '배치됨');
+  const bed = c.items.find((x) => x.id === 'bed');
+  const small = c.items.find((x) => x.id === 'small');
+  const big = c.items.find((x) => x.id === 'big');
+  const desk = c.items.find((x) => x.id === 'desk');
+  // 작은 조명: 책상 위(elevM)
+  assert.ok(small.elevM > 0, '작은 조명은 책상 위');
+  const db = itemAABB(desk), sb = itemAABB(small);
+  assert.ok(sb.left >= db.left - 1e-6 && sb.right <= db.right + 1e-6, '책상 발자국 안');
+  // 큰 조명: 침대에 인접(헤드 옆) — 침대 AABB에서 0.5m 이내
+  assert.ok(!big.elevM, '큰 조명은 바닥');
+  const bb = itemAABB(bed), gb = itemAABB(big);
+  const gap = Math.max(bb.left - gb.right, gb.left - bb.right, bb.top - gb.bottom, gb.top - bb.bottom);
+  assert.ok(gap < 0.5, `큰 조명이 침대 옆에 있어야 함 (gap ${gap.toFixed(2)}m)`);
+});
+
+test('clampCenterToRoom: 사용자 드래그가 방 밖으로 못 나감', () => {
+  const it = { wM: 1.2, dM: 0.6, rotationDeg: 0 };
+  // 밖으로 끌어도 발자국이 경계 안으로 클램프
+  assert.deepEqual(clampCenterToRoom(it, -5, -5, 3.0, 4.0), { cx: 0.6, cy: 0.3 });
+  assert.deepEqual(clampCenterToRoom(it, 99, 99, 3.0, 4.0), { cx: 3.0 - 0.6, cy: 4.0 - 0.3 });
+  // 회전(90°) 시 스왑된 발자국 기준
+  const r = clampCenterToRoom({ ...it, rotationDeg: 90 }, 0, 0, 3.0, 4.0);
+  assert.deepEqual(r, { cx: 0.3, cy: 0.6 });
 });

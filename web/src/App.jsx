@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef } from 'react';
 import { consumeAuthHash, currentUser, logout } from './lib/auth.js';
 import { toPlacedItem, resolveDims, CATALOG } from './lib/catalog.js';
-import { validateLayout, findFreeSpot, snapRotation } from './lib/geometry.js';
+import { validateLayout, findFreeSpot, snapRotation, clampCenterToRoom } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
 import { fetchDims, layoutFurniture, renderScene, chatLayout, postCommunity } from './lib/api.js';
 import { parseCommand, hasPlaceHint } from './lib/chatcmd.js';
@@ -77,8 +77,22 @@ export default function App() {
     setItems((p) => [...p, it]);
     setSelectedId(it.id);
   }
-  function moveItem(id, cx, cy) { setItems((p) => p.map((it) => (it.id === id ? { ...it, cx, cy } : it))); }
-  function rotateItem(id) { setItems((p) => p.map((it) => (it.id === id ? { ...it, rotationDeg: snapRotation((it.rotationDeg || 0) + 90) } : it))); }
+  // 사용자 편집(드래그/회전)은 방 범위를 벗어날 수 없다 — 발자국 기준 클램프.
+  function moveItem(id, cx, cy) {
+    setItems((p) => p.map((it) => {
+      if (it.id !== id) return it;
+      const c = room ? clampCenterToRoom(it, cx, cy, room.widthM, room.depthM) : { cx, cy };
+      return { ...it, cx: c.cx, cy: c.cy };
+    }));
+  }
+  function rotateItem(id) {
+    setItems((p) => p.map((it) => {
+      if (it.id !== id) return it;
+      const rot = snapRotation((it.rotationDeg || 0) + 90);
+      const c = room ? clampCenterToRoom({ ...it, rotationDeg: rot }, it.cx, it.cy, room.widthM, room.depthM) : { cx: it.cx, cy: it.cy };
+      return { ...it, rotationDeg: rot, cx: c.cx, cy: c.cy };
+    }));
+  }
   function rotateSel() { if (selectedId) rotateItem(selectedId); }
   function deleteSel() { setItems((p) => p.filter((it) => it.id !== selectedId)); setSelectedId(null); }
   function setSelDim(field, cm) {

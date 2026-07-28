@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Line, Group, Text, Circle, Shape, Image as KImage } from 'react-konva';
-import { effectiveFootprint, doorSwing } from '../lib/geometry.js';
+import { effectiveFootprint, clampCenterToRoom, doorSwing } from '../lib/geometry.js';
 import { accuracyMeta } from '../lib/catalog.js';
 
 const PAD = 16;
@@ -43,11 +43,16 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
   const stageH = room.depthM * ppm + 2 * PAD;
 
   const toPx = (m) => m * ppm;
+  const toM = (px) => px / ppm;
 
-  function moveItem(idx, xPx, yPx) {
-    const cx = (xPx - PAD) / ppm;
-    const cy = (yPx - PAD) / ppm;
-    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, cx, cy } : it)));
+  function moveItem(idx, xPx, yPx, node) {
+    const it = items[idx];
+    const raw = { cx: toM(xPx - PAD), cy: toM(yPx - PAD) };
+    const c = clampCenterToRoom(it, raw.cx, raw.cy, room.widthM, room.depthM);   // 방 밖 드래그 금지
+    if (node && (Math.abs(c.cx - raw.cx) > 1e-9 || Math.abs(c.cy - raw.cy) > 1e-9)) {
+      node.position({ x: PAD + toPx(c.cx), y: PAD + toPx(c.cy) });               // 노드도 경계 안으로 되돌림
+    }
+    setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, cx: c.cx, cy: c.cy } : x)));
   }
 
   // 0.5m 격자
@@ -130,7 +135,7 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                 x={PAD + toPx(it.cx)}
                 y={PAD + toPx(it.cy)}
                 draggable
-                onDragMove={(e) => moveItem(idx, e.target.x(), e.target.y())}
+                onDragMove={(e) => moveItem(idx, e.target.x(), e.target.y(), e.target)}
                 onClick={() => setSelectedId(it.id)}
                 onTap={() => setSelectedId(it.id)}
               >

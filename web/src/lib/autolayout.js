@@ -106,11 +106,39 @@ function repairCandidate(items, room, openings = []) {
     if (!p) return null;                             // 배치 실패 → 후보 폐기(로컬 폴백으로)
     it.cx = p.cx; it.cy = p.cy; it.rotationDeg = p.rot; delete it._place; placed.push({ box: p.box, it }); moved++;
   }
-  // 낮은 조명(h<70cm): 배치된 책상/테이블이 있으면 그 위 코너쪽으로(사용자 지시)
+  // 조명 후처리(복수 대응): 낮은 조명은 책상/테이블 위(양끝 순서대로), 플로어 스탠드는 침대 헤드 옆으로.
+  let repDeskLampEnd = 0;
   for (const it of res) {
-    if (roles.get(it.id) !== 'lamp' || it.hM >= DESK_LAMP_MAX_H) continue;
-    const surfP = placed.find((pp) => pp.it && (pp.it.cat === '책상' || pp.it.cat === '테이블') && pp.it.hM);
-    if (surfP) { placeLampOnDesk(it, surfP.it, W, D); delete it._place; moved++; }
+    if (roles.get(it.id) !== 'lamp') continue;
+    if (it.hM < DESK_LAMP_MAX_H) {
+      const surfP = placed.find((pp) => pp.it && (pp.it.cat === '책상' || pp.it.cat === '테이블') && pp.it.hM);
+      if (surfP) { placeLampOnDesk(it, surfP.it, W, D, repDeskLampEnd++); delete it._place; moved++; }
+      continue;
+    }
+    // 플로어 스탠드: 침대가 있으면 헤드 양옆 후보로 스냅(이미 헤드 옆이면 유지)
+    const bedP = placed.find((pp) => pp.it && pp.it.cat === '침대');
+    if (!bedP) continue;
+    const bedIt = bedP.it;
+    const bw2 = { 0: 'top', 180: 'bottom', 270: 'left', 90: 'right' }[bedIt.rotationDeg || 0];
+    if (!bw2) continue;
+    const bb = itemAABB(bedIt);
+    const rot = bedIt.rotationDeg || 0;
+    const { w: lw, d: ld } = effectiveFootprint(it.wM, it.dM, rot);
+    const cands = (bw2 === 'top' || bw2 === 'bottom')
+      ? [{ cx: bb.right + lw / 2 + 0.03, cy: bw2 === 'top' ? ld / 2 + 0.005 : D - ld / 2 - 0.005, rot },
+         { cx: bb.left - lw / 2 - 0.03, cy: bw2 === 'top' ? ld / 2 + 0.005 : D - ld / 2 - 0.005, rot }]
+      : [{ cx: bw2 === 'left' ? lw / 2 + 0.005 : W - lw / 2 - 0.005, cy: bb.top - ld / 2 - 0.03, rot },
+         { cx: bw2 === 'left' ? lw / 2 + 0.005 : W - lw / 2 - 0.005, cy: bb.bottom + ld / 2 + 0.03, rot }];
+    const near = cands.some((c) => Math.hypot(c.cx - it.cx, c.cy - it.cy) < 0.25);
+    if (near) continue;                                    // 이미 헤드 옆 → 유지
+    for (const c of cands) {
+      const b = boxAt(it, c.cx, c.cy, c.rot);
+      if (inRoom(b, W, D) && !overlapsOther(b, it)
+          && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))) {
+        it.cx = c.cx; it.cy = c.cy; it.rotationDeg = c.rot; delete it._place;
+        placed.push({ box: b, it }); moved++; break;
+      }
+    }
   }
   // 러그: 문 스윙 위면 가장 가까운 회피 자리로(가구 겹침은 허용 유지)
   for (const it of res) {
@@ -199,7 +227,7 @@ function segSlots(it, seg) {
 // 낮은 조명(h<70cm) = 탁상 스탠드 — 책상/테이블 '위'에 올린다(elevM = 상판 높이).
 // 책상이 방 코너에 붙어 있으면 조명도 그 코너 쪽 끝에(사용자 지시).
 export const DESK_LAMP_MAX_H = 0.7;
-function placeLampOnDesk(lamp, desk, W, D) {
+function placeLampOnDesk(lamp, desk, W, D, end = 0) {
   const b = itemAABB(desk);
   const roomCorners = [[0, 0], [W, 0], [0, D], [W, D]];
   const deskCorners = [[b.left, b.top], [b.right, b.top], [b.left, b.bottom], [b.right, b.bottom]];
@@ -207,6 +235,11 @@ function placeLampOnDesk(lamp, desk, W, D) {
   for (const dc of deskCorners) for (const rc of roomCorners) {
     const dd = Math.hypot(dc[0] - rc[0], dc[1] - rc[1]);
     if (dd < bestD) { bestD = dd; best = dc; }
+  }
+  // 두 번째 탁상 조명은 반대쪽 끝(코너쪽 끝과 가장 먼 상판 모서리)에
+  if (end > 0) {
+    best = deskCorners.reduce((far, dc) =>
+      Math.hypot(dc[0] - best[0], dc[1] - best[1]) > Math.hypot(far[0] - best[0], far[1] - best[1]) ? dc : far, deskCorners[0]);
   }
   const cl = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
   lamp.cx = cl(best[0], b.left + lamp.wM / 2 + 0.03, b.right - lamp.wM / 2 - 0.03);
@@ -415,7 +448,7 @@ function attempt(room, items, openings = [], relax = 1) {
   const desk = solids.find((it) => roles.get(it.id) === 'desk') || solids.find((it) => roles.get(it.id) === 'table');
   const chair = solids.find((it) => roles.get(it.id) === 'chair');
   const tv = solids.find((it) => isTV(it) && roles.get(it.id) !== 'bed');
-  const lamp = solids.find((it) => roles.get(it.id) === 'lamp');
+  const lamps = solids.filter((it) => roles.get(it.id) === 'lamp');   // 조명 전부(큰 것·작은 것 각자 규칙)
 
   // 1) 침대(최대 앵커) — 코너(꼭짓점) 밀착 우선(사용자 지시), 안 되면 벽면 폴백. 못 놓으면 폐기.
   let bedWall = null;
@@ -437,12 +470,17 @@ function attempt(room, items, openings = [], relax = 1) {
     if (!set) return null;                              // 책상(+의자) 못 놓으면 폐기
     done.add(desk.id); if (chair && set.chair) { done.add(chair.id); rel.r2 = true; }
   }
-  // 4) R3: 조명 — 낮은 조명(h<70cm)은 책상/테이블 위 코너쪽 끝에(R3-b), 플로어 스탠드는 침대 헤드 코너에
-  if (lamp && lamp.hM < DESK_LAMP_MAX_H && desk && done.has(desk.id)) {
-    placeLampOnDesk(lamp, desk, W, D);
-    rel.r3 = true; done.add(lamp.id);
-  } else if (lamp && bed && bedWall) {
-    rel.r3 = placeLampAtBedHead(lamp, bed, bedWall, placed, W, D, openings); if (rel.r3) done.add(lamp.id);
+  // 4) R3: 조명 전부 각자 규칙 — 낮은 조명(h<70cm)은 책상/테이블 위(R3-b, 두 번째는 반대쪽 끝),
+  //    플로어 스탠드는 침대 헤드 코너(두 번째는 반대편 코너 — placeLampAtBedHead가 빈쪽을 자동 선택).
+  let deskLampEnd = 0;
+  for (const lampIt of lamps) {
+    if (lampIt.hM < DESK_LAMP_MAX_H && desk && done.has(desk.id)) {
+      placeLampOnDesk(lampIt, desk, W, D, deskLampEnd++);
+      rel.r3 = true; done.add(lampIt.id);
+    } else if (bed && bedWall) {
+      const okL = placeLampAtBedHead(lampIt, bed, bedWall, placed, W, D, openings);
+      if (okL) { rel.r3 = true; done.add(lampIt.id); }
+    }
   }
 
   // 5) 나머지 — 크기순(면적 내림차순)으로 코너부터(사용자 지시). 동률은 랜덤 변주.

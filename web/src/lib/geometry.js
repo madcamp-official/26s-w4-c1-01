@@ -327,6 +327,13 @@ export function circulationScore(items, roomWM, roomDM, cell = 0.1, cutouts = []
   return { connected: freeTotal ? best / freeTotal : 1, freeRatio: freeTotal / (nx * ny) };
 }
 
+// 사용자 드래그/회전 클램프 — 발자국이 방 사각형 밖으로 못 나가게 중심좌표 제한(2D·3D 편집 공용).
+export function clampCenterToRoom(item, cx, cy, roomWM, roomDM) {
+  const { w, d } = effectiveFootprint(item.wM, item.dM, item.rotationDeg || 0);
+  const cl = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+  return { cx: cl(cx, w / 2, roomWM - w / 2), cy: cl(cy, d / 2, roomDM - d / 2) };
+}
+
 // 겹치지 않는 초기 배치 지점 찾기(간단 그리드 탐색) — "다중 배치 자동 정리"의 씨앗.
 export function findFreeSpot(newItem, placed, roomWM, roomDM, step = 0.1, cutouts = []) {
   const { w, d } = effectiveFootprint(newItem.wM, newItem.dM, newItem.rotationDeg || 0);
