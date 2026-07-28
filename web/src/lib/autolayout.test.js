@@ -250,23 +250,24 @@ test('validateCandidates: 겹치는 LLM 후보는 폐기 대신 보정', () => {
   assert.equal(validateCandidates(cand, tiny, bigItems).length, 0);
 });
 
-test('validateCandidates: 책상 밑 틈입한 Gemini 의자는 보정에서 유지', () => {
+test('validateCandidates: 벽 중간 Gemini 책상 → 코너 스냅 + 의자 세트 재구성', () => {
   const room = { widthM: 3.0, depthM: 4.0 };
   const items = [
     { id: 'desk', cat: '책상', name: '책상', wM: 1.2, dM: 0.6, hM: 0.75, cx: 0, cy: 0, rotationDeg: 0 },
     { id: 'chair', cat: '의자', name: '의자', wM: 0.55, dM: 0.55, hM: 0.9, cx: 0, cy: 0, rotationDeg: 0 },
   ];
-  // 책상 앞면(+y)에 의자를 28cm만 띄워 틈입시킨 유효 구도(cm 단위)
+  // Gemini가 책상을 위벽 '중간'에, 의자를 틈입 구도로 놓은 후보
   const cand = [{ strategy: 'tuck', items: [
     { id: 'desk', cx: 150, cy: 60, rotation: 0 },
     { id: 'chair', cx: 150, cy: 88, rotation: 180 },
   ] }];
   const rb = validateCandidates(cand, room, items);
-  assert.equal(rb.length, 1, '구도 후보 채택');
+  assert.equal(rb.length, 1, '후보 채택');
   const d = rb[0].items.find((x) => x.id === 'desk'), c = rb[0].items.find((x) => x.id === 'chair');
-  // 보정이 의자를 끌어내지 않고 틈입 위치 그대로 유지(구도 겹침 허용)
-  assert.ok(deskChairComposed(c, d), '보정 후에도 구도 유지');
-  assert.ok(Math.abs(c.cx - 1.5) < 1e-6 && Math.abs(c.cy - 0.88) < 1e-6, '의자 원위치 유지');
+  // 새 정책: 책상은 코너로 스냅(러그 제외 크기순 코너), 의자는 세트로 따라가 구도 유지
+  const db = itemAABB(d);
+  assert.ok((db.left <= 0.14 || db.right >= 3.0 - 0.14) && (db.top <= 0.14 || db.bottom >= 4.0 - 0.14), '책상 코너 스냅');
+  assert.ok(deskChairComposed(c, d), '의자가 책상 앞면 구도로 재구성');
 });
 
 test('frontClearance: 앞면 빈 깊이 계산(벽·장애물)', () => {
@@ -476,4 +477,28 @@ test('책상·테이블 코너 선호(soft): 빈 방에서 책상 세트가 코�
   for (const c of generateLayouts(room, items, 3, 600)) {
     assert.ok(inCorner(c.items.find((x) => x.id === 'desk')), '책상이 코너 밀착');
   }
+});
+
+test('크기순 코너 채우기: 침대·옷장이 서로 다른 코너에, 수납 Gemini 벽중간도 스냅', () => {
+  const room = { widthM: 3.4, depthM: 4.4 };
+  const items = [
+    { id: 'bed', cat: '침대', name: '퀸 침대', wM: 1.5, dM: 2.0, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'wr', cat: '수납', name: '옷장', wM: 1.0, dM: 0.6, hM: 1.8, cx: 0, cy: 0, rotationDeg: 0 },
+  ];
+  const inCorner = (it) => {
+    const b = itemAABB(it);
+    return (b.left <= 0.14 || b.right >= 3.4 - 0.14) && (b.top <= 0.14 || b.bottom >= 4.4 - 0.14);
+  };
+  for (const c of generateLayouts(room, items, 3, 600)) {
+    assert.ok(inCorner(c.items.find((x) => x.id === 'bed')), '침대 코너');
+    assert.ok(inCorner(c.items.find((x) => x.id === 'wr')), '옷장도 코너');
+  }
+  // Gemini가 옷장을 벽 중간에 → 보정이 빈 코너로 스냅
+  const cand = [{ strategy: 'x', items: [
+    { id: 'bed', cx: 75, cy: 100, rotation: 0 },        // 좌상단 코너(유지)
+    { id: 'wr', cx: 170, cy: 410, rotation: 180 },      // 아래벽 중간
+  ] }];
+  const out = validateCandidates(cand, room, items);
+  assert.ok(out.length >= 1);
+  assert.ok(inCorner(out[0].items.find((x) => x.id === 'wr')), '벽중간 옷장 → 코너 스냅');
 });

@@ -42,7 +42,8 @@ function repairCandidate(items, room, openings = []) {
   const roles = new Map(items.map((it) => [it.id, roleOf(it)]));
   const res = items.map((it) => ({ ...it }));       // rug 포함 전부 복사(rug는 바닥 레이어라 그대로 유지)
   const solids = res.filter((it) => roles.get(it.id) !== 'rug');
-  const order = [...solids.filter((it) => ANCHOR.has(roles.get(it.id))), ...solids.filter((it) => !ANCHOR.has(roles.get(it.id)))];
+  // 크기순(발자국 면적 내림차순) — 큰 가구부터 코너를 차지(사용자 지시: 러그 제외 크기순 코너).
+  const order = [...solids].sort((a, b) => b.wM * b.dM - a.wM * a.dM);
   // 컷아웃(비직사각형 방의 벽체)을 '고정 가구'로 시딩 — 유지/재배치 검사가 자동으로 회피.
   const placed = cutAABBs(room.cutouts).map((box) => ({ box, it: { cat: '벽체' } }));
   const segs = wallSegments(room);   // Phase2: 컷아웃 안쪽 면 포함 실제 벽면
@@ -54,17 +55,37 @@ function repairCandidate(items, room, openings = []) {
     const obs = placed.filter((p) => !pairOverlapOK(it, p.it)).map((p) => p.box);
     return frontClearance(it, obs, W, D) >= need;
   };
+  const CORNER_ROLE = new Set(['bed', 'desk', 'storage', 'sofa', 'table']);   // 코너 선호 가구(러그 제외 대형)
   for (const it of order) {
-    const isBed = roles.get(it.id) === 'bed';
-    if (!it._place) {                                // Gemini 위치가 있으면 유효한지 확인 후 유지
-      const b = boxAt(it, it.cx, it.cy, it.rotationDeg);
-      if (inRoom(b, W, D) && !overlapsOther(b, it) && frontOK(it)
-          && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))
-          && (!isBed || itemInCorner({ ...it }, W, D))) { placed.push({ box: b, it }); continue; }   // 침대는 코너일 때만 유지(사용자 지시)
+    const role = roles.get(it.id);
+    const isBed = role === 'bed';
+    const already = !it._place ? boxAt(it, it.cx, it.cy, it.rotationDeg) : null;
+    const validHere = !!already && inRoom(already, W, D) && !overlapsOther(already, it) && frontOK(it)
+      && !openings.some((o) => openingBlocksAABB(already, o, W, D, it.hM));
+    // 의자: 책상 세트 재구성 우선 — 이미 놓인 책상 앞면에 마주보게(틈입/간격은 의자 깊이에 적응)
+    if (role === 'chair') {
+      const deskP = placed.find((pp) => pp.it && (pp.it.cat === '책상' || pp.it.cat === '테이블') && pp.it.rotationDeg != null);
+      if (deskP) {
+        const dk = deskP.it;
+        const crot = (dk.rotationDeg + 180) % 360;
+        const f = FRONT_VEC[dk.rotationDeg];
+        const gap = it.dM <= 0.62 ? -0.25 : 0.03;
+        const off = Math.max(0.05, dk.dM / 2 + it.dM / 2 + gap);
+        const chx = dk.cx + f[0] * off, chy = dk.cy + f[1] * off;
+        const cb = boxAt(it, chx, chy, crot);
+        const probe = { ...it, cx: chx, cy: chy, rotationDeg: crot };   // 구도 판정은 '이동 후' 좌표로
+        if (inRoom(cb, W, D) && !overlapsOther(cb, probe)
+            && !openings.some((o) => openingBlocksAABB(cb, o, W, D, it.hM))) {
+          it.cx = chx; it.cy = chy; it.rotationDeg = crot; delete it._place;
+          placed.push({ box: cb, it }); moved++; continue;
+        }
+      }
     }
+    // 코너에 이미 유효하게 있으면 유지. 코너 선호 가구가 벽 중간에 있으면 아래에서 스냅 시도.
+    if (validHere && (!CORNER_ROLE.has(role) || itemInCorner(it, W, D))) { placed.push({ box: already, it }); continue; }
     const ox = it._place ? (it.cx || W / 2) : it.cx, oy = it._place ? (it.cy || D / 2) : it.cy;
-    // 침대: 가장 가까운 코너로 스냅(사용자 지시). 실패 시 일반 보정으로 폴백.
-    if (isBed) {
+    // 코너 스냅(크기순 순회라 큰 가구부터 코너 차지). 침대는 강제, 나머지는 빈 코너가 있으면.
+    if (CORNER_ROLE.has(role)) {
       const corners = cornerSlots(it, segs)
         .sort((c1, c2) => Math.hypot(c1.cx - ox, c1.cy - oy) - Math.hypot(c2.cx - ox, c2.cy - oy));
       let snapped = false;
@@ -77,6 +98,8 @@ function repairCandidate(items, room, openings = []) {
         }
       }
       if (snapped) continue;
+      // 코너가 다 찼는데 원위치가 유효하면 유지(soft) — 침대만은 일반 보정으로 넘어가 반드시 재배치
+      if (validHere && !isBed) { placed.push({ box: already, it }); continue; }
     }
     // 누락(_place)이거나 위치가 무효 → 원위치(누락은 방 중앙) 근처 유효 자리로 스냅.
     const p = placeItemNear(it, ox, oy, placed, W, D, openings, segs);
@@ -227,10 +250,8 @@ function placeItem(it, placedBoxes, W, D, openings, segs, relax = 1) {
   const free = (b, c) => inRoom(b, W, D) && placedBoxes.every((pb) => !aabbOverlap(b, pb))
     && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))
     && (!need || frontClearance({ ...it, cx: c.cx, cy: c.cy, rotationDeg: c.rot }, placedBoxes, W, D) >= need);
-  const wantCorner = it.cat === '책상' || it.cat === '테이블';   // 코너 선호(soft) — 사용자 지시
-  const wcands = wantCorner
-    ? [...shuffle(cornerSlots(it, segs)), ...shuffle(wallCandidates(it, segs))]
-    : shuffle(wallCandidates(it, segs));
+  // 러그 제외 전 가구 코너 우선(사용자 지시: 크기순으로 코너부터) — 코너 소진 시 벽면·내부로
+  const wcands = [...shuffle(cornerSlots(it, segs)), ...shuffle(wallCandidates(it, segs))];
   for (const c of wcands) {
     const b = boxAt(it, c.cx, c.cy, c.rot);
     if (free(b, c)) return { ...c, box: b, onWall: true };
@@ -364,11 +385,10 @@ function attempt(room, items, openings = [], relax = 1) {
   // 4) R3: 조명 ↔ 침대 헤드 코너
   if (lamp && bed && bedWall) { rel.r3 = placeLampAtBedHead(lamp, bed, bedWall, placed, W, D, openings); if (rel.r3) done.add(lamp.id); }
 
-  // 5) 나머지 — 앵커 먼저, 벽/내부 일반 배치
-  const remaining = solids.filter((it) => !done.has(it.id));
-  const anchors = shuffle(remaining.filter((it) => ANCHOR.has(roles.get(it.id))));
-  const rest = shuffle(remaining.filter((it) => !ANCHOR.has(roles.get(it.id))));
-  for (const it of [...anchors, ...rest]) {
+  // 5) 나머지 — 크기순(면적 내림차순)으로 코너부터(사용자 지시). 동률은 랜덤 변주.
+  const remaining = solids.filter((it) => !done.has(it.id))
+    .sort((a, b) => (b.wM * b.dM - a.wM * a.dM) + (rnd() - 0.5) * 0.01);
+  for (const it of remaining) {
     const p = placeItem(it, placed, W, D, openings, segs, relax);
     if (!p) return null;
     it.cx = p.cx; it.cy = p.cy; it.rotationDeg = p.rot; placed.push(p.box);
@@ -415,7 +435,7 @@ export function generateLayouts(room, items, count = 3, tries = 400, openings = 
     const rc = (v.rel.r1 ? 1 : 0) + (v.rel.r2 ? 1 : 0) + (v.rel.r3 ? 1 : 0);   // 만족한 관계 수
     const bedIt = v.items.find((it) => roleOf(it) === 'bed');
     const corner = bedIt ? (itemInCorner(bedIt, W, D) ? 1 : 0) : 1;             // 침대 코너 밀착(R0, hard 선호)
-    const dtCorner = v.items.filter((it) => (it.cat === '책상' || it.cat === '테이블') && itemInCorner(it, W, D)).length;
+    const dtCorner = v.items.filter((it) => ['책상', '테이블', '수납', '소파'].includes(it.cat) && itemInCorner(it, W, D)).length;
     v.score = 10 * rc + 0.6 * v.wallRatio + 0.4 * v.circulation - 4 * v.fv + 2 * corner + 0.7 * dtCorner;
   }
   // 앞면 위반 0인 후보가 하나라도 있으면 위반 배치는 아예 제외(hard 정책).
