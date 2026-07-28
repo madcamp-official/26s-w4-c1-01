@@ -461,3 +461,19 @@ test('침대 코너 밀착(사용자 지시): 로컬 엔진·Gemini 보정 모�
   assert.ok(out.length >= 1, '보정 채택');
   assert.ok(inCorner(out[0].items.find((x) => x.id === 'bed')), '보정된 침대도 코너');
 });
+
+test('책상·테이블 코너 선호(soft): 빈 방에서 책상 세트가 코너에 앉음', () => {
+  const room = { widthM: 3.4, depthM: 4.2 };
+  const items = [
+    { id: 'desk', cat: '책상', name: '책상', wM: 1.2, dM: 0.6, hM: 0.75, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'chair', cat: '의자', name: '의자', wM: 0.5, dM: 0.5, hM: 0.9, cx: 0, cy: 0, rotationDeg: 0 },
+  ];
+  const inCorner = (it) => {
+    const b = itemAABB(it);
+    return (b.left <= 0.14 || b.right >= 3.4 - 0.14) && (b.top <= 0.14 || b.bottom >= 4.2 - 0.14);
+  };
+  // 코너 슬롯을 먼저 시도하므로 빈 방에선 항상 코너에 앉아야 함(soft지만 우선순위 1)
+  for (const c of generateLayouts(room, items, 3, 600)) {
+    assert.ok(inCorner(c.items.find((x) => x.id === 'desk')), '책상이 코너 밀착');
+  }
+});

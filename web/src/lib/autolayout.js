@@ -60,12 +60,12 @@ function repairCandidate(items, room, openings = []) {
       const b = boxAt(it, it.cx, it.cy, it.rotationDeg);
       if (inRoom(b, W, D) && !overlapsOther(b, it) && frontOK(it)
           && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))
-          && (!isBed || bedInCorner({ ...it }, W, D))) { placed.push({ box: b, it }); continue; }   // 침대는 코너일 때만 유지(사용자 지시)
+          && (!isBed || itemInCorner({ ...it }, W, D))) { placed.push({ box: b, it }); continue; }   // 침대는 코너일 때만 유지(사용자 지시)
     }
     const ox = it._place ? (it.cx || W / 2) : it.cx, oy = it._place ? (it.cy || D / 2) : it.cy;
     // 침대: 가장 가까운 코너로 스냅(사용자 지시). 실패 시 일반 보정으로 폴백.
     if (isBed) {
-      const corners = bedCornerSlots(it, segs)
+      const corners = cornerSlots(it, segs)
         .sort((c1, c2) => Math.hypot(c1.cx - ox, c1.cy - oy) - Math.hypot(c2.cx - ox, c2.cy - oy));
       let snapped = false;
       for (const c of corners) {
@@ -159,8 +159,9 @@ function segSlots(it, seg) {
   for (let t = lo; t <= hi + 1e-9; t += STEP) out.push(horiz ? { cx: t, cy: fixed, rot } : { cx: fixed, cy: t, rot });
   return out;
 }
-// 침대 코너 슬롯 — 각 바운딩 세그먼트의 양 끝(=두 벽이 만나는 꼭짓점 자리). 사용자 지시: 침대는 코너 밀착.
-function bedCornerSlots(bed, segs) {
+// 코너 슬롯 — 각 바운딩 세그먼트의 양 끝(=두 벽이 만나는 꼭짓점 자리).
+// 침대는 코너 강제(R0), 책상·테이블은 코너 선호(soft) — 사용자 지시.
+function cornerSlots(bed, segs) {
   const out = [];
   for (const sg of segs.filter((x) => x.src === 'bound')) {
     const rot = FACE_ROT[sg.kind];
@@ -179,8 +180,8 @@ function bedCornerSlots(bed, segs) {
   }
   return out;
 }
-// 침대가 코너에 밀착했는가 — 서로 수직인 바운딩 벽 2면에 동시 근접(tol).
-function bedInCorner(bed, W, D, tol = 0.14) {
+// 가구가 코너에 밀착했는가 — 서로 수직인 바운딩 벽 2면에 동시 근접(tol).
+function itemInCorner(bed, W, D, tol = 0.14) {
   const b = itemAABB(bed);
   const xTouch = b.left <= tol || b.right >= W - tol;
   const yTouch = b.top <= tol || b.bottom >= D - tol;
@@ -226,7 +227,11 @@ function placeItem(it, placedBoxes, W, D, openings, segs, relax = 1) {
   const free = (b, c) => inRoom(b, W, D) && placedBoxes.every((pb) => !aabbOverlap(b, pb))
     && !openings.some((o) => openingBlocksAABB(b, o, W, D, it.hM))
     && (!need || frontClearance({ ...it, cx: c.cx, cy: c.cy, rotationDeg: c.rot }, placedBoxes, W, D) >= need);
-  for (const c of shuffle(wallCandidates(it, segs))) {
+  const wantCorner = it.cat === '책상' || it.cat === '테이블';   // 코너 선호(soft) — 사용자 지시
+  const wcands = wantCorner
+    ? [...shuffle(cornerSlots(it, segs)), ...shuffle(wallCandidates(it, segs))]
+    : shuffle(wallCandidates(it, segs));
+  for (const c of wcands) {
     const b = boxAt(it, c.cx, c.cy, c.rot);
     if (free(b, c)) return { ...c, box: b, onWall: true };
   }
@@ -267,7 +272,8 @@ function placeTVFacingBed(tv, bed, bedWall, placed, W, D, openings, segs, cuts) 
 // R2: 책상을 벽에, 의자를 책상 앞면 앞에 마주보게(세트). 의자까지 놓여야 성공.
 function placeDeskChair(desk, chair, placed, W, D, openings, segs) {
   for (const wall of shuffle(['top', 'bottom', 'left', 'right'])) {
-    for (const c of shuffle(wallSlots(desk, wall, segs))) {
+    const cornerFirst = shuffle(cornerSlots(desk, segs).filter((c) => c.wall === wall));
+    for (const c of [...cornerFirst, ...shuffle(wallSlots(desk, wall, segs))]) {
       const deskBox = boxAt(desk, c.cx, c.cy, c.rot);
       const deskFree = placed.every((pb) => !aabbOverlap(deskBox, pb)) && !openings.some((o) => openingBlocksAABB(deskBox, o, W, D, desk.hM));
       if (!inRoom(deskBox, W, D) || !deskFree) continue;
@@ -338,7 +344,7 @@ function attempt(room, items, openings = [], relax = 1) {
   // 1) 침대(최대 앵커) — 코너(꼭짓점) 밀착 우선(사용자 지시), 안 되면 벽면 폴백. 못 놓으면 폐기.
   let bedWall = null;
   if (bed) {
-    for (const c of shuffle(bedCornerSlots(bed, segs))) {
+    for (const c of shuffle(cornerSlots(bed, segs))) {
       if (commit(bed, c.cx, c.cy, c.rot, placed, W, D, openings)) { bedWall = c.wall; break; }
     }
     if (!bedWall) {
@@ -408,8 +414,9 @@ export function generateLayouts(room, items, count = 3, tries = 400, openings = 
     v.fv = frontViolations(v.items, W, D, room.cutouts);                       // 앞면 여유 위반(컷아웃 벽체 포함)
     const rc = (v.rel.r1 ? 1 : 0) + (v.rel.r2 ? 1 : 0) + (v.rel.r3 ? 1 : 0);   // 만족한 관계 수
     const bedIt = v.items.find((it) => roleOf(it) === 'bed');
-    const corner = bedIt ? (bedInCorner(bedIt, W, D) ? 1 : 0) : 1;             // 침대 코너 밀착(사용자 지시)
-    v.score = 10 * rc + 0.6 * v.wallRatio + 0.4 * v.circulation - 4 * v.fv + 2 * corner;
+    const corner = bedIt ? (itemInCorner(bedIt, W, D) ? 1 : 0) : 1;             // 침대 코너 밀착(R0, hard 선호)
+    const dtCorner = v.items.filter((it) => (it.cat === '책상' || it.cat === '테이블') && itemInCorner(it, W, D)).length;
+    v.score = 10 * rc + 0.6 * v.wallRatio + 0.4 * v.circulation - 4 * v.fv + 2 * corner + 0.7 * dtCorner;
   }
   // 앞면 위반 0인 후보가 하나라도 있으면 위반 배치는 아예 제외(hard 정책).
   const clean = valid.filter((v) => v.fv === 0);
