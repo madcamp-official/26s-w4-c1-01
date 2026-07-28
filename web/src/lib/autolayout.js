@@ -2,7 +2,7 @@
 // 원칙: 배치할 때마다 겹침/방밖을 검증해 "유효한 자리"에만 놓는다. 한 가구라도 못 놓으면 그 배치는 폐기.
 // 가중치: 대부분의 가구는 벽에 밀착(벽 자리를 먼저 시도). 러그는 바닥 레이어(중앙, 충돌 제외).
 // 랜덤 변주로 서로 다른 유효 배치 여러 개를 만들고, 벽밀착률 높은 순 + 다양성으로 상위 N개를 고른다.
-import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore, openingBlocksAABB, pairOverlapOK, frontClearance, frontViolations, FRONT_NEED, EPS } from './geometry.js';
+import { effectiveFootprint, aabbOverlap, itemAABB, validateLayout, circulationScore, openingBlocksAABB, pairOverlapOK, frontClearance, frontViolations, FRONT_NEED, cutAABBs, EPS } from './geometry.js';
 
 // LLM 후보(cm 좌표) → 우리 아이템으로 매핑 + 겹침/방밖 재검증(안전망). 유효한 배치만 반환.
 // LLM 산술은 틀릴 수 있으므로 여기서 반드시 재검사해 겹치는 후보를 폐기한다.
@@ -18,11 +18,11 @@ export function validateCandidates(candidates, room, items, openings = []) {
       return { ...it, cx: (Number(ci.cx) || 0) / 100, cy: (Number(ci.cy) || 0) / 100, rotationDeg: rot };
     });
     // LLM 산술 오류(겹침/방밖/개구부 침범)·누락을 '기각' 대신 '보정' — 위반/누락 가구만 유효 자리로 배치.
-    const rep = repairCandidate(mapped, room, openings);
+    const rep = repairCandidate(mapped, room, openings);   // room.cutouts는 repair 내부에서 장애물로 시딩
     if (!rep) continue;                           // 보정 불가(자리 없음) → 폐기 → 로컬 폴백이 채움
     // 품질 게이트: 보정 후에도 수납/책상/소파 앞면이 막힌 배치는 '유효하지만 나쁜' 배치 → 폐기.
     // (LLM 후보를 무조건 살리다 배치 품질이 떨어지는 문제 방지 — 미달이면 로컬 엔진이 채움)
-    if (frontViolations(rep.items, W, D) > 0) continue;
+    if (frontViolations(rep.items, W, D, room.cutouts) > 0) continue;
     const nonRug = rep.items.filter((it) => it.cat !== '러그');
     const touch = nonRug.filter((it) => {
       const b = itemAABB(it);
@@ -45,7 +45,8 @@ function repairCandidate(items, room, openings = []) {
   const res = items.map((it) => ({ ...it }));       // rug 포함 전부 복사(rug는 바닥 레이어라 그대로 유지)
   const solids = res.filter((it) => roles.get(it.id) !== 'rug');
   const order = [...solids.filter((it) => ANCHOR.has(roles.get(it.id))), ...solids.filter((it) => !ANCHOR.has(roles.get(it.id)))];
-  const placed = [];   // {box, it} — 의자-책상 구도 겹침 허용 위해 아이템도 보관
+  // 컷아웃(비직사각형 방의 벽체)을 '고정 가구'로 시딩 — 유지/재배치 검사가 자동으로 회피.
+  const placed = cutAABBs(room.cutouts).map((box) => ({ box, it: { cat: '벽체' } }));
   const overlapsOther = (b, it) => placed.some((p) => aabbOverlap(b, p.box) && !pairOverlapOK(it, p.it));
   let moved = 0;
   const frontOK = (it) => {
@@ -243,11 +244,12 @@ function placeLampAtBedHead(lamp, bed, bedWall, placed, W, D, openings) {
 // 필수 관계 R1(TV↔침대)·R2(의자↔책상 세트)·R3(조명↔침대헤드)를 우선 배치하고, 나머지는 벽/내부에.
 function attempt(room, items, openings = [], relax = 1) {
   const W = room.widthM, D = room.depthM;
+  const cuts = cutAABBs(room.cutouts);   // 컷아웃 = 처음부터 놓여 있는 벽체
   const res = items.map((it) => ({ ...it }));
   const roles = new Map(res.map((it) => [it.id, roleOf(it)]));
   res.filter((it) => roles.get(it.id) === 'rug').forEach((it) => { it.rotationDeg = 0; it.cx = W / 2; it.cy = D / 2; });
   const solids = res.filter((it) => roles.get(it.id) !== 'rug');
-  const placed = [];
+  const placed = [...cuts];
   const done = new Set();
   const rel = { r1: null, r2: null, r3: null };
 
@@ -321,8 +323,8 @@ export function generateLayouts(room, items, count = 3, tries = 400, openings = 
   const W = room.widthM, D = room.depthM;
   for (const v of valid) {
     const solids = v.items.filter((it) => roleOf(it) !== 'rug');
-    v.circulation = circulationScore(solids, W, D).connected;
-    v.fv = frontViolations(v.items, W, D);                                     // 앞면 여유 위반(수납/책상/소파)
+    v.circulation = circulationScore(solids, W, D, 0.1, room.cutouts).connected;
+    v.fv = frontViolations(v.items, W, D, room.cutouts);                       // 앞면 여유 위반(컷아웃 벽체 포함)
     const rc = (v.rel.r1 ? 1 : 0) + (v.rel.r2 ? 1 : 0) + (v.rel.r3 ? 1 : 0);   // 만족한 관계 수
     v.score = 10 * rc + 0.6 * v.wallRatio + 0.4 * v.circulation - 4 * v.fv;    // 관계 최우선, 앞면 막힘 강한 감점
   }

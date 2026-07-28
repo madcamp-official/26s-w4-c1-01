@@ -373,3 +373,34 @@ test('컷아웃: frontClearance가 컷아웃 벽체에 막힘 + openingOnCutout 
   assert.equal(openingOnCutout({ wall: 'bottom', pos: 0.8, width: 0.9 }, 3.0, 4.0, cut), false);
   assert.equal(openingOnCutout({ wall: 'top', pos: 2.4, width: 0.9 }, 3.0, 4.0, cut), false, '반대 벽은 무관');
 });
+
+test('generateLayouts: L자 방(컷아웃) — 어떤 가구도 컷아웃 침범 없음', () => {
+  const room = { widthM: 3.2, depthM: 4.6, cutouts: [{ x: 1.7, y: 3.2, w: 1.5, d: 1.4 }] };  // 우하단 욕실
+  const items = [
+    { id: 'bed', cat: '침대', name: '퀸 침대', wM: 1.5, dM: 2.0, hM: 0.5, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'desk', cat: '책상', name: '책상', wM: 1.1, dM: 0.6, hM: 0.75, cx: 0, cy: 0, rotationDeg: 0 },
+    { id: 'wr', cat: '수납', name: '옷장', wM: 0.9, dM: 0.55, hM: 1.8, cx: 0, cy: 0, rotationDeg: 0 },
+  ];
+  const cands = generateLayouts(room, items, 3, 600);
+  assert.ok(cands.length >= 1, 'L자 방에서도 배치 가능');
+  for (const c of cands) {
+    for (const it of c.items.filter((x) => x.cat !== '러그')) {
+      assert.equal(outOfRoom(itemAABB(it), room.widthM, room.depthM, room.cutouts), false,
+        `${it.id}가 컷아웃/방밖 침범 금지`);
+    }
+    const v = validateLayout(c.items.filter((x) => x.cat !== '러그'), room.widthM, room.depthM, [], room.cutouts);
+    assert.ok(v.ok, '컷아웃 인지 validateLayout 통과');
+  }
+});
+
+test('validateCandidates: 컷아웃 위 Gemini 후보는 보정으로 밀어냄', () => {
+  const room = { widthM: 3.0, depthM: 4.0, cutouts: [{ x: 1.6, y: 2.6, w: 1.4, d: 1.4 }] };
+  const items = [{ id: 'wr', cat: '수납', name: '옷장', wM: 1.0, dM: 0.5, hM: 1.8, cx: 0, cy: 0, rotationDeg: 0 }];
+  // 컷아웃 한복판에 놓은 LLM 후보
+  const bad = [{ strategy: 'x', items: [{ id: 'wr', cx: 230, cy: 330, rotation: 0 }] }];
+  const out = validateCandidates(bad, room, items);
+  for (const c of out) {
+    const it = c.items.find((x) => x.id === 'wr');
+    assert.equal(outOfRoom(itemAABB(it), 3.0, 4.0, room.cutouts), false, '보정 후 컷아웃 밖');
+  }
+});
