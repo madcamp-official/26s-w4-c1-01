@@ -14,7 +14,7 @@ android {
         versionCode 1
         versionName "1.0"
         // 앱이 로드할 배포 URL — 터널 개통 후 도메인 확정되면 여기만 바꾸면 됨
-        buildConfigField "String", "APP_URL", '"https://bangkku.madcamp-kaist.org"'
+        buildConfigField "String", "APP_URL", '"https://bangkku-fairy.madcamp-kaist.org"'
     }
     buildFeatures { buildConfig true }
     buildTypes {

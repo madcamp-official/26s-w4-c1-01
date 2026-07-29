@@ -38,6 +38,25 @@ def living_bbox(W, D, cutouts):
     return (0.0, W, 0.0, D) if x1 <= x0 or y1 <= y0 else (x0, x1, y0, y1)
 
 
+def _hits(px, py, qx, qy, r):
+    """선분 (px,py)-(qx,qy)가 축정렬 사각형 r=(x0,x1,y0,y1)을 지나는가 — slab test."""
+    a, b, c, d = r
+    dx, dy = qx - px, qy - py
+    t0, t1 = 0.0, 1.0
+    for p, q, lo, hi in ((dx, px, a, b), (dy, py, c, d)):
+        if abs(p) < 1e-9:
+            if q < lo or q > hi:
+                return False
+            continue
+        s0, s1 = (lo - q) / p, (hi - q) / p
+        if s0 > s1:
+            s0, s1 = s1, s0
+        t0, t1 = max(t0, s0), min(t1, s1)
+        if t0 > t1:
+            return False
+    return t1 - t0 > 1e-6      # 스치듯 접하는 건 가림으로 치지 않는다
+
+
 def auto_camera(view, W, D, H, cutouts=None):
     """자동 다각도 카메라(Blender 좌표) — '컷아웃(부속실 벽체)이 가장 적은 코너' 밖에서 방 안을 봄.
     고정 near-left 코너를 쓰면 그 코너에 욕실·주방 벽체가 있을 때 화면이 벽으로 가득 찬다.
@@ -47,14 +66,35 @@ def auto_camera(view, W, D, H, cutouts=None):
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     corners = {("near", "left"): (x0, y0), ("near", "right"): (x1, y0),
                ("far", "left"): (x0, y1), ("far", "right"): (x1, y1)}
+    rects = [(c["x"] - c["w"] / 2, c["x"] + c["w"] / 2, c["y"] - c["d"] / 2, c["y"] + c["d"] / 2)
+             for c in (cutouts or [])]
 
-    def blocked(px, py):    # 코너에 가까운 컷아웃일수록 크게 가림(면적/거리² 가중)
-        s = 0.0
-        for c in cutouts or []:
-            s += c["w"] * c["d"] / (1.0 + (c["x"] - px) ** 2 + (c["y"] - py) ** 2)
-        return s
+    def visible(px, py):
+        """그 지점에서 실제로 보이는 바닥 비율 — 부속실 벽체(전고)는 시선을 막는다.
+        '가까운 컷아웃 면적'만 세던 예전 방식은 방을 가로지르는 칸막이를 못 봤다.
+        판정은 코너가 아니라 '실제 카메라 위치'(뒤로 뺀 자리)에서 한다 — 뒤로 물러나면
+        각도가 눕고 칸막이가 더 많이 겹친다(1호: 코너 100% → 실제 위치 42%)."""
+        step, seen, tot = 0.25, 0, 0
+        gy = y0 + step / 2
+        while gy < y1:
+            gx = x0 + step / 2
+            while gx < x1:
+                if not any(a <= gx <= b and c <= gy <= d for (a, b, c, d) in rects):
+                    tot += 1
+                    if not any(_hits(px, py, gx, gy, r) for r in rects):
+                        seen += 1
+                gx += step
+            gy += step
+        return seen / tot if tot else 0.0
 
-    yside, xside = min(corners, key=lambda k: blocked(*corners[k]))
+    back = 0.85 + 0.42 * max(LW, LD)      # wide 카메라가 코너에서 물러나는 거리(아래와 동일 식)
+
+    def campos(k):
+        kx, ky = corners[k]
+        return (kx - (back * 0.8 if k[1] == "left" else -back * 0.8),
+                ky - (back * 0.8 if k[0] == "near" else -back * 0.8))
+
+    yside, xside = max(corners, key=lambda k: visible(*campos(k)))
     if view == "wide2":   # '반대편' = 최적 코너의 대각 — 카메라 쪽 부속실 면은 blender가 컷어웨이한다
         yside = "near" if yside == "far" else "far"
         xside = "left" if xside == "right" else "right"
