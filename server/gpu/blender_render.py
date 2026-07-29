@@ -287,14 +287,26 @@ for _ci, _c in enumerate(S.get("cutouts", [])):
     _hw, _hd = _c["w"] / 2, _c["d"] / 2
     _x0, _x1 = _c["x"] - _hw, _c["x"] + _hw
     _y0, _y1 = _c["y"] - _hd, _c["y"] + _hd
-    if _y0 > _EPSB:      # 앞면(-y)
-        plane(f"cut{_ci}_n", _c["w"], H, (_c["x"], _y0, H / 2), rot=(math.radians(90), 0, 0), m=WALL)
-    if _y1 < D - _EPSB:  # 뒷면(+y)
-        plane(f"cut{_ci}_f", _c["w"], H, (_c["x"], _y1, H / 2), rot=(math.radians(90), 0, 0), m=WALL)
-    if _x0 > _EPSB:      # 왼면(-x)
-        plane(f"cut{_ci}_l", H, _c["d"], (_x0, _c["y"], H / 2), rot=(0, math.radians(90), 0), m=WALL)
-    if _x1 < W - _EPSB:  # 오른면(+x)
-        plane(f"cut{_ci}_r", H, _c["d"], (_x1, _c["y"], H / 2), rot=(0, math.radians(-90), 0), m=WALL)
+    # 컷어웨이 일관성: '숨김 벽에 붙은' 부속실은 그 벽과 함께 통째로 잘려나간 것으로 취급 —
+    # 모든 면을 카메라에서 숨긴다(빛·그림자는 유지). 아니면 반대편(wide2) 등에서 부속실 벽의
+    # 뒷면이 화면을 가려 '벽만 보이는 그림'이 된다. 카메라 반대쪽 부속실은 그대로 보인다.
+    _touch = set()
+    if _y0 <= _EPSB: _touch.add("near")
+    if _y1 >= D - _EPSB: _touch.add("far")
+    if _x0 <= _EPSB: _touch.add("left")
+    if _x1 >= W - _EPSB: _touch.add("right")
+    _cut_hidden = bool(_touch & hide)
+    for _nm, _cond, _args in (
+        ("n", _y0 > _EPSB, (_c["w"], H, (_c["x"], _y0, H / 2), (math.radians(90), 0, 0))),
+        ("f", _y1 < D - _EPSB, (_c["w"], H, (_c["x"], _y1, H / 2), (math.radians(90), 0, 0))),
+        ("l", _x0 > _EPSB, (H, _c["d"], (_x0, _c["y"], H / 2), (0, math.radians(90), 0))),
+        ("r", _x1 < W - _EPSB, (H, _c["d"], (_x1, _c["y"], H / 2), (0, math.radians(-90), 0))),
+    ):
+        if not _cond:
+            continue
+        _fo = plane(f"cut{_ci}_{_nm}", _args[0], _args[1], _args[2], rot=_args[3], m=WALL)
+        if _cut_hidden:
+            _fo.visible_camera = False
     # 윗면은 천장(z=H)과 동일 평면 — 생성하지 않는다(천장이 담당)
 
 # ---------- 개구부(창문·문) — 벽별 임의 위치. 2D 평면의 문/창을 렌더에 반영 ----------

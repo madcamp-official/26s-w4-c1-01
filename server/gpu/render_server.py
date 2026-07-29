@@ -29,6 +29,9 @@ def auto_camera(view, W, D, H, cutouts=None):
         return s
 
     yside, xside = min(corners, key=lambda k: blocked(*corners[k]))
+    if view == "wide2":   # '반대편' = 최적 코너의 대각 — 카메라 쪽 부속실 면은 blender가 컷어웨이한다
+        yside = "near" if yside == "far" else "far"
+        xside = "left" if xside == "right" else "right"
     kx, ky = corners[(yside, xside)]
     mx = 1.0 if xside == "left" else -1.0     # 코너 → 방 안쪽 단위방향
     my = 1.0 if yside == "near" else -1.0

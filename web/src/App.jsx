@@ -53,7 +53,7 @@ export default function App() {
   const [renderImg, setRenderImg] = useState(null);
   const [renderBusy, setRenderBusy] = useState(false);
   const [renderPreset, setRenderPreset] = useState('day');
-  const [renderView, setRenderView] = useState('wide');   // 'wide' | 'cozy' | 'me'(내 3D 시점) — 렌더 카메라 고정
+  const [renderView, setRenderView] = useState('wide');   // 'wide' | 'cozy' | 'wide2'(반대편 와이드) — 서버 프레이밍
   // 조명 수동 제어 — on: null(자동=프리셋 정책)/true/false, color: hex. ref로 최신값 보장(연타 시 stale 방지).
   const [lampOn, setLampOn] = useState(null);
   const [lampColor, setLampColor] = useState('#FFB873');
@@ -168,7 +168,7 @@ export default function App() {
     if (!its.some((it) => it.glb)) { setRenderImg(null); return; }
     busyRef.current = true; setRenderBusy(true);
     try {
-      const r = await renderScene(room, its, cam3d.current, preset, viewMode === 'me' ? null : viewMode, openings, lampRef.current);
+      const r = await renderScene(room, its, cam3d.current, preset, viewMode, openings, lampRef.current);
       setRenderImg(r?.status === 'OK' && r.image ? r.image : null);
     } catch { setRenderImg(null); } finally {
       busyRef.current = false; setRenderBusy(false);
@@ -176,7 +176,7 @@ export default function App() {
       if (p) { pendingRender.current = null; setTimeout(() => doRenderItems(p.its, p.preset, p.viewMode), 0); }
     }
   }
-  // 시간대·각도를 함께 확정해 현재 배치로 렌더. 'me'=내 3D 시점(cam3d), 그 외=서버 프레이밍.
+  // 시간대·각도를 함께 확정해 현재 배치로 렌더 — 전부 서버 프레이밍(wide/cozy/wide2).
   // trigger는 로딩 문구 구분용(무엇이 바뀌어서 다시 찍는지) — 최초 렌더 등 구분 불필요할 땐 생략.
   function renderWith(preset, viewMode, trigger = null) {
     setRenderPreset(preset); setRenderView(viewMode); setRenderTrigger(trigger);

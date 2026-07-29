@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 const TIMES = [['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['night', '🌙']];
-const VIEWS = [['wide', '와이드'], ['cozy', '아늑'], ['me', '내 시점']];
+const VIEWS = [['wide', '와이드'], ['cozy', '아늑'], ['wide2', '반대편']];   // wide2 = 와이드의 대각 반대 코너
 // 조명 색온도 프리셋 — 웜(2700K)/쿨(5000K)
 const LAMP_COLORS = [['#FFB873', '웜'], ['#DDEBFF', '쿨']];
 
