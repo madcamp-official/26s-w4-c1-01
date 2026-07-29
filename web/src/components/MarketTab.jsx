@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CATALOG, deriveStyle, deriveSize, accuracyMeta } from '../lib/catalog.js';
 import { searchFurniture, recommendSimilar } from '../lib/api.js';
 import { MARKET_CATS, MOODS, MOOD_BG, MOOD_TO_STYLE } from '../lib/appdata.js';
+import { getWishlist, toggleWish } from '../lib/wishlist.js';
 
 // 마켓 — 카테고리 세그먼트 + 검색(네이버) + 필터(분위기/가격순/사이즈) + 상품 2열 그리드.
 // 결과에서 '닮은 상품 찾기'로 진입하면 배치한 가구로 recommendSimilar 실행(네이버 실상품).
@@ -14,6 +15,18 @@ export default function MarketTab({ recommendItem, onConsumeRecommend, onBuyClic
   const [moods, setMoods] = useState([]);
   const [sizeOnly, setSizeOnly] = useState(false);
   const [sort, setSort] = useState(null);          // null | 'asc' | 'desc' — 가격순 정렬
+  const [wished, setWished] = useState(() => new Set(getWishlist().map((x) => x.id)));
+
+  function onToggleWish(e, it) {
+    e.preventDefault();    // 카드 전체가 <a>라 하트만 누른 건데 구매링크로 새 탭 열리는 것 방지
+    e.stopPropagation();
+    const on = toggleWish(it);
+    setWished((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(it.id); else next.delete(it.id);
+      return next;
+    });
+  }
   const reqId = useRef(0);   // 진행 중 원격요청 토큰 — 사용자가 그 사이 카테고리/검색을 바꾸면 늦게 온 응답을 무시.
 
   // 결과 화면에서 넘어온 추천 요청 처리(1회).
@@ -103,6 +116,7 @@ export default function MarketTab({ recommendItem, onConsumeRecommend, onBuyClic
                   <span className="thumb">
                     {it.image ? <img src={it.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <span style={{ position: 'absolute', inset: 0, background: it.color || '#EAD7CE' }} />}
                     {source === 'naver' && <span className="nbadge">N</span>}
+                    <button className={`wish-btn ${wished.has(it.id) ? 'on' : ''}`} onClick={(e) => onToggleWish(e, it)} title="찜하기">{wished.has(it.id) ? '♥' : '♡'}</button>
                   </span>
                   <div className="pnm">{it.name}</div>
                   <div className="ppr">

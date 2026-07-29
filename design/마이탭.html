@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css">
+<style>body{margin:0;background:#F0EEE9;font-family:'Pretendard Variable',-apple-system,sans-serif}</style>
+</helmet>
+<div style="padding:48px 56px">
+  <div style="font:700 14px 'Pretendard Variable',sans-serif;color:#2B2118;background:#fff;display:inline-block;padding:7px 16px;border-radius:100px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.06)">9 · 마이 탭 (좋아요·찜 모아보기 추가)</div>
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+    <div style="width:100%;height:100%;background:#FFF3ED;display:flex;flex-direction:column">
+      <div style="flex:1;overflow:auto;padding:60px 22px 16px;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:56px;height:56px;border-radius:50%;background:#EAD7CE;flex:none"></div>
+          <div style="flex:1"><div style="font:800 16px 'Pretendard Variable',sans-serif;color:#2B2118">수민</div><div style="font:400 12px 'Pretendard Variable',sans-serif;color:#9C8B7E">카카오 로그인 · 포근한 북유럽 무드</div></div>
+          <span style="background:#fff;border-radius:12px;padding:8px 12px;font:700 12.5px 'Pretendard Variable',sans-serif;color:#835151;white-space:nowrap">수정</span>
+        </div>
+
+        <div>
+          <div style="font:700 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">내 취향 태그</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="padding:9px 14px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">포근한 북유럽</span>
+            <span style="padding:9px 14px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">러블리 파스텔</span>
+            <span style="padding:9px 14px;border-radius:100px;background:#F2E3DC;color:#835151;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">예산 30~50만원</span>
+          </div>
+        </div>
+
+        <div>
+          <div style="font:700 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;margin-bottom:8px">배치함</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 14px rgba(43,33,24,0.06)">
+              <div style="aspect-ratio:4/3;background:#F5F2EE"></div>
+              <div style="padding:8px 10px;font:700 12px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">내 방꾸 #1</div>
+            </div>
+            <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 14px rgba(43,33,24,0.06)">
+              <div style="aspect-ratio:4/3;background:#F5F2EE"></div>
+              <div style="padding:8px 10px;font:700 12px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap">내 방꾸 #2</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border-radius:16px;box-shadow:0 4px 14px rgba(43,33,24,0.06);overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 16px;font:400 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;border-bottom:1px solid #F0EAE2;white-space:nowrap"><span>🎀 좋아요한 글</span><span style="color:#B5A79A">›</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 16px;font:400 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap"><span>🛋️ 찜한 상품</span><span style="color:#B5A79A">›</span></div>
+        </div>
+
+        <div style="background:#fff;border-radius:16px;box-shadow:0 4px 14px rgba(43,33,24,0.06);overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 16px;font:400 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;border-bottom:1px solid #F0EAE2;white-space:nowrap"><span>계정 관리</span><span style="color:#B5A79A">›</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 16px;font:400 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;border-bottom:1px solid #F0EAE2;white-space:nowrap"><span>알림 설정</span><span style="color:#B5A79A">›</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 16px;font:400 13.5px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap"><span>로그아웃</span><span style="color:#B5A79A">›</span></div>
+        </div>
+      </div>
+      <div style="display:flex;padding:10px 20px 28px;background:#fff;border-top:1px solid rgba(43,33,24,0.06)">
+        <div style="flex:1;text-align:center"><div style="font:16px sans-serif;opacity:0.4">🏠</div><div style="font:600 10.5px 'Pretendard Variable',sans-serif;color:#B5A79A;margin-top:3px">배치</div></div>
+        <div style="flex:1;text-align:center"><div style="font:16px sans-serif;opacity:0.4">🛋️</div><div style="font:600 10.5px 'Pretendard Variable',sans-serif;color:#B5A79A;margin-top:3px">마켓</div></div>
+        <div style="flex:1;text-align:center"><div style="font:16px sans-serif">👤</div><div style="font:700 10.5px 'Pretendard Variable',sans-serif;color:#835151;margin-top:3px">마이</div></div>
+      </div>
+    </div>
+  </x-import>
+  <div style="max-width:402px;font:400 12px/1.6 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-top:10px">기존 마이 탭에 "좋아요한 글"(커뮤니티)·"찜한 상품"(마켓) 모아보기 항목만 신설.</div>
+</div>
+
+</x-dc>
+</body>
+</html>

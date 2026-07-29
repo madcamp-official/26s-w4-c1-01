@@ -3,7 +3,7 @@
 // 피드는 서버(SQLite)에서 불러오되, 서버 미연동/빈 DB일 땐 목업으로 폴백(정직 원칙: fallback은 MVP).
 import { useState, useEffect } from 'react';
 import { COMMUNITY_CATS, COMMUNITY_POSTS } from '../lib/appdata.js';
-import { fetchCommunityFeed, updateCommunityPost, deleteCommunityPost } from '../lib/api.js';
+import { fetchCommunityFeed, updateCommunityPost, deleteCommunityPost, likeCommunityPost } from '../lib/api.js';
 
 const STAMP_STEPS = [
   { key: 'taste', label: '취향입력' },
@@ -35,7 +35,8 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
   }, [tab, cat]);
 
   const mockPosts = cat === 'all' ? COMMUNITY_POSTS : COMMUNITY_POSTS.filter((p) => p.cat === cat);
-  const posts = serverPosts && serverPosts.length ? serverPosts : mockPosts;
+  const isServerFeed = !!(serverPosts && serverPosts.length);   // 목업 데모 글엔 실제 좋아요 서버 id가 없어 좋아요 버튼을 안 보임
+  const posts = isServerFeed ? serverPosts : mockPosts;
 
   function startEdit(p) { setEditingId(p.id); setEditTitle(p.title); }
   function cancelEdit() { setEditingId(null); setEditTitle(''); }
@@ -52,6 +53,13 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
     if (!window.confirm('이 글을 삭제할까요?')) return;
     const r = await deleteCommunityPost(id);
     if (r?.status === 'OK') setServerPosts((prev) => (prev || []).filter((x) => x.id !== id));
+  }
+  async function handleLike(p) {
+    const r = await likeCommunityPost(p.id);
+    if (r?.status === 'NOAUTH') { alert('로그인하면 좋아요할 수 있어요'); return; }
+    if (r?.status === 'OK') {
+      setServerPosts((prev) => (prev || []).map((x) => (x.id === p.id ? { ...x, liked: r.liked, likes: r.likes } : x)));
+    }
   }
 
   return (
@@ -136,13 +144,21 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
                       <div className="feed-title">{p.title}</div>
                     )}
                     {p.meta && <div className="feed-meta">{p.meta}</div>}
-                    <div className="feed-meta">
-                      {[
-                        typeof p.likes === 'number' && `❤️ ${p.likes}`,
-                        typeof p.comments === 'number' && `댓글 ${p.comments}`,
-                        typeof p.saves === 'number' && `저장 ${p.saves}`,
-                        p.answering && '답변 대기중',
-                      ].filter(Boolean).join(' · ')}
+                    <div className="feed-meta feed-meta-row">
+                      {isServerFeed ? (
+                        <button className={`feed-like ${p.liked ? 'on' : ''}`} onClick={() => handleLike(p)}>
+                          {p.liked ? '❤️' : '🤍'} {typeof p.likes === 'number' ? p.likes : 0}
+                        </button>
+                      ) : (
+                        typeof p.likes === 'number' && <span>❤️ {p.likes}</span>
+                      )}
+                      <span>
+                        {[
+                          typeof p.comments === 'number' && `댓글 ${p.comments}`,
+                          typeof p.saves === 'number' && `저장 ${p.saves}`,
+                          p.answering && '답변 대기중',
+                        ].filter(Boolean).join(' · ')}
+                      </span>
                     </div>
                     {p.mine && editingId !== p.id && (
                       <div className="feed-own-acts">
