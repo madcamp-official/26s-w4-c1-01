@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Line, Group, Text, Circle, Shape, Image as KImage } from 'react-konva';
 import { effectiveFootprint, clampCenterToRoom, doorSwing } from '../lib/geometry.js';
 import { accuracyMeta } from '../lib/catalog.js';
@@ -7,12 +7,27 @@ const PAD = 16;
 const MAX_H = 470;
 // 컷아웃 구역 이름 — 도면(floorplanSvg)과 같은 어휘를 쓴다. 없으면 '배치금지'로만 보인다.
 const CUT_LABEL = { bath: '욕실', closet: '보일러실', kitchen: '주방', entry: '현관' };
+const CUT_ICON = { bath: '🚿', closet: '🧰', kitchen: '🍳', entry: '🚪', room: '🛏️' };
+
+// 실제 도면 이미지를 방 좌표에 1:1로 깔기 위한 로더(use-image 의존성 없이).
+function useImageSrc(src) {
+  const [img, setImg] = useState(null);
+  useEffect(() => {
+    if (!src) { setImg(null); return; }
+    const im = new window.Image();
+    im.onload = () => setImg(im);
+    im.src = src;
+    return () => { im.onload = null; };
+  }, [src]);
+  return img;
+}
 
 // 축척 2D 탑다운 플래너. 배치·스케일·맞음판정은 전부 미터 좌표계 기하(lib/geometry)로 결정.
 // 회전은 90도 스냅이라 시각적 rect 회전과 effectiveFootprint 스왑이 일치한다.
 export default function Planner({ room, items, setItems, selectedId, setSelectedId, flags, openings = [] }) {
   const wrapRef = useRef(null);
   const [wrapW, setWrapW] = useState(600);
+  const planImg = useImageSrc(room.underlay);   // 실측 도면 배경(없으면 null)
   const imgCache = useRef({});
   const [, setImgTick] = useState(0);
   // 제품 썸네일 로더(탑다운 타일 위 오버레이). 로드되면 리렌더.
@@ -77,17 +92,32 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
             )
           )}
 
-          {/* 컷아웃(비직사각형 방의 벽체/욕실) — 배치금지 구역을 벽색으로 + 구역 이름 */}
+          {/* 실제 도면(있으면) — 방 사각형에 1:1로 깔아 그 위에서 배치한다. 가구·판정은 그대로 기하가 결정. */}
+          {planImg && (
+            <KImage image={planImg} x={PAD} y={PAD} width={toPx(room.widthM)} height={toPx(room.depthM)}
+              opacity={0.55} listening={false} />
+          )}
+
+          {/* 컷아웃(비직사각형 방의 벽체/욕실) — 배치금지 구역 + 아이콘·이름.
+              도면을 깔았을 땐 도면이 이미 그 구역을 그리고 있으므로 반투명으로 덮는다. */}
           {(room.cutouts || []).map((c, i) => {
-            const label = c.label || CUT_LABEL[c.kind] || '';
+            const kind = c.kind || 'bath';
+            const label = c.label || CUT_LABEL[kind] || '';
+            const icon = CUT_ICON[c.label === '침실' ? 'room' : kind] || '';
             const boxW = toPx(c.w), boxH = toPx(c.d);
+            const showText = boxW > 34 && boxH > 30;      // 아이콘+글자 2줄이 들어갈 때만
+            const iconOnly = !showText && boxW > 18 && boxH > 16;
             return (
               <Group key={`cut${i}`} listening={false}>
                 <Rect x={PAD + toPx(c.x)} y={PAD + toPx(c.y)} width={boxW} height={boxH}
-                  fill="#e3ddd2" stroke="#8a8172" strokeWidth={2} cornerRadius={1} />
-                {/* 좁은 구역엔 글자가 안 들어가므로 최소 크기에서만 표시 */}
-                {label && boxW > 34 && boxH > 16 && (
-                  <Text x={PAD + toPx(c.x)} y={PAD + toPx(c.y) + boxH / 2 - 6} width={boxW}
+                  fill={planImg ? 'rgba(227,221,210,0.55)' : '#e3ddd2'}
+                  stroke="#8a8172" strokeWidth={2} cornerRadius={1} />
+                {(showText || iconOnly) && (
+                  <Text x={PAD + toPx(c.x)} y={PAD + toPx(c.y) + boxH / 2 - (showText ? 16 : 8)} width={boxW}
+                    text={icon} fontSize={showText ? 18 : 13} align="center" />
+                )}
+                {showText && label && (
+                  <Text x={PAD + toPx(c.x)} y={PAD + toPx(c.y) + boxH / 2 + 4} width={boxW}
                     text={label} fontSize={11} fontStyle="bold" fill="#6f6558" align="center" />
                 )}
               </Group>

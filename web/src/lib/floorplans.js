@@ -153,6 +153,7 @@ export const FLOORPLANS = [
     ],
     // 이 세대는 욕실·주방·현관이 전부 세대 '안'이라 바깥 복도(annex)가 없다.
     annex: { d: 0, bath: null, kitchen: { x: 0, w: 0 }, entry: { x: 0, w: 0 } },
+    underlay: './plans/underlay-1.png',   // 방 bbox에 1:1 대응하는 실제 도면 크롭
     real: { source: '인허가 평면도 실측', areaM2: 29.86, unitMm: '5,500 × 5,800' },
     desc: '실제 도면 그대로 — 보일러실·주방·현관·욕실이 파인 L자, 가구 놓을 공간 약 14㎡',
   },
@@ -168,6 +169,7 @@ export const FLOORPLANS = [
       { x: 1.5, y: 3.5, w: 2.9, d: 0.9, kind: 'kitchen' },  // 하단 주방 빌트인
     ],
     annex: { d: 0, bath: null, kitchen: { x: 0, w: 0 }, entry: { x: 0, w: 0 } },
+    underlay: './plans/underlay-2.png',   // 방 bbox에 1:1 대응하는 실제 도면 크롭
     real: { source: '인허가 평면도 실측', areaM2: 27.34, unitMm: '5,100 × 4,400' },
     desc: '전용 27.34㎡ — 욕실이 우상단, 주방이 아래 벽면. 가로가 넓은 편',
   },
@@ -184,6 +186,7 @@ export const FLOORPLANS = [
       { x: 3.3, y: 3.2, w: 1.0, d: 2.0, kind: 'kitchen' },  // 우측 세로 주방
     ],
     annex: { d: 0, bath: null, kitchen: { x: 0, w: 0 }, entry: { x: 0, w: 0 } },
+    underlay: './plans/underlay-3.png',   // 방 bbox에 1:1 대응하는 실제 도면 크롭
     real: { source: '인허가 평면도 실측', areaM2: 27.48, unitMm: '4,500 × 5,400' },
     desc: '전용 27.48㎡ — 부속실이 한쪽 벽에 몰려 반대쪽이 통으로 남는 세로형',
   },
@@ -201,6 +204,7 @@ export const FLOORPLANS = [
       { x: 2.85, y: 4.15, w: 2.0, d: 1.8, kind: 'bath' },   // 욕실
     ],
     annex: { d: 0, bath: null, kitchen: { x: 0, w: 0 }, entry: { x: 0, w: 0 } },
+    underlay: './plans/underlay-4.png',   // 방 bbox에 1:1 대응하는 실제 도면 크롭
     real: { source: '인허가 평면도 실측', areaM2: 35.91, unitMm: '5,700 × 6,300' },
     desc: '전용 35.91㎡ — 침실이 벽으로 분리된 1.5룸. 5세대 중 가장 큼',
   },
@@ -217,6 +221,7 @@ export const FLOORPLANS = [
       { x: 0, y: 2.55, w: 0.85, d: 3.2, kind: 'kitchen' },  // 좌측 세로 주방
     ],
     annex: { d: 0, bath: null, kitchen: { x: 0, w: 0 }, entry: { x: 0, w: 0 } },
+    underlay: './plans/underlay-5.png',   // 방 bbox에 1:1 대응하는 실제 도면 크롭
     real: { source: '인허가 평면도 실측', areaM2: 26.86, unitMm: '4,650 × 6,400' },
     desc: '전용 26.86㎡ — 부속실이 위쪽에 모여 아래가 길게 트인 세로형',
   },

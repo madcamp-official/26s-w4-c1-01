@@ -249,3 +249,19 @@ function timeout(ms) {
   setTimeout(() => c.abort(), ms);
   return c.signal;
 }
+
+// 도면 사진 → 편집 가능한 방 초안. hintM(사용자가 줄자로 잰 가로 한 변)을 주면 그 비율로 보정된다.
+// 반환: {status:'OK', room:{widthM,depthM,cutouts,openings}, accuracy, confidence, note} | {status:'NOKEY'|'ERROR'}
+// 정직 원칙: LLM 판독은 확정이 아니라 초안이다. 호출부는 accuracy/confidence를 UI에 그대로 노출해야 한다.
+export async function readFloorplan(dataUrl, hintM = null) {
+  try {
+    const res = await fetch(`${API_BASE}/api/floorplan`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl, ...(hintM ? { hintM } : {}) }), signal: timeout(150000),
+    });
+    if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}` };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', reason: String(e.message || e) };
+  }
+}

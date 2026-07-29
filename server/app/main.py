@@ -12,6 +12,7 @@
 import os
 import re
 import json
+import asyncio as _asyncio   # 429 재시도 대기
 from typing import Optional
 
 try:
@@ -24,6 +25,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .dims import parse_dims, fetch_dims_from_url
+
+
+# 외부 API 에러 문구에는 요청 URL이 통째로 들어가고, 그 URL에 API 키가 쿼리로 붙어 있다.
+# 그대로 프런트에 내려주면 브라우저 화면에 키가 노출된다 → 항상 이걸로 감싸서 내보낸다.
+_SECRET_RE = re.compile(r"(key=)[^&\s'\"]+|(?:AIza|AQ\.)[A-Za-z0-9_\-]{8,}")
+
+
+def _safe_err(e, n: int = 200) -> str:
+    return _SECRET_RE.sub(lambda m: (m.group(1) or "") + "<REDACTED>", str(e))[:n]
+
 
 app = FastAPI(title="bangkku-api", version="0.1.0")
 app.add_middleware(
@@ -93,7 +104,7 @@ async def search(q: str = ""):
             )
         return {"status": "OK", "items": items}
     except Exception as e:  # noqa: BLE001 — 어떤 실패든 폴백으로
-        return {"status": "FALLBACK", "reason": str(e)[:120], "items": []}
+        return {"status": "FALLBACK", "reason": _safe_err(e, 120), "items": []}
 
 
 @app.get("/api/dims")
@@ -123,7 +134,7 @@ async def composite(req: ComposeReq):
             r.raise_for_status()
             return {"status": "OK", "image": r.json().get("image")}
     except Exception as e:  # noqa: BLE001
-        return {"status": "CLIENT", "reason": str(e)[:120]}
+        return {"status": "CLIENT", "reason": _safe_err(e, 120)}
 
 
 class RelightReq(BaseModel):
@@ -150,7 +161,7 @@ async def relight(req: RelightReq):
             return {"status": "OK", "image": data["image"]}
         return {"status": "CLIENT", "reason": str(data.get("reason", "sd error"))[:120]}
     except Exception as e:  # noqa: BLE001
-        return {"status": "CLIENT", "reason": str(e)[:120]}
+        return {"status": "CLIENT", "reason": _safe_err(e, 120)}
 
 
 @app.post("/api/card")
@@ -164,7 +175,7 @@ async def card(req: ComposeReq):
             r.raise_for_status()
             return {"status": "OK", "image": r.json().get("image")}
     except Exception as e:  # noqa: BLE001
-        return {"status": "TEXT_CARD", "text": _text_card(req), "reason": str(e)[:120]}
+        return {"status": "TEXT_CARD", "text": _text_card(req), "reason": _safe_err(e, 120)}
 
 
 _LAYOUT_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "방꾸요정-배치-LLM-프롬프트.md")
@@ -266,7 +277,7 @@ async def render(req: RenderReq):
             return {"status": "OK", "image": data["image"]}
         return {"status": "ERROR", "reason": str(data.get("reason", "render error"))[:200]}
     except Exception as e:  # noqa: BLE001
-        return {"status": "ERROR", "reason": str(e)[:200]}
+        return {"status": "ERROR", "reason": _safe_err(e, 200)}
 
 
 class LayoutReq(BaseModel):
@@ -308,7 +319,7 @@ async def layout(req: LayoutReq):
                 text = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
         return {"status": "OK", "candidates": _parse_candidates(text), "provider": provider}
     except Exception as e:  # noqa: BLE001
-        return {"status": "ERROR", "reason": str(e)[:200]}
+        return {"status": "ERROR", "reason": _safe_err(e, 200)}
 
 
 async def shape_query(q: str) -> Optional[str]:
@@ -454,7 +465,7 @@ async def chat_layout(req: ChatReq):
             obj = json.loads(txt[s:e + 1]) if 0 <= s < e else {"decision": "reject", "reason": "이해하지 못했어요."}
         return {"status": "OK", "decision": obj.get("decision", "reject"), "reason": obj.get("reason", ""), "items": obj.get("items", [])}
     except Exception as e:  # noqa: BLE001
-        return {"status": "ERROR", "decision": "reject", "reason": "처리 중 문제가 생겼어요. 다시 시도해 주세요.", "error": str(e)[:150]}
+        return {"status": "ERROR", "decision": "reject", "reason": "처리 중 문제가 생겼어요. 다시 시도해 주세요.", "error": _safe_err(e, 150)}
 
 
 def _text_card(req: ComposeReq) -> str:
@@ -571,7 +582,7 @@ async def auth_callback(provider: str, code: str = "", error: str = ""):
         user["exp"] = int(_time.time()) + 60 * 60 * 24 * 30
         return RedirectResponse(AUTH_BASE + "/#auth=" + _sign_token(user))
     except Exception as e:  # noqa: BLE001
-        return RedirectResponse(AUTH_BASE + "/#auth_error=" + _uparse.quote(str(e)[:80]))
+        return RedirectResponse(AUTH_BASE + "/#auth_error=" + _uparse.quote(_safe_err(e, 80)))
 
 
 # ── 커뮤니티(방꾸 이야기) — 홈 세그먼트 전환용(design/커뮤니티.html 1c안). 이 프로젝트 첫 영구 저장소라 SQLite 파일 하나로 가볍게.
@@ -633,7 +644,7 @@ async def community_post(req: CommunityPostReq, request: Request):
         conn.commit(); conn.close()
         return {"status": "OK", "post": {**post, "mine": owner is not None}}
     except Exception as e:  # noqa: BLE001
-        return {"status": "ERROR", "reason": str(e)[:150]}
+        return {"status": "ERROR", "reason": _safe_err(e, 150)}
 
 
 @app.get("/api/community/feed")
@@ -657,7 +668,7 @@ async def community_feed(request: Request, cat: str = "all"):
         ]
         return {"status": "OK", "posts": posts}
     except Exception as e:  # noqa: BLE001
-        return {"status": "ERROR", "reason": str(e)[:150], "posts": []}
+        return {"status": "ERROR", "reason": _safe_err(e, 150), "posts": []}
 
 
 class CommunityEditReq(BaseModel):
@@ -703,3 +714,145 @@ async def community_delete(post_id: str, request: Request):
     conn.execute("DELETE FROM posts WHERE id=?", (post_id,))
     conn.commit(); conn.close()
     return {"status": "OK"}
+
+
+# ── 도면 사진 → 편집 가능한 방(초안) ────────────────────────────────────────────
+# 정직 원칙: LLM이 읽은 치수는 '초안'이다. 같은 도면을 반복 판독시키면 방 면적이 최대 46%까지
+# 흔들리는 걸 실측으로 확인했다(인허가 도면 기준). 그래서 이 엔드포인트는 확정 치수를 주지 않고,
+# accuracy='estimate'를 달아 돌려주며 앱이 사용자 확인(한 변 실측 보정)을 거치게 한다.
+_PLAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "widthM": {"type": "number"}, "depthM": {"type": "number"},
+        "cutouts": {"type": "array", "items": {"type": "object", "properties": {
+            "x": {"type": "number"}, "y": {"type": "number"},
+            "w": {"type": "number"}, "d": {"type": "number"},
+            "kind": {"type": "string"}}, "required": ["x", "y", "w", "d", "kind"]}},
+        "openings": {"type": "array", "items": {"type": "object", "properties": {
+            "kind": {"type": "string"}, "wall": {"type": "string"},
+            "pos": {"type": "number"}, "width": {"type": "number"}},
+            "required": ["kind", "wall", "pos", "width"]}},
+        "printedAreaM2": {"type": "number"},
+        "confidence": {"type": "number"},
+        "note": {"type": "string"},
+    },
+    "required": ["widthM", "depthM", "cutouts", "openings", "confidence", "note"],
+}
+
+_PLAN_SYS = (
+    "너는 한국 원룸 평면도를 읽어 가구배치 앱이 쓸 방 데이터를 만드는 판독기다.\n"
+    "좌표계: 방 좌상단이 원점, +x 오른쪽(너비), +y 아래(깊이), 단위는 미터(m).\n"
+    "- widthM/depthM = 세대 '내부'(벽 안쪽) 사각형. 도면에 치수(mm)가 적혀 있으면 그 값을 쓴다.\n"
+    "- cutouts = 가구를 놓을 수 없는 구역. kind는 bath(욕실)·kitchen(주방)·entry(현관)·closet(붙박이/보일러실) 중 하나.\n"
+    "  방 사각형 안에 들어가야 하고 서로 겹치면 안 된다.\n"
+    "- openings = 문/창. wall은 top|bottom|left|right, pos는 그 벽 시작점에서 개구부 중심까지 거리(m).\n"
+    "- printedAreaM2 = 도면에 '전용면적'이 인쇄돼 있으면 그 숫자. 없으면 생략.\n"
+    "- confidence 0~1: 치수선 숫자를 직접 읽었으면 높게, 비율로 추정했으면 0.4 이하.\n"
+    "- note: 사용자에게 보여줄 한 문장(무엇을 근거로 읽었는지, 무엇이 불확실한지).\n"
+    "치수를 지어내지 마라. 근거가 없으면 confidence를 낮추고 note에 '치수 표기 없음'이라고 적어라."
+)
+
+
+class FloorplanReq(BaseModel):
+    image: str                      # dataURL 또는 base64
+    hintM: Optional[float] = None   # 사용자가 아는 한 변(m) — 있으면 그 값으로 비례 보정
+
+
+def _clean_plan(p: dict) -> dict:
+    """LLM 출력 정규화 — 방 밖 컷아웃 잘라내기, 겹침 제거, 5cm 스냅, 개구부 범위 보정."""
+    snap = lambda v: round(float(v) * 20) / 20
+    W = max(1.2, min(12.0, snap(p.get("widthM", 3.0))))
+    D = max(1.2, min(12.0, snap(p.get("depthM", 4.0))))
+    kinds = {"bath", "kitchen", "entry", "closet"}
+    cuts = []
+    for c in p.get("cutouts", []) or []:
+        x, y = max(0.0, snap(c.get("x", 0))), max(0.0, snap(c.get("y", 0)))
+        w, d = snap(c.get("w", 0)), snap(c.get("d", 0))
+        w, d = min(w, W - x), min(d, D - y)                       # 방 밖으로 못 나가게
+        if w < 0.3 or d < 0.3:
+            continue
+        box = {"x": x, "y": y, "w": w, "d": d, "kind": c.get("kind") if c.get("kind") in kinds else "closet"}
+        if any(min(a["x"] + a["w"], x + w) - max(a["x"], x) > 0.05 and
+               min(a["y"] + a["d"], y + d) - max(a["y"], y) > 0.05 for a in cuts):
+            continue                                              # 겹치면 버림(엔진 면적 계산이 틀어짐)
+        cuts.append(box)
+    ops = []
+    for o in p.get("openings", []) or []:
+        wall = o.get("wall") if o.get("wall") in {"top", "bottom", "left", "right"} else "bottom"
+        kind = "door" if o.get("kind") == "door" else "window"
+        wid = max(0.4, min(3.0, snap(o.get("width", 0.9))))
+        span = D if wall in ("left", "right") else W
+        pos = min(max(snap(o.get("pos", span / 2)), wid / 2), span - wid / 2)
+        ops.append({"kind": kind, "wall": wall, "pos": pos, "width": wid,
+                    **({"hinge": "a"} if kind == "door" else {})})
+    return {"widthM": W, "depthM": D, "cutouts": cuts, "openings": ops}
+
+
+@app.post("/api/floorplan")
+async def floorplan(req: FloorplanReq):
+    """도면 사진 → 편집 가능한 방 초안. 반환: {status, room, accuracy, confidence, note}."""
+    gkey = os.getenv("GEMINI_API_KEY")
+    if not (gkey and httpx):
+        return {"status": "NOKEY", "reason": "AI 연결이 안 돼 있어요(키 미설정)."}
+    raw = (req.image or "").split(",", 1)[-1]
+    if len(raw) < 100:
+        return {"status": "ERROR", "reason": "이미지가 비어 있어요."}
+    mime = "image/png" if "image/png" in (req.image or "") else "image/jpeg"
+    body = {
+        "system_instruction": {"parts": [{"text": _PLAN_SYS}]},
+        "contents": [{"role": "user", "parts": [
+            {"inline_data": {"mime_type": mime, "data": raw}},
+            {"text": "이 평면도를 위 규칙대로 읽어 JSON으로만 출력하라."},
+        ]}],
+        # 2048로는 부족 — flash 계열은 thinking 토큰을 먼저 쓰고 답을 낸다(추천 기능에서 겪은 문제).
+        "generationConfig": {"maxOutputTokens": 16384, "temperature": 0.1,
+                             "responseMimeType": "application/json", "responseSchema": _PLAN_SCHEMA},
+    }
+    # 무료 티어는 분당 요청/토큰 한도가 빡빡해 429가 흔하다. 응답이 주는 retryDelay만큼 쉬고 한 번 더.
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}"
+    obj = None
+    try:
+        async with httpx.AsyncClient(timeout=120) as cx:
+            for attempt in (0, 1):
+                r = await cx.post(url, json=body)
+                if r.status_code == 429 and attempt == 0:
+                    delay = 20.0
+                    try:    # {"error":{"details":[{"retryDelay":"17s"}]}}
+                        for d in (r.json().get("error", {}).get("details") or []):
+                            if "retryDelay" in d:
+                                delay = min(45.0, float(str(d["retryDelay"]).rstrip("s")) + 1)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    await _asyncio.sleep(delay)
+                    continue
+                if r.status_code == 429:
+                    return {"status": "RATE_LIMIT",
+                            "reason": "지금 AI 요청이 몰렸어요. 1분 뒤에 다시 시도하거나, 평수로 먼저 진행해 주세요."}
+                r.raise_for_status()
+                data = r.json()
+                break
+        cand = (data.get("candidates") or [{}])[0]
+        txt = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
+        obj = json.loads(txt)
+    except Exception as e:  # noqa: BLE001 — 실패는 예외가 아니라 status로(프런트가 수동 입력으로 폴백)
+        return {"status": "ERROR", "reason": _safe_err(e, 150)}
+
+    room = _clean_plan(obj)
+    # 사용자가 아는 한 변이 있으면 그 비율로 전체를 보정한다(LLM 절대치수보다 실측이 우선).
+    if req.hintM and req.hintM > 0.5 and room["widthM"] > 0:
+        k = req.hintM / room["widthM"]
+        for key in ("widthM", "depthM"):
+            room[key] = round(room[key] * k, 2)
+        for c in room["cutouts"]:
+            for key in ("x", "y", "w", "d"):
+                c[key] = round(c[key] * k, 2)
+        for o in room["openings"]:
+            for key in ("pos", "width"):
+                o[key] = round(o[key] * k, 2)
+    return {
+        "status": "OK", "room": room,
+        "accuracy": "measured" if req.hintM else "estimate",
+        "confidence": float(obj.get("confidence", 0.0) or 0.0),
+        "printedAreaM2": obj.get("printedAreaM2"),
+        "note": str(obj.get("note", ""))[:200],
+    }

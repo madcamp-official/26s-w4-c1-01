@@ -24,6 +24,15 @@ sys.path.insert(0, os.path.join(HERE, "app"))
 from dims import parse_dims, fetch_dims_from_url  # noqa: E402 (공유 치수 모듈)
 
 
+
+# 외부 API 에러 문구에 요청 URL(=API 키 포함)이 들어가므로, 프런트로 내보내기 전에 가린다.
+_SECRET_RE = re.compile(r"(key=)[^&\s'\"]+|(?:AIza|AQ\.)[A-Za-z0-9_\-]{8,}")
+
+
+def _safe_err(e, n=200):
+    return _SECRET_RE.sub(lambda m: (m.group(1) or "") + "<REDACTED>", str(e))[:n]
+
+
 def load_env():
     env = {}
     path = os.path.join(HERE, ".env")
@@ -387,7 +396,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             try:
                 return self._json({"status": "OK", "items": naver_search(q)})
             except Exception as e:  # noqa: BLE001 — 어떤 실패든 폴백
-                return self._json({"status": "FALLBACK", "reason": str(e)[:120], "items": []})
+                return self._json({"status": "FALLBACK", "reason": _safe_err(e, 120), "items": []})
         if u.path == "/api/dims":
             url = urllib.parse.parse_qs(u.query).get("url", [""])[0]
             d = fetch_dims_from_url(url, ENV)
@@ -422,7 +431,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 user["exp"] = int(time.time()) + 60 * 60 * 24 * 30   # 30일
                 return self._redirect(base + "/#auth=" + sign_token(user))
             except Exception as e:  # noqa: BLE001
-                return self._redirect(base + "/#auth_error=" + urllib.parse.quote(str(e)[:80]))
+                return self._redirect(base + "/#auth_error=" + urllib.parse.quote(_safe_err(e, 80)))
         self._json({"error": "not found"}, 404)
 
     def do_POST(self):
@@ -455,9 +464,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     try:
                         last = str(json.load(e).get("reason", str(e)))[:200]
                     except Exception:  # noqa: BLE001
-                        last = str(e)[:200]
+                        last = _safe_err(e, 200)
                 except Exception as e:  # noqa: BLE001
-                    last = str(e)[:200]
+                    last = _safe_err(e, 200)
             return self._json({"status": "ERROR", "reason": last})
 
         # 유사 가구 추천 — LLM이 네이버 검색어 생성 → 네이버 검색 병합
@@ -468,7 +477,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 rec = recommend_similar(body.get("item") or {})
                 return self._json({"status": "OK", **rec})
             except Exception as e:  # noqa: BLE001
-                return self._json({"status": "ERROR", "reason": str(e)[:200], "items": []})
+                return self._json({"status": "ERROR", "reason": _safe_err(e, 200), "items": []})
 
         # 대화형 배치 — 현재 배치+사용자 요청 → 이행/기각+이유(앱이 겹침 재검증 후 반영)
         if path == "/api/chat-layout":
@@ -479,7 +488,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"status": "OK", **gemini_chat_layout(body)})
             except Exception as e:  # noqa: BLE001
                 return self._json({"status": "ERROR", "decision": "reject",
-                                   "reason": "처리 중 문제가 생겼어요. 다시 시도해 주세요.", "error": str(e)[:150]})
+                                   "reason": "처리 중 문제가 생겼어요. 다시 시도해 주세요.", "error": _safe_err(e, 150)})
 
         # 원룸 자동 배치 — LLM(Gemini/Claude)이 후보 생성(앱이 겹침 재검증)
         if path == "/api/layout":
@@ -489,7 +498,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 cands = gemini_layout(body) if LLM_PROVIDER == "gemini" else anthropic_layout(body)
                 return self._json({"status": "OK", "candidates": cands, "provider": LLM_PROVIDER})
             except Exception as e:  # noqa: BLE001
-                return self._json({"status": "ERROR", "reason": str(e)[:200]})
+                return self._json({"status": "ERROR", "reason": _safe_err(e, 200)})
 
         # 이하 /api/relight
         if not SD_SERVER_URL:
@@ -505,7 +514,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"status": "OK", "image": data["image"]})
             return self._json({"status": "CLIENT", "reason": str(data.get("reason", "sd error"))[:120]})
         except Exception as e:  # noqa: BLE001
-            return self._json({"status": "CLIENT", "reason": str(e)[:120]})
+            return self._json({"status": "CLIENT", "reason": _safe_err(e, 120)})
 
     def log_message(self, fmt, *args):
         print("[devserver]", fmt % args)
