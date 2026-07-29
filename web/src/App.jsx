@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef } from 'react';
 import { consumeAuthHash, currentUser, logout } from './lib/auth.js';
 import { toPlacedItem, resolveDims, CATALOG, deriveStyle } from './lib/catalog.js';
-import { validateLayout, findFreeSpot, snapRotation, clampCenterToRoom } from './lib/geometry.js';
+import { validateLayout, findFreeSpot, snapRotation, clampCenterFree } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
 import { fetchDims, layoutFurniture, renderScene, chatLayout, postCommunity } from './lib/api.js';
 import { parseCommand, parseRecommendCommand, hasPlaceHint } from './lib/chatcmd.js';
@@ -97,11 +97,13 @@ export default function App() {
     }
     return [...pool].sort(() => Math.random() - 0.5).slice(0, n);   // 매번 같은 것만 뜨지 않게 섞기
   }
-  // 사용자 편집(드래그/회전)은 방 범위를 벗어날 수 없다 — 발자국 기준 클램프.
+  // 사용자 편집(드래그/회전)은 방 범위를 벗어날 수 없고, 컷아웃(욕실·주방 등)도 뚫을 수 없다.
+  // 러그만 예외(밟는 물건 — validateLayout의 soft 정책과 일치).
   function moveItem(id, cx, cy) {
     setItems((p) => p.map((it) => {
       if (it.id !== id) return it;
-      const c = room ? clampCenterToRoom(it, cx, cy, room.widthM, room.depthM) : { cx, cy };
+      const cuts = it.cat === '러그' ? [] : room?.cutouts || [];
+      const c = room ? clampCenterFree(it, cx, cy, room.widthM, room.depthM, cuts, it) : { cx, cy };
       return { ...it, cx: c.cx, cy: c.cy };
     }));
   }
@@ -109,7 +111,8 @@ export default function App() {
     setItems((p) => p.map((it) => {
       if (it.id !== id) return it;
       const rot = snapRotation((it.rotationDeg || 0) + 90);
-      const c = room ? clampCenterToRoom({ ...it, rotationDeg: rot }, it.cx, it.cy, room.widthM, room.depthM) : { cx: it.cx, cy: it.cy };
+      const cuts = it.cat === '러그' ? [] : room?.cutouts || [];
+      const c = room ? clampCenterFree({ ...it, rotationDeg: rot }, it.cx, it.cy, room.widthM, room.depthM, cuts, it) : { cx: it.cx, cy: it.cy };
       return { ...it, rotationDeg: rot, cx: c.cx, cy: c.cy };
     }));
   }

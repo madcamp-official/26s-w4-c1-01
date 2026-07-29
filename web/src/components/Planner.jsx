@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Line, Group, Text, Circle, Shape, Image as KImage } from 'react-konva';
-import { effectiveFootprint, clampCenterToRoom, doorSwing } from '../lib/geometry.js';
+import { effectiveFootprint, clampCenterFree, doorSwing } from '../lib/geometry.js';
 import { accuracyMeta } from '../lib/catalog.js';
 
 const PAD = 16;
@@ -64,7 +64,9 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
   function moveItem(idx, xPx, yPx, node) {
     const it = items[idx];
     const raw = { cx: toM(xPx - PAD), cy: toM(yPx - PAD) };
-    const c = clampCenterToRoom(it, raw.cx, raw.cy, room.widthM, room.depthM);   // 방 밖 드래그 금지
+    // 방 밖 + 컷아웃(욕실·주방 등) 드래그 금지 — 러그만 예외(soft 정책과 일치)
+    const cuts = it.cat === '러그' ? [] : room.cutouts || [];
+    const c = clampCenterFree(it, raw.cx, raw.cy, room.widthM, room.depthM, cuts, it);
     if (node && (Math.abs(c.cx - raw.cx) > 1e-9 || Math.abs(c.cy - raw.cy) > 1e-9)) {
       node.position({ x: PAD + toPx(c.cx), y: PAD + toPx(c.cy) });               // 노드도 경계 안으로 되돌림
     }

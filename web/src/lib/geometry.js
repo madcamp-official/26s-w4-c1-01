@@ -334,6 +334,41 @@ export function clampCenterToRoom(item, cx, cy, roomWM, roomDM) {
   return { cx: cl(cx, w / 2, roomWM - w / 2), cy: cl(cy, d / 2, roomDM - d / 2) };
 }
 
+// 벽 클램프 + 컷아웃(욕실·주방 등 부속실) 밀어내기 — 방밖 금지와 같은 hard 정책.
+// 겹치면 '가장 가까운 바깥'으로 최소 이동 축을 골라 밀어낸다. 여러 컷아웃이 낀 코너는
+// 몇 회 반복으로 해소하고, 그래도 안 되면(가구가 틈보다 큰 경우) prev(직전 위치)를 유지한다.
+// 러그는 밟고 지나는 물건이라 호출부에서 제외한다(validateLayout의 soft 정책과 일치).
+export function clampCenterFree(item, cx, cy, roomWM, roomDM, cutouts = [], prev = null) {
+  const { w, d } = effectiveFootprint(item.wM, item.dM, item.rotationDeg || 0);
+  let { cx: X, cy: Y } = clampCenterToRoom(item, cx, cy, roomWM, roomDM);
+  const boxes = cutAABBs(cutouts);
+  if (!boxes.length) return { cx: X, cy: Y };
+  for (let pass = 0; pass < 4; pass++) {
+    const me = { left: X - w / 2, right: X + w / 2, top: Y - d / 2, bottom: Y + d / 2 };
+    const hit = boxes.find((b) => aabbOverlap(me, b));
+    if (!hit) return { cx: X, cy: Y };
+    // 4방향 탈출 비용(이동거리) 오름차순 — 방 밖으로 나가는 방향은 건너뜀
+    const pushes = [
+      { dx: hit.left - me.right - EPS, dy: 0 },
+      { dx: hit.right - me.left + EPS, dy: 0 },
+      { dx: 0, dy: hit.top - me.bottom - EPS },
+      { dx: 0, dy: hit.bottom - me.top + EPS },
+    ].sort((a, b) => Math.abs(a.dx + a.dy) - Math.abs(b.dx + b.dy));
+    let moved = false;
+    for (const p of pushes) {
+      const nx = X + p.dx, ny = Y + p.dy;
+      if (nx - w / 2 < -EPS || nx + w / 2 > roomWM + EPS || ny - d / 2 < -EPS || ny + d / 2 > roomDM + EPS) continue;
+      X = nx; Y = ny; moved = true; break;
+    }
+    if (!moved) break;
+  }
+  const me = { left: X - w / 2, right: X + w / 2, top: Y - d / 2, bottom: Y + d / 2 };
+  if (boxes.some((b) => aabbOverlap(me, b))) {
+    return prev ? { cx: prev.cx, cy: prev.cy } : clampCenterToRoom(item, cx, cy, roomWM, roomDM);
+  }
+  return { cx: X, cy: Y };
+}
+
 // 겹치지 않는 초기 배치 지점 찾기(간단 그리드 탐색) — "다중 배치 자동 정리"의 씨앗.
 export function findFreeSpot(newItem, placed, roomWM, roomDM, step = 0.1, cutouts = []) {
   const { w, d } = effectiveFootprint(newItem.wM, newItem.dM, newItem.rotationDeg || 0);

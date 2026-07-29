@@ -14,17 +14,32 @@ GLBDIR = os.getenv("GLBDIR", "/root/glb")
 LOCK = threading.Lock()
 
 
-def auto_camera(view, W, D, H):
-    """자동 다각도 카메라(Blender 좌표, near-left 코너 밖에서 방 안을 봄).
+def auto_camera(view, W, D, H, cutouts=None):
+    """자동 다각도 카메라(Blender 좌표) — '컷아웃(부속실 벽체)이 가장 적은 코너' 밖에서 방 안을 봄.
+    고정 near-left 코너를 쓰면 그 코너에 욕실·주방 벽체가 있을 때 화면이 벽으로 가득 찬다.
     wide = 방 전체가 보이는 높은 광각 코너샷 / cozy = 눈높이에 가깝고 살짝 좁은 아늑한 3-4분면."""
     cx, cy = W * 0.5, D * 0.5
+    corners = {("near", "left"): (0.0, 0.0), ("near", "right"): (W, 0.0),
+               ("far", "left"): (0.0, D), ("far", "right"): (W, D)}
+
+    def blocked(px, py):    # 코너에 가까운 컷아웃일수록 크게 가림(면적/거리² 가중)
+        s = 0.0
+        for c in cutouts or []:
+            s += c["w"] * c["d"] / (1.0 + (c["x"] - px) ** 2 + (c["y"] - py) ** 2)
+        return s
+
+    yside, xside = min(corners, key=lambda k: blocked(*corners[k]))
+    kx, ky = corners[(yside, xside)]
+    mx = 1.0 if xside == "left" else -1.0     # 코너 → 방 안쪽 단위방향
+    my = 1.0 if yside == "near" else -1.0
     if view == "cozy":
-        cam = {"pos": [-W * 0.28, -D * 0.30, H * 0.46], "target": [cx * 1.08, cy * 1.02, 0.45], "lens": 30}
+        cam = {"pos": [kx - mx * W * 0.28, ky - my * D * 0.30, H * 0.46],
+               "target": [cx + mx * 0.04 * W, cy + my * 0.01 * D, 0.45], "lens": 30}
     else:  # wide (기본) — 초기 위치는 대략, 최종 프레이밍은 blender의 camera_fit_coords가 방 코너에 맞춤
         b = 0.85 + 0.42 * max(W, D)
-        cam = {"pos": [-b * 0.80, -b * 0.80, min(1.65 + 0.42 * H, H * 1.0)],
-               "target": [cx, cy * 0.93, 0.4], "lens": 21, "fit": True}
-    return cam, ["near", "left", "ceil"]
+        cam = {"pos": [kx - mx * b * 0.80, ky - my * b * 0.80, min(1.65 + 0.42 * H, H * 1.0)],
+               "target": [cx, cy - my * 0.07 * cy, 0.4], "lens": 21, "fit": True}
+    return cam, [yside, xside, "ceil"]
 
 
 def build_scene(p):
@@ -40,6 +55,15 @@ def build_scene(p):
         items.append({"glb": path, "x": float(it.get("x", W / 2)),
                       "y": D - float(it.get("y", D / 2)), "rot": int(it.get("rot", 0)),
                       "elev": float(it.get("elev", 0))})
+    # 컷아웃(부속실 벽체)을 카메라 결정 '전에' 계산 — 자동 카메라가 가림이 적은 코너를 고르는 근거.
+    cutouts = []
+    for c in p.get("cutouts", []):
+        cw = float(c.get("w", 0)); cd = float(c.get("d", 0))
+        if cw <= 0 or cd <= 0:
+            continue
+        ccx = float(c.get("x", 0)) + cw / 2
+        ccy = float(c.get("y", 0)) + cd / 2
+        cutouts.append({"x": ccx, "y": D - ccy, "w": cw, "d": cd})   # 아이템과 동일한 깊이축 뒤집기
     # 카메라 결정 우선순위:
     #  1) view("wide"/"cozy") 지정 → 자동 다각도(카메라 무시)  2) 사용자 3D 시점(camera)  3) 기본 = wide 자동
     view = p.get("view")
@@ -53,7 +77,7 @@ def build_scene(p):
             "ceil",   # 3D 뷰는 오픈탑 → 위에서 내려다볼 때 천장이 안 가리게
         ]
     else:
-        cam, ahide = auto_camera(view or "wide", W, D, H)
+        cam, ahide = auto_camera(view or "wide", W, D, H, cutouts)
         hide = p.get("hide") or ahide
     # 2D 평면의 문/창(top/bottom/left/right) → 렌더 벽(far/near/left/right).
     # 아이템과 동일한 깊이축 뒤집기: top(y0)→far(yD), bottom(yD)→near(y0). left/right는 벽 따라 위치(y)를 D-pos로.
@@ -72,14 +96,6 @@ def build_scene(p):
             openings.append({"kind": "door", "wall": rw, "pos": pos, "width": width})
         else:
             openings.append({"kind": "window", "wall": rw, "pos": pos, "width": width, "h": 1.0, "z": 1.7})
-    cutouts = []
-    for c in p.get("cutouts", []):
-        cw = float(c.get("w", 0)); cd = float(c.get("d", 0))
-        if cw <= 0 or cd <= 0:
-            continue
-        ccx = float(c.get("x", 0)) + cw / 2
-        ccy = float(c.get("y", 0)) + cd / 2
-        cutouts.append({"x": ccx, "y": D - ccy, "w": cw, "d": cd})   # 아이템과 동일한 깊이축 뒤집기
     out = {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI, "cutouts": cutouts,
            "preset": p.get("preset", "day"),           # 시간대 조명 프리셋(blender가 노출·창색·태양광 결정)
            "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1600)), "ry": int(p.get("ry", 900)),
