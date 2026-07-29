@@ -20,14 +20,36 @@ export default function RoomInput({ onBack, onNext, photo, onPhoto }) {
 
   const plan = FLOORPLANS.find((p) => p.id === sel);
 
+  // 판독된 세대 영역({x0,y0,x1,y1} 0~1 비율)만 잘라낸다 — 층 도면을 통째로 올려도
+  // 계단실·옆세대·치수선 띠가 언더레이에 안 들어가게. 실패하면 원본 그대로.
+  function cropToBox(dataUrl, box) {
+    return new Promise((resolve) => {
+      if (!box) return resolve(dataUrl);
+      const im = new window.Image();
+      im.onload = () => {
+        const sx = box.x0 * im.width, sy = box.y0 * im.height;
+        const sw = (box.x1 - box.x0) * im.width, sh = (box.y1 - box.y0) * im.height;
+        if (sw < 20 || sh < 20) return resolve(dataUrl);
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(sw); cv.height = Math.round(sh);
+        cv.getContext('2d').drawImage(im, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL('image/jpeg', 0.92));
+      };
+      im.onerror = () => resolve(dataUrl);
+      im.src = dataUrl;
+    });
+  }
+
   async function runScan(dataUrl, hintM) {
     setScanning(true); setScanErr('');
     const r = await readFloorplan(dataUrl, hintM);
-    setScanning(false);
-    if (r.status === 'OK') setScan(r);
-    else if (r.status === 'NOKEY') setScanErr('AI 연결이 안 돼 있어요. 평수 추정으로 진행해 주세요.');
+    if (r.status === 'OK') {
+      r.unitImg = await cropToBox(dataUrl, r.imageBox);   // 세대 영역만 잘라 미리보기·언더레이로
+      setScan(r);
+    } else if (r.status === 'NOKEY') setScanErr('AI 연결이 안 돼 있어요. 평수 추정으로 진행해 주세요.');
     else if (r.status === 'RATE_LIMIT') setScanErr(r.reason);   // 서버가 이미 한 번 기다렸다 재시도한 뒤다
     else setScanErr('도면을 읽지 못했어요. 도면이 잘 보이게 다시 찍거나, 평수로 진행해 주세요.');
+    setScanning(false);
   }
 
   // 도면 사진은 대개 수 MB다. 그대로 보내면 업로드도 느리고 LLM 토큰(=분당 한도)도 크게 먹어
@@ -77,8 +99,8 @@ export default function RoomInput({ onBack, onNext, photo, onPhoto }) {
       const sr = scan.room;
       const r = roomFromMeasured({ widthM: sr.widthM, depthM: sr.depthM });
       r.cutouts = sr.cutouts || [];
-      r.underlay = scanImg;             // 내가 올린 도면을 그대로 깔고 그 위에서 배치
-      r.accuracy = scan.accuracy;       // 'estimate' = AI 판독 초안(사용자 실측 전)
+      r.underlay = scan.unitImg || scanImg;   // 판독된 '세대 영역'만 깔기(층 도면 전체가 아니라)
+      r.accuracy = scan.accuracy;             // 'estimate' = AI 판독 초안(사용자 실측 전)
       onNext(r, sr.openings || []);
     } else {
       onNext(estimateRoom({ pyeong }), []);
@@ -140,7 +162,8 @@ export default function RoomInput({ onBack, onNext, photo, onPhoto }) {
           {scanErr && <p className="mockup-note" style={{ color: 'var(--bad)' }}>{scanErr}</p>}
 
           {scanImg && !scanning && (
-            <img src={scanImg} alt="올린 도면" style={{ width: '100%', borderRadius: 10, border: '1px solid var(--line)' }} />
+            // 판독 후엔 '읽어낸 세대 영역'을 보여준다 — 층 도면에서 어느 세대를 골랐는지 눈으로 확인.
+            <img src={scan?.unitImg || scanImg} alt="올린 도면" style={{ width: '100%', borderRadius: 10, border: '1px solid var(--line)' }} />
           )}
 
           {scan && (
@@ -153,6 +176,8 @@ export default function RoomInput({ onBack, onNext, photo, onPhoto }) {
                 <span className="badge est">AI 판독 초안</span>
                 <span className="badge mid">확신도 {Math.round((scan.confidence || 0) * 100)}%</span>
                 {scan.printedAreaM2 && <span className="badge real">도면 표기 {scan.printedAreaM2}㎡</span>}
+                {scan.unitLabel && <span className="badge real">{scan.unitLabel} 세대</span>}
+                {(scan.unitsDetected || 1) > 1 && <span className="badge warn">여러 세대 중 1곳만 읽음</span>}
               </div>
               {scan.note && <p className="mockup-note">{scan.note}</p>}
               <FloorPlan plan={scanPlan} width={300} />

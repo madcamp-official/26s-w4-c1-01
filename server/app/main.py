@@ -733,22 +733,32 @@ _PLAN_SCHEMA = {
             "pos": {"type": "number"}, "width": {"type": "number"}},
             "required": ["kind", "wall", "pos", "width"]}},
         "printedAreaM2": {"type": "number"},
+        "unitLabel": {"type": "string"},
+        "unitsDetected": {"type": "number"},
+        # 선택한 세대가 이미지에서 차지하는 영역 [ymin,xmin,ymax,xmax], 0~1000 정규화(Gemini box 규약).
+        "imageBox": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
         "confidence": {"type": "number"},
         "note": {"type": "string"},
     },
-    "required": ["widthM", "depthM", "cutouts", "openings", "confidence", "note"],
+    "required": ["widthM", "depthM", "cutouts", "openings", "imageBox", "confidence", "note"],
 }
 
 _PLAN_SYS = (
     "너는 한국 원룸 평면도를 읽어 가구배치 앱이 쓸 방 데이터를 만드는 판독기다.\n"
-    "좌표계: 방 좌상단이 원점, +x 오른쪽(너비), +y 아래(깊이), 단위는 미터(m).\n"
-    "- widthM/depthM = 세대 '내부'(벽 안쪽) 사각형. 도면에 치수(mm)가 적혀 있으면 그 값을 쓴다.\n"
-    "- cutouts = 가구를 놓을 수 없는 구역. kind는 bath(욕실)·kitchen(주방)·entry(현관)·closet(붙박이/보일러실) 중 하나.\n"
+    "0) 세대 선택 — 이미지가 '한 세대'가 아닐 수 있다(층 전체 도면, 여러 세대, 계단실·복도·주차·치수선 띠 포함).\n"
+    "   읽을 대상은 '주거 세대 하나'뿐이다: 세대 라벨(N호)과 전용면적이 붙은 세대를 우선하고, 여럿이면 가장 크고 완전하게\n"
+    "   보이는 세대 하나만 고른다. 계단실·엘리베이터·공용복도·주차장·기계실·옆 세대는 절대 방에 포함하지 마라.\n"
+    "   (욕실·다용도실·발코니처럼 그 세대 '안'의 부속실은 세대에 포함한다.)\n"
+    "   - imageBox = 고른 세대의 외곽벽이 이미지에서 차지하는 영역. [ymin,xmin,ymax,xmax], 각 값은 0~1000(이미지 크기 대비 비율).\n"
+    "   - unitLabel = 고른 세대의 라벨(예: '1호'). 없으면 생략. unitsDetected = 이미지에 보이는 주거 세대 수.\n"
+    "1) 좌표계: 고른 세대의 좌상단이 원점, +x 오른쪽(너비), +y 아래(깊이), 단위는 미터(m).\n"
+    "- widthM/depthM = 그 세대 '내부'(벽 안쪽) 사각형. 도면에 치수(mm)가 적혀 있으면 그 값을 쓴다.\n"
+    "- cutouts = 가구를 놓을 수 없는 구역. kind는 bath(욕실)·kitchen(주방)·entry(현관)·closet(붙박이/보일러실/다용도실) 중 하나.\n"
     "  방 사각형 안에 들어가야 하고 서로 겹치면 안 된다.\n"
     "- openings = 문/창. wall은 top|bottom|left|right, pos는 그 벽 시작점에서 개구부 중심까지 거리(m).\n"
-    "- printedAreaM2 = 도면에 '전용면적'이 인쇄돼 있으면 그 숫자. 없으면 생략.\n"
+    "- printedAreaM2 = 그 세대에 '전용면적'이 인쇄돼 있으면 그 숫자. 없으면 생략.\n"
     "- confidence 0~1: 치수선 숫자를 직접 읽었으면 높게, 비율로 추정했으면 0.4 이하.\n"
-    "- note: 사용자에게 보여줄 한 문장(무엇을 근거로 읽었는지, 무엇이 불확실한지).\n"
+    "- note: 사용자에게 보여줄 한 문장(어느 세대를 골랐고 무엇이 불확실한지).\n"
     "치수를 지어내지 마라. 근거가 없으면 confidence를 낮추고 note에 '치수 표기 없음'이라고 적어라."
 )
 
@@ -857,10 +867,22 @@ async def floorplan(req: FloorplanReq):
         for o in room["openings"]:
             for key in ("pos", "width"):
                 o[key] = round(o[key] * k, 2)
+    # imageBox([ymin,xmin,ymax,xmax] 0~1000) → 0~1 비율 {x0,y0,x1,y1}. 프런트가 이 영역만 잘라
+    # 언더레이로 깐다 — 층 도면을 통째로 올려도 계단실·옆세대·치수선 띠가 배경에 안 들어가게.
+    image_box = None
+    try:
+        b = [max(0.0, min(1000.0, float(v))) / 1000.0 for v in (obj.get("imageBox") or [])]
+        if len(b) == 4 and b[2] - b[0] > 0.05 and b[3] - b[1] > 0.05:
+            image_box = {"y0": round(b[0], 4), "x0": round(b[1], 4), "y1": round(b[2], 4), "x1": round(b[3], 4)}
+    except Exception:  # noqa: BLE001 — 박스가 이상하면 없는 것으로(전체 이미지 폴백)
+        image_box = None
     return {
         "status": "OK", "room": room,
         "accuracy": "measured" if req.hintM else "estimate",
         "confidence": float(obj.get("confidence", 0.0) or 0.0),
         "printedAreaM2": obj.get("printedAreaM2"),
+        "unitLabel": str(obj.get("unitLabel", "") or "")[:20] or None,
+        "unitsDetected": int(obj.get("unitsDetected", 1) or 1),
+        "imageBox": image_box,
         "note": str(obj.get("note", ""))[:200],
     }
