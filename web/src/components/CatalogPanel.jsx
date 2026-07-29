@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { searchFurniture, recommendSimilar } from '../lib/api.js';
-import { resolveDims, accuracyMeta, CATEGORIES, STYLE_OPTIONS, SIZE_OPTIONS, deriveStyle, deriveSize } from '../lib/catalog.js';
+import { resolveDims, accuracyMeta, CATEGORIES, STYLE_OPTIONS, SIZE_OPTIONS, PRICE_OPTIONS, deriveStyle, deriveSize, derivePriceBand } from '../lib/catalog.js';
 
 // 가구 팔레트 — 자연어 검색 + 분위기/사이즈/종류 필터 + 네이버 유사추천 + 클릭으로 배치에 추가.
 export default function CatalogPanel({ onAdd }) {
@@ -11,6 +11,7 @@ export default function CatalogPanel({ onAdd }) {
   const [catF, setCatF] = useState('');   // '' = 전체
   const [moodF, setMoodF] = useState('');
   const [sizeF, setSizeF] = useState('');
+  const [priceF, setPriceF] = useState('');
   const [recFor, setRecFor] = useState(null);   // 추천 기준 아이템
   const [recItems, setRecItems] = useState([]);
   const [recLoading, setRecLoading] = useState(false);
@@ -41,13 +42,14 @@ export default function CatalogPanel({ onAdd }) {
     if (catF && c.cat !== catF) return false;
     if (moodF && deriveStyle(c) !== moodF) return false;
     if (sizeF && deriveSize(c) !== sizeF) return false;
+    if (priceF && derivePriceBand(c) !== priceF) return false;
     return true;
-  }), [items, catF, moodF, sizeF]);
+  }), [items, catF, moodF, sizeF, priceF]);
 
   const Chip = ({ val, cur, set, children }) => (
     <button className={'fchip' + (cur === val ? ' on' : '')} onClick={() => set(cur === val ? '' : val)}>{children}</button>
   );
-  const hasFilter = catF || moodF || sizeF;
+  const hasFilter = catF || moodF || sizeF || priceF;
 
   return (
     <div className="palette">
@@ -71,13 +73,14 @@ export default function CatalogPanel({ onAdd }) {
       </div>
 
       <div className="filterbar">
-        <div className="filterrow"><span className="flabel">분위기</span>{STYLE_OPTIONS.map((s) => <Chip key={s} val={s} cur={moodF} set={setMoodF}>{s}</Chip>)}</div>
-        <div className="filterrow"><span className="flabel">사이즈</span>{SIZE_OPTIONS.map((s) => <Chip key={s} val={s} cur={sizeF} set={setSizeF}>{s}</Chip>)}</div>
         <div className="filterrow"><span className="flabel">종류</span>{CATEGORIES.map((s) => <Chip key={s} val={s} cur={catF} set={setCatF}>{s}</Chip>)}</div>
+        <div className="filterrow"><span className="flabel">사이즈</span>{SIZE_OPTIONS.map((s) => <Chip key={s} val={s} cur={sizeF} set={setSizeF}>{s}</Chip>)}</div>
+        <div className="filterrow"><span className="flabel">분위기</span>{STYLE_OPTIONS.map((s) => <Chip key={s} val={s} cur={moodF} set={setMoodF}>{s}</Chip>)}</div>
+        <div className="filterrow"><span className="flabel">가격대</span>{PRICE_OPTIONS.map((s) => <Chip key={s} val={s} cur={priceF} set={setPriceF}>{s}</Chip>)}</div>
         {hasFilter && (
           <div className="filterrow">
             <span className="fcount">{filtered.length}종</span>
-            <button className="fchip clear" onClick={() => { setCatF(''); setMoodF(''); setSizeF(''); }}>초기화 ✕</button>
+            <button className="fchip clear" onClick={() => { setCatF(''); setMoodF(''); setSizeF(''); setPriceF(''); }}>초기화 ✕</button>
           </div>
         )}
       </div>

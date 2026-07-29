@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css">
+<style>body{margin:0;background:#F0EEE9;font-family:'Pretendard Variable',-apple-system,sans-serif}</style>
+</helmet>
+<div style="padding:48px 56px">
+  <div style="font:700 14px 'Pretendard Variable',sans-serif;color:#2B2118;background:#fff;display:inline-block;padding:7px 16px;border-radius:100px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.06)">가구 담기 · 마켓 탭 필터 바텀시트 (실제 구현 색상/데이터 반영)</div>
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+    <div style="width:100%;height:100%;background:rgba(43,33,24,0.35);display:flex;flex-direction:column;justify-content:flex-end">
+      <div style="background:#fff;border-radius:24px 24px 0 0;padding:20px 18px 28px;display:flex;flex-direction:column;gap:14px;max-height:97%;box-sizing:border-box">
+
+        <div style="width:36px;height:4px;border-radius:100px;background:#E7E1D8;margin:0 auto;flex:none"></div>
+
+        <div style="display:flex;align-items:center;gap:6px;flex:none">
+          <span style="font:800 19px 'Pretendard Variable',sans-serif;color:#2B2118">가구 담기</span>
+          <span style="font-size:17px">🛍️</span>
+        </div>
+
+        <div style="display:inline-flex;align-items:center;gap:5px;font:600 11.5px 'Pretendard Variable',sans-serif;color:#3a6b8a;background:#e4ecf3;padding:5px 10px;border-radius:999px;align-self:flex-start;flex:none;white-space:nowrap">
+          ● 실측 3D 가구 184종 · 검색하면 네이버 실상품도 나와요
+        </div>
+
+        <div style="display:flex;gap:8px;flex:none">
+          <div style="flex:1;display:flex;align-items:center;background:#FFF3ED;border-radius:100px;padding:12px 16px;min-width:0">
+            <span style="font:400 13.5px 'Pretendard Variable',sans-serif;color:#B5A79A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">예: 3인 소파</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;background:#835151;color:#fff;font:700 13px 'Pretendard Variable',sans-serif;padding:0 18px;border-radius:100px;white-space:nowrap">🔍 검색</div>
+        </div>
+
+        <div style="border:1px solid #ECE3DB;border-radius:20px;padding:14px 14px 16px;display:flex;flex-direction:column;gap:12px;flex:none">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font:700 13px 'Pretendard Variable',sans-serif;color:#2B2118">필터</span>
+            <span style="font:700 11.5px 'Pretendard Variable',sans-serif;color:#835151;white-space:nowrap">3개 선택됨 · 초기화</span>
+          </div>
+
+          <div>
+            <div style="font:700 11px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-bottom:6px">분위기</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">미드센추리</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">모던</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">북유럽</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#835151;color:#fff;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">내추럴</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">인더스트리얼</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">클래식</span>
+            </div>
+          </div>
+
+          <div>
+            <div style="font:700 11px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-bottom:6px">사이즈</div>
+            <div style="display:flex;gap:6px">
+              <span style="flex:1;text-align:center;padding:8px 4px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif">소형</span>
+              <span style="flex:1;text-align:center;padding:8px 4px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif">중형</span>
+              <span style="flex:1;text-align:center;padding:8px 4px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif">대형</span>
+            </div>
+          </div>
+
+          <div>
+            <div style="font:700 11px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-bottom:6px">종류</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span style="padding:8px 14px;border-radius:100px;background:#835151;color:#fff;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">침대</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">소파</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">테이블</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">책상</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">의자</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">수납</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">조명</span>
+              <span style="padding:8px 14px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif;white-space:nowrap">러그</span>
+            </div>
+          </div>
+
+          <div>
+            <div style="font:700 11px 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-bottom:6px">가격대</div>
+            <div style="display:flex;gap:6px">
+              <span style="flex:1;text-align:center;padding:8px 4px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif">~10만</span>
+              <span style="flex:1;text-align:center;padding:8px 4px;border-radius:100px;background:#F2ECE3;color:#8A7A6C;font:700 12px 'Pretendard Variable',sans-serif">10~30만</span>
+              <span style="flex:1;text-align:center;padding:8px 4px;border-radius:100px;background:#835151;color:#fff;font:700 12px 'Pretendard Variable',sans-serif">30만+</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;overflow-y:auto">
+
+          <div style="display:flex;align-items:center;gap:10px;border:1px solid #ECE3DB;border-radius:16px;padding:9px 10px">
+            <span style="width:54px;height:54px;border-radius:12px;flex:none;background:#efeae0;border:1px solid rgba(0,0,0,0.08)"></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+              <span style="font:700 12.5px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">러스틱 솔리드 파인 침대</span>
+              <span style="display:flex;align-items:center;gap:5px;font:400 11px 'Pretendard Variable',sans-serif;color:#8A7A6C;white-space:nowrap">
+                201×211×51cm
+                <span style="font:700 10px 'Pretendard Variable',sans-serif;background:#E7EFE0;color:#5a7a3f;padding:1px 6px;border-radius:999px">정형</span>
+              </span>
+              <span style="display:flex;align-items:center;gap:6px">
+                <span style="font:700 10.5px 'Pretendard Variable',sans-serif;background:#F1EDE7;color:#835151;padding:2px 8px;border-radius:999px;white-space:nowrap">내추럴·중형</span>
+                <span style="font:800 13px 'Pretendard Variable',sans-serif;color:#835151;white-space:nowrap">702,000원</span>
+              </span>
+            </span>
+            <span style="width:28px;height:28px;border-radius:50%;flex:none;background:#835151;color:#fff;display:flex;align-items:center;justify-content:center;font:700 13px sans-serif">✓</span>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;border:1px solid #ECE3DB;border-radius:16px;padding:9px 10px">
+            <span style="width:54px;height:54px;border-radius:12px;flex:none;background:#efeae0;border:1px solid rgba(0,0,0,0.08)"></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+              <span style="font:700 12.5px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">파슨 퀸 침대</span>
+              <span style="display:flex;align-items:center;gap:5px;font:400 11px 'Pretendard Variable',sans-serif;color:#8A7A6C;white-space:nowrap">
+                194×220×169cm
+                <span style="font:700 10px 'Pretendard Variable',sans-serif;background:#E7EFE0;color:#5a7a3f;padding:1px 6px;border-radius:999px">정형</span>
+              </span>
+              <span style="display:flex;align-items:center;gap:6px">
+                <span style="font:700 10.5px 'Pretendard Variable',sans-serif;background:#F1EDE7;color:#835151;padding:2px 8px;border-radius:999px;white-space:nowrap">내추럴·중형</span>
+                <span style="font:800 13px 'Pretendard Variable',sans-serif;color:#835151;white-space:nowrap">521,000원</span>
+              </span>
+            </span>
+            <span style="width:28px;height:28px;border-radius:50%;flex:none;background:#fff;border:2px solid #ECE3DB"></span>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;border:1px solid #ECE3DB;border-radius:16px;padding:9px 10px">
+            <span style="width:54px;height:54px;border-radius:12px;flex:none;background:#efeae0;border:1px solid rgba(0,0,0,0.08)"></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+              <span style="font:700 12.5px 'Pretendard Variable',sans-serif;color:#2B2118;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">파슨 킹 우드 침대</span>
+              <span style="display:flex;align-items:center;gap:5px;font:400 11px 'Pretendard Variable',sans-serif;color:#8A7A6C;white-space:nowrap">
+                222×253×194cm
+                <span style="font:700 10px 'Pretendard Variable',sans-serif;background:#E7EFE0;color:#5a7a3f;padding:1px 6px;border-radius:999px">정형</span>
+              </span>
+              <span style="display:flex;align-items:center;gap:6px">
+                <span style="font:700 10.5px 'Pretendard Variable',sans-serif;background:#F1EDE7;color:#835151;padding:2px 8px;border-radius:999px;white-space:nowrap">내추럴·대형</span>
+                <span style="font:800 13px 'Pretendard Variable',sans-serif;color:#835151;white-space:nowrap">642,000원</span>
+              </span>
+            </span>
+            <span style="width:28px;height:28px;border-radius:50%;flex:none;background:#835151;color:#fff;display:flex;align-items:center;justify-content:center;font:700 13px sans-serif">✓</span>
+          </div>
+
+        </div>
+
+        <div style="background:#835151;color:#fff;font:800 15px 'Pretendard Variable',sans-serif;text-align:center;padding:16px;border-radius:18px;box-shadow:0 8px 22px rgba(131,81,81,0.20);flex:none">완료 · 2개 담음</div>
+      </div>
+    </div>
+  </x-import>
+  <div style="max-width:402px;font:400 12px/1.6 'Pretendard Variable',sans-serif;color:#8A7A6C;margin-top:10px">
+    필터는 4그룹(종류·사이즈·분위기·가격대) 전부 반영. 색상·라벨은 참고 이미지 대신 실제 web/src/styles.css 토큰 그대로: 상태줄=badge.mid(파랑, 기본 브라우징 상태 — CatalogPanel과 동일), 필터칩 선택=--accent(#835151)/미선택=--muted-surface(#F2ECE3), 치수뱃지=badge.ok(정형·초록)/badge.warn(추정·주황, 네이버 상품에서만 등장), 무드·사이즈 태그=--chip(#F1EDE7)+accent 글자, 가격대=derivePriceBand(~10만/10~30만/30만+), 완료 버튼=.cta 그대로(라운드 18px·그림자). 상품 3종·가격·모드/사이즈 태그는 실제 카탈로그(ABO3D) 값을 그대로 계산해 넣었고, 사이즈는 침대 전용 기준(200/235cm)을 적용해 대부분 "중형"으로 나옴 — 참고 이미지의 "대형" 일괄 표기는 구식 전역 기준(90/155cm)의 결과라 반영하지 않음.
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>

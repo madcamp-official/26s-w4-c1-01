@@ -111,12 +111,32 @@ export function deriveStyle(item) {
   for (const [label, re] of STYLE_MAP) if (re.test(n)) return label;
   return null;
 }
-// 사이즈 — 발자국 최대 변(cm)으로 소/중/대(방에 맞춰 고르기용).
+// 사이즈 — 발자국 최대 변(cm)으로 소/중/대. 카테고리마다 '큰 가구'의 기준이 다름
+// (침대는 다 커서 전역 90/155 기준으론 전부 대형, 의자는 다 작아서 전부 소형 — 필터가 무력화됨).
+// 그래서 카테고리별로 실측 cm 기준을 따로 둔다. 목록에 없는 카테고리는 전역 기준으로 폴백.
+const SIZE_THRESH_BY_CAT = {
+  침대: [200, 235],
+  소파: [160, 200],
+  테이블: [60, 100],
+  책상: [100, 140],
+  의자: [55, 70],
+  수납: [70, 110],
+  조명: [30, 45],
+  러그: [150, 220],
+};
 export const SIZE_OPTIONS = ['소형', '중형', '대형'];
 export function deriveSize(item) {
   const rd = resolveDims(item);
   const m = Math.max(rd.w, rd.d);
-  return m <= 90 ? '소형' : m <= 155 ? '중형' : '대형';
+  const [lo, hi] = SIZE_THRESH_BY_CAT[item?.cat] || [90, 155];
+  return m <= lo ? '소형' : m <= hi ? '중형' : '대형';
+}
+
+// 가격대 — 추정가(estimatePrice) 기준 3구간.
+export const PRICE_OPTIONS = ['~10만', '10~30만', '30만+'];
+export function derivePriceBand(item) {
+  const p = typeof item?.price === 'number' ? item.price : 0;
+  return p < 100000 ? '~10만' : p < 300000 ? '10~30만' : '30만+';
 }
 
 // 치수 신뢰도 → 표시용 {short, tone, hex}. tone: ok(정형·입력) / mid(상세·AI) / warn(추정·미상)
