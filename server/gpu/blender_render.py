@@ -427,20 +427,6 @@ if PRE.get("sun") and any(o.get("kind") == "window" for o in S.get("openings", [
     _fd.shadow_soft_size = 0.9                       # 큰 소프트 반경 — 그림자 없는 앰비언트처럼
     _fo.location = (W / 2, D / 2, H * 0.55)          # 방 중심 높이 — 수직면(벽체 옆면)도 밝힌다
 
-# 조명 '가구'가 있으면 그게 빛의 주인공 — 천장등은 보조로 줄인다(무드의 핵심).
-LAMPS = [it for it in S["items"] if it.get("lamp")]
-if PRE.get("lamp", 0) > 0:  # 실내 천장등(밤 위주)
-    ld = bpy.data.lights.new("lamp", 'AREA'); lo = bpy.data.objects.new("lamp", ld)
-    sc.collection.objects.link(lo)
-    ld.shape = 'RECTANGLE'; ld.size = min(W, 1.2); ld.size_y = min(D, 1.2)
-    ld.energy = 60 * PRE["lamp"] * (0.30 if LAMPS else 1.0); ld.color = (1.0, 0.86, 0.66)
-    lo.location = (W / 2, D / 2, H - 0.05)
-
-# ---------- 조명 가구 = 실제 광원 ----------
-# 전구를 갓 상단 림 높이(h*0.92)에 둬 위·아래로 빛이 새는 고전적 무드샷 구도.
-# 세기는 프리셋 lamp 계수에 비례(밤 최대) + 낮에도 은은한 최소치 — "조명이 빛의 원천".
-# 시간대 정책(기본): 밤/노을 = 조명 ON, 낮/아침 = OFF. 사용자가 lampOn(true/false)으로 강제
-# 오버라이드할 수 있고(낮에 켜기·밤에 끄기), lampColor(hex)로 색온도를 고른다.
 def _hex_rgb(hx):
     try:
         hx = str(hx).lstrip("#")
@@ -452,6 +438,23 @@ def _hex_rgb(hx):
 _lampOn = S.get("lampOn", None)
 _LEFF = PRE.get("lamp", 0) if _lampOn is None else (0.0 if not _lampOn else max(PRE.get("lamp", 0), 0.85))
 _LC = _hex_rgb(S.get("lampColor")) or (1.0, 0.72, 0.45)   # 기본 ~2700K 웜톤
+
+# 조명 '가구'가 있으면 그게 빛의 주인공 — 천장등은 보조로 줄인다(무드의 핵심).
+LAMPS = [it for it in S["items"] if it.get("lamp")]
+if PRE.get("lamp", 0) > 0:  # 실내 천장등(밤 위주)
+    ld = bpy.data.lights.new("lamp", 'AREA'); lo = bpy.data.objects.new("lamp", ld)
+    sc.collection.objects.link(lo)
+    ld.shape = 'RECTANGLE'; ld.size = min(W, 1.2); ld.size_y = min(D, 1.2)
+    _on = LAMPS and _LEFF >= 0.05
+    ld.energy = 60 * PRE["lamp"] * (0.18 if _on else 1.0)
+    ld.color = _LC if _on else (1.0, 0.86, 0.66)   # 조명 켜짐 → 보조광도 선택 색온도를 따른다
+    lo.location = (W / 2, D / 2, H - 0.05)
+
+# ---------- 조명 가구 = 실제 광원 ----------
+# 전구를 갓 상단 림 높이(h*0.92)에 둬 위·아래로 빛이 새는 고전적 무드샷 구도.
+# 세기는 프리셋 lamp 계수에 비례(밤 최대) + 낮에도 은은한 최소치 — "조명이 빛의 원천".
+# 시간대 정책(기본): 밤/노을 = 조명 ON, 낮/아침 = OFF. 사용자가 lampOn(true/false)으로 강제
+# 오버라이드할 수 있고(낮에 켜기·밤에 끄기), lampColor(hex)로 색온도를 고른다.
 if _LEFF >= 0.05:
     for _li, _lp in enumerate(LAMPS):
         _bz = float(_lp.get("elev", 0)) + float(_lp.get("h", 1.5)) * 0.92
@@ -500,10 +503,13 @@ def place(path, x, y, rotdeg, elev=0):
     # three.js(Room3D, rot=-θ, Y-up) → Blender(Z-up) 손대칭 없는 변환: 깊이축 뒤집기(D-cy)와 짝 → rot=-θ
     obj.rotation_euler = (0, 0, math.radians(-rotdeg))
     obj.location = (x, y, obj.dimensions.z / 2 + 0.002 + elev)   # elev: 책상 위 조명 등
+    return obj
 
 
 for it in S["items"]:
-    place(it["glb"], it["x"], it["y"], it.get("rot", 0), it.get("elev", 0))
+    _ob = place(it["glb"], it["x"], it["y"], it.get("rot", 0), it.get("elev", 0))
+    if it.get("lamp") and _ob is not None:
+        _ob.visible_shadow = False   # 갓이 전구 빛을 삼키면 색온도 선택이 화면에 안 드러난다
 
 # ---------- 카메라 ----------
 cam_d = bpy.data.cameras.new("cam"); cam = bpy.data.objects.new("cam", cam_d)
