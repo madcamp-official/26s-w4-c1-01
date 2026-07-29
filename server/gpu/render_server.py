@@ -14,13 +14,39 @@ GLBDIR = os.getenv("GLBDIR", "/root/glb")
 LOCK = threading.Lock()
 
 
+def living_bbox(W, D, cutouts):
+    """부속실(욕실·주방·현관)을 뺀 '실제 방'의 경계상자. 카메라는 건물 외곽이 아니라 이걸 기준으로 잡는다 —
+    도면형 원룸은 오른쪽 절반이 통째로 욕실+현관인 경우가 있어, 외곽 기준이면 방이 구석에 조그맣게 찍힌다."""
+    boxes = [(c["x"] - c["w"] / 2, c["x"] + c["w"] / 2, c["y"] - c["d"] / 2, c["y"] + c["d"] / 2)
+             for c in (cutouts or [])]
+    if not boxes:
+        return 0.0, W, 0.0, D
+    xs = sorted({0.0, W} | {v for b in boxes for v in b[:2] if 0.0 < v < W})
+    x0 = y0 = float("inf"); x1 = y1 = float("-inf")
+    for i in range(len(xs) - 1):
+        ax, bx = xs[i], xs[i + 1]
+        if bx - ax < 1e-4:
+            continue
+        xm = (ax + bx) / 2
+        y = 0.0
+        for (a, b1) in sorted((b[2], b[3]) for b in boxes if b[0] <= xm <= b[1]):
+            if a > y + 1e-4:
+                x0, x1, y0, y1 = min(x0, ax), max(x1, bx), min(y0, y), max(y1, a)
+            y = max(y, b1)
+        if y < D - 1e-4:
+            x0, x1, y0, y1 = min(x0, ax), max(x1, bx), min(y0, y), max(y1, D)
+    return (0.0, W, 0.0, D) if x1 <= x0 or y1 <= y0 else (x0, x1, y0, y1)
+
+
 def auto_camera(view, W, D, H, cutouts=None):
     """자동 다각도 카메라(Blender 좌표) — '컷아웃(부속실 벽체)이 가장 적은 코너' 밖에서 방 안을 봄.
     고정 near-left 코너를 쓰면 그 코너에 욕실·주방 벽체가 있을 때 화면이 벽으로 가득 찬다.
     wide = 방 전체가 보이는 높은 광각 코너샷 / cozy = 눈높이에 가깝고 살짝 좁은 아늑한 3-4분면."""
-    cx, cy = W * 0.5, D * 0.5
-    corners = {("near", "left"): (0.0, 0.0), ("near", "right"): (W, 0.0),
-               ("far", "left"): (0.0, D), ("far", "right"): (W, D)}
+    x0, x1, y0, y1 = living_bbox(W, D, cutouts)
+    LW, LD = x1 - x0, y1 - y0
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    corners = {("near", "left"): (x0, y0), ("near", "right"): (x1, y0),
+               ("far", "left"): (x0, y1), ("far", "right"): (x1, y1)}
 
     def blocked(px, py):    # 코너에 가까운 컷아웃일수록 크게 가림(면적/거리² 가중)
         s = 0.0
@@ -29,14 +55,17 @@ def auto_camera(view, W, D, H, cutouts=None):
         return s
 
     yside, xside = min(corners, key=lambda k: blocked(*corners[k]))
+    if view == "wide2":   # '반대편' = 최적 코너의 대각 — 카메라 쪽 부속실 면은 blender가 컷어웨이한다
+        yside = "near" if yside == "far" else "far"
+        xside = "left" if xside == "right" else "right"
     kx, ky = corners[(yside, xside)]
     mx = 1.0 if xside == "left" else -1.0     # 코너 → 방 안쪽 단위방향
     my = 1.0 if yside == "near" else -1.0
     if view == "cozy":
-        cam = {"pos": [kx - mx * W * 0.28, ky - my * D * 0.30, H * 0.46],
-               "target": [cx + mx * 0.04 * W, cy + my * 0.01 * D, 0.45], "lens": 30}
+        cam = {"pos": [kx - mx * LW * 0.28, ky - my * LD * 0.30, H * 0.46],
+               "target": [cx + mx * 0.04 * LW, cy + my * 0.01 * LD, 0.45], "lens": 30}
     else:  # wide (기본) — 초기 위치는 대략, 최종 프레이밍은 blender의 camera_fit_coords가 방 코너에 맞춤
-        b = 0.85 + 0.42 * max(W, D)
+        b = 0.85 + 0.42 * max(LW, LD)
         cam = {"pos": [kx - mx * b * 0.80, ky - my * b * 0.80, min(1.65 + 0.42 * H, H * 1.0)],
                "target": [cx, cy - my * 0.07 * cy, 0.4], "lens": 21, "fit": True}
     return cam, [yside, xside, "ceil"]
