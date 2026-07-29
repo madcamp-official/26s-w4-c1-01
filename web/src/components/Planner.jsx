@@ -7,7 +7,6 @@ const PAD = 16;
 const MAX_H = 470;
 // 컷아웃 구역 이름 — 도면(floorplanSvg)과 같은 어휘를 쓴다. 없으면 '배치금지'로만 보인다.
 const CUT_LABEL = { bath: '욕실', closet: '보일러실', kitchen: '주방', entry: '현관' };
-const CUT_ICON = { bath: '🚿', closet: '🧰', kitchen: '🍳', entry: '🚪', room: '🛏️' };
 
 // 실제 도면 이미지를 방 좌표에 1:1로 깔기 위한 로더(use-image 의존성 없이).
 function useImageSrc(src) {
@@ -104,21 +103,15 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
           {(room.cutouts || []).map((c, i) => {
             const kind = c.kind || 'bath';
             const label = c.label || CUT_LABEL[kind] || '';
-            const icon = CUT_ICON[c.label === '침실' ? 'room' : kind] || '';
             const boxW = toPx(c.w), boxH = toPx(c.d);
-            const showText = boxW > 34 && boxH > 30;      // 아이콘+글자 2줄이 들어갈 때만
-            const iconOnly = !showText && boxW > 18 && boxH > 16;
+            const showText = boxW > 34 && boxH > 16;      // 글자가 들어갈 때만(좁으면 생략)
             return (
               <Group key={`cut${i}`} listening={false}>
                 <Rect x={PAD + toPx(c.x)} y={PAD + toPx(c.y)} width={boxW} height={boxH}
                   fill={planImg ? 'rgba(222,213,199,0.92)' : '#e3ddd2'}
                   stroke="#6f6558" strokeWidth={2.5} cornerRadius={1} />
-                {(showText || iconOnly) && (
-                  <Text x={PAD + toPx(c.x)} y={PAD + toPx(c.y) + boxH / 2 - (showText ? 16 : 8)} width={boxW}
-                    text={icon} fontSize={showText ? 18 : 13} align="center" />
-                )}
                 {showText && label && (
-                  <Text x={PAD + toPx(c.x)} y={PAD + toPx(c.y) + boxH / 2 + 4} width={boxW}
+                  <Text x={PAD + toPx(c.x)} y={PAD + toPx(c.y) + boxH / 2 - 6} width={boxW}
                     text={label} fontSize={11} fontStyle="bold" fill="#54493d" align="center" />
                 )}
               </Group>
