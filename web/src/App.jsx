@@ -24,6 +24,10 @@ const LAYOUT_TARGET = 1;
 const LAYOUT_MAX_TRIES = 20;
 const layoutSig = (c) => c.items.map((i) => `${Math.round(i.cx * 100)},${Math.round(i.cy * 100)},${i.rotationDeg}`).join('|');
 const TAB_SCREENS = ['home', 'market', 'mypage'];
+const SAVED_ROOMS_KEY = 'bk-saved-rooms';
+function loadSavedRooms() {
+  try { return JSON.parse(localStorage.getItem(SAVED_ROOMS_KEY) || '[]'); } catch { return []; }
+}
 
 // 부팅 시 1회: OAuth 콜백 해시 소비(로그인 복귀) 또는 보관된 세션 복원.
 const bootAuth = consumeAuthHash();
@@ -39,6 +43,7 @@ export default function App() {
   const [furnitureBought, setFurnitureBought] = useState(false);   // 마켓 탭 방문이 아니라 실제 구매링크 클릭 시에만 true
   const [roomsDone, setRoomsDone] = useState(0);
   const [roomCounted, setRoomCounted] = useState(false);   // 현재 방을 '완성한 방'에 이미 셌는지(재배치 중복 방지)
+  const [savedRooms, setSavedRooms] = useState(loadSavedRooms);   // 마이 탭 배치함 — localStorage와 동기화
 
   const [room, setRoom] = useState(null);
   const [openings, setOpenings] = useState([]);
@@ -341,17 +346,18 @@ export default function App() {
     return postCommunity({ cat: 'flex', title, image: renderImg, meta });
   }
   // 배치함(마이페이지) 저장 — 서버 DB가 아직 없어 로컬(브라우저)에만 저장하는 MVP 폴백(정직 원칙: 완성된 만큼만 제공).
-  const SAVED_ROOMS_KEY = 'bk-saved-rooms';
   function saveRoom() {
     if (!room) return { status: 'ERROR', reason: '저장할 방이 없어요' };
     try {
-      const list = JSON.parse(localStorage.getItem(SAVED_ROOMS_KEY) || '[]');
+      const list = loadSavedRooms();
       list.unshift({
         id: `room-${Date.now()}`, savedAt: Date.now(),
         room, openings, items, renderImg: renderImg || null,
         roomLabel: `${room.widthM}m × ${room.depthM}m`, estimate, estimateIsEst,
       });
-      localStorage.setItem(SAVED_ROOMS_KEY, JSON.stringify(list.slice(0, 30)));   // 용량 방지로 최근 30개만
+      const trimmed = list.slice(0, 30);   // 용량 방지로 최근 30개만
+      localStorage.setItem(SAVED_ROOMS_KEY, JSON.stringify(trimmed));
+      setSavedRooms(trimmed);
       return { status: 'OK' };
     } catch (e) {
       return { status: 'ERROR', reason: String(e.message || e) };
@@ -423,7 +429,7 @@ export default function App() {
       )}
 
       {screen === 'mypage' && (
-        <MyTab taste={taste} savedCount={roomsDone} user={user} onEditTaste={() => setScreen('onboarding')}
+        <MyTab taste={taste} savedRooms={savedRooms} user={user} onEditTaste={() => setScreen('onboarding')}
           onLogout={() => { logout(); setUser(null); setScreen('login'); }} />
       )}
 
