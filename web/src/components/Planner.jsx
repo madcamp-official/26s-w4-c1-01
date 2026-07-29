@@ -92,10 +92,11 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
             )
           )}
 
-          {/* 실제 도면(있으면) — 방 사각형에 1:1로 깔아 그 위에서 배치한다. 가구·판정은 그대로 기하가 결정. */}
+          {/* 실제 도면(있으면) — 방 사각형에 1:1로 깔아 그 위에서 배치한다. 가구·판정은 그대로 기하가 결정.
+              불투명도 0.16: 도면은 윤곽만 은은하게 — 배치 요소가 주인공. */}
           {planImg && (
             <KImage image={planImg} x={PAD} y={PAD} width={toPx(room.widthM)} height={toPx(room.depthM)}
-              opacity={0.55} listening={false} />
+              opacity={0.16} listening={false} />
           )}
 
           {/* 컷아웃(비직사각형 방의 벽체/욕실) — 배치금지 구역 + 아이콘·이름.
@@ -110,15 +111,15 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
             return (
               <Group key={`cut${i}`} listening={false}>
                 <Rect x={PAD + toPx(c.x)} y={PAD + toPx(c.y)} width={boxW} height={boxH}
-                  fill={planImg ? 'rgba(227,221,210,0.55)' : '#e3ddd2'}
-                  stroke="#8a8172" strokeWidth={2} cornerRadius={1} />
+                  fill={planImg ? 'rgba(222,213,199,0.92)' : '#e3ddd2'}
+                  stroke="#6f6558" strokeWidth={2.5} cornerRadius={1} />
                 {(showText || iconOnly) && (
                   <Text x={PAD + toPx(c.x)} y={PAD + toPx(c.y) + boxH / 2 - (showText ? 16 : 8)} width={boxW}
                     text={icon} fontSize={showText ? 18 : 13} align="center" />
                 )}
                 {showText && label && (
                   <Text x={PAD + toPx(c.x)} y={PAD + toPx(c.y) + boxH / 2 + 4} width={boxW}
-                    text={label} fontSize={11} fontStyle="bold" fill="#6f6558" align="center" />
+                    text={label} fontSize={11} fontStyle="bold" fill="#54493d" align="center" />
                 )}
               </Group>
             );
