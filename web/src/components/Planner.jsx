@@ -13,6 +13,11 @@ const ZONE_FILL = { bath: '#E7EFF2', kitchen: '#EAE3D8', closet: '#E9E2D6', entr
 // Konva Shape sceneFunc 하나로 클리핑까지 처리(노드 수 절약). dim=언더레이 위에서는 살짝 비치게.
 function drawZone(kctx, kind, x, y, w, h, ppm, dim, chipHalf = 0) {
   const ctx = kctx._context || kctx;          // roundRect 등 네이티브 API 사용
+  if (kind === 'void') {                      // 세대 밖(비직사각형 외곽) — 외벽과 같은 덩어리로
+    ctx.fillStyle = '#3A332B';
+    ctx.fillRect(x, y, w, h);
+    return;
+  }
   ctx.save();
   ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
   ctx.globalAlpha = dim ? 0.93 : 1;
@@ -193,7 +198,7 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
           {/* 컷아웃(부속실) — 도면 표기법으로: 욕실 타일, 주방 카운터, 현관/보일러실 해칭 + 라벨 칩 */}
           {(room.cutouts || []).map((c, i) => {
             const kind = c.kind || 'bath';
-            const label = c.label || CUT_LABEL[kind] || '';
+            const label = kind === 'void' ? '' : (c.label || CUT_LABEL[kind] || '');   // void는 벽 — 라벨 없음
             const zx = PAD + toPx(c.x), zy = PAD + toPx(c.y), zw = toPx(c.w), zh = toPx(c.d);
             const chipW = label.length * 12 + 18, chipH = 21;
             const chip = label && zw > chipW + 8 && zh > chipH + 6;   // 칩이 들어갈 때만

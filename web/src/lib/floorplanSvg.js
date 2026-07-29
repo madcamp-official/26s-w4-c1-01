@@ -96,6 +96,10 @@ export function floorplanSvg(plan, targetW = 360) {
   for (const c of plan.cutouts || []) {
     const cx0 = X(c.x), cy0 = Y(c.y), cw = px(c.w), ch = px(c.d);
     const kind = c.kind || 'bath';
+    if (kind === 'void') {                     // 세대 밖(비직사각형 외곽) — 외벽 덩어리, 라벨·문 없음
+      rect(cx0, cy0, cw, ch, C.wall);
+      continue;
+    }
     if (kind === 'kitchen') drawCounterBox(cx0, cy0, cw, ch, true);
     else if (kind === 'closet') drawCounterBox(cx0, cy0, cw, ch, false);
     else if (kind === 'entry') drawEntryBox(cx0, cy0, cw, ch);

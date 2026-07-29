@@ -825,8 +825,12 @@ _PLAN_SYS = (
     "   침실·안방·거실·서재처럼 가구를 놓는 '생활 공간'은 절대 cutout이 아니다 — 그 공간이 배치 대상이므로 비워 둔다.\n"
     "   label = 도면에 그 실 이름이 인쇄돼 있으면 그대로(예: '다용도실'). 각 부속실의 '벽 위치 그대로' box를 준다.\n"
     "   전부 imageBox 안에 있어야 하고 서로 겹치면 안 된다.\n"
+    "1-1) 세대 외곽이 L자·ㄷ자 등 '비직사각형'이면: imageBox는 세대 전체를 감싸는 바운딩 박스로 잡고,\n"
+    "   박스 안에 들어온 '세대 밖' 영역(옆 세대·복도·계단실·엘리베이터·건물 외부)을 kind=\"void\" cutout으로 반드시 표시한다.\n"
+    "   void를 빠뜨리면 그 자리에 가구가 놓이는 치명적 오류가 된다. 세대 경계벽을 따라가며 확인하라.\n"
     "2) openings = 세대 외곽벽 위의 문(door)/창(window) 개구부 box.\n"
-    "3) widthM/depthM = imageBox가 나타내는 세대 내부의 실제 미터 치수. 도면에 인쇄된 치수(mm)·전용면적을 근거로만 추정한다.\n"
+    "3) widthM/depthM = imageBox(바운딩 박스)의 실제 미터 치수. 도면에 인쇄된 치수(mm)·전용면적을 근거로만 추정한다.\n"
+    "   비직사각형 세대는 바운딩 박스가 전용면적보다 클 수 있다 — 전용면적에 맞추려 박스를 줄이지 마라.\n"
     "- printedAreaM2 = 그 세대에 '전용면적'이 인쇄돼 있으면 그 숫자. 없으면 생략.\n"
     "- confidence 0~1: 치수선 숫자를 직접 읽었으면 높게, 비율로 추정했으면 0.4 이하.\n"
     "- note: 사용자에게 보여줄 한 문장(어느 세대를 골랐고 무엇이 불확실한지).\n"
@@ -867,12 +871,13 @@ def _clean_plan(p: dict):
     except Exception:  # noqa: BLE001
         unit = [0, 0, 1000, 1000]
 
-    kinds = {"bath", "kitchen", "entry", "closet"}
+    kinds = {"bath", "kitchen", "entry", "closet", "void"}   # void = 세대 밖(비직사각형 외곽)
     # 생활 공간(침실·거실 등)은 '배치 대상'이지 배치금지가 아니다 — 프롬프트가 놓쳐도 여기서 거른다.
     # ('주방'의 방, '다용도실'의 실이 걸리지 않게 구체 명사만 매칭.)
     living_re = re.compile(r"침실|안방|거실|서재|응접|리빙|드레스")
     cuts = []
-    for c in p.get("cutouts", []) or []:
+    # void(세대 밖)를 먼저 처리 — 부속실 박스와 겹치면 유령 바닥을 막는 void가 남는 쪽이 안전하다.
+    for c in sorted(p.get("cutouts", []) or [], key=lambda c: 0 if c.get("kind") == "void" else 1):
         label = str(c.get("label", "") or "").strip()
         if label and (living_re.search(label) or label == "방"):
             continue
