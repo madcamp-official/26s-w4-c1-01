@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 const SUGGESTIONS = ['침대 넣어줘', '소파 빼줘', '책상 더 크게', '조명 하나 추가해줘', '침대를 창가로 옮겨줘'];
 
 // 대화형 배치 도우미 — 문장 칩/자연어 → 추가·삭제·크기·재배치. 적용되면 App이 결과 화면으로 이동.
-export default function LayoutChat({ items, onSubmit }) {
+// "OO 추천해줘"는 바로 반영하지 않고 후보 카드(options)를 보여주고, 고르면 onPickOption으로 실제 추가.
+export default function LayoutChat({ items, onSubmit, onPickOption }) {
   const [msgs, setMsgs] = useState([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -19,7 +20,7 @@ export default function LayoutChat({ items, onSubmit }) {
     setBusy(true);
     try {
       const res = await onSubmit(m, msgs.slice(-8));
-      setMsgs((x) => [...x, { role: 'assistant', text: res?.reply || (res?.applied ? '반영했어! ✏️' : '반영하기 어려워요.') }]);
+      setMsgs((x) => [...x, { role: 'assistant', text: res?.reply || (res?.applied ? '반영했어! ✏️' : '반영하기 어려워요.'), options: res?.options }]);
     } catch {
       setMsgs((x) => [...x, { role: 'assistant', text: '문제가 생겼어요. 다시 시도해 주세요.' }]);
     } finally {
@@ -27,12 +28,28 @@ export default function LayoutChat({ items, onSubmit }) {
     }
   }
 
+  function pick(opt) {
+    onPickOption?.(opt.id);
+    setMsgs((x) => [...x, { role: 'assistant', text: `${opt.name} 추가했어! 도면에서 확인해봐 ✏️` }]);
+  }
+
   return (
     <div className="chatpanel">
       <div className="chat-head">💬 배치 도우미 <span>문장을 고르거나 입력하면 반영하고 결과를 보여줘요</span></div>
       <div className="chat-msgs" ref={scrollRef}>
         {msgs.length === 0 && <div className="chat-hint">✨ 자주 쓰는 문장을 눌러 바로 넣어보세요</div>}
-        {msgs.map((m, i) => <div key={i} className={'chat-msg ' + m.role}>{m.text}</div>)}
+        {msgs.map((m, i) => (
+          <div key={i} className={'chat-msg ' + m.role}>
+            {m.text}
+            {m.options?.length > 0 && (
+              <div className="chat-options">
+                {m.options.map((o) => (
+                  <button key={o.id} className="chat-option" onClick={() => pick(o)} disabled={busy}>{o.name}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
         {busy && <div className="chat-msg assistant busy">반영하는 중…</div>}
       </div>
       <div className="chat-chips">

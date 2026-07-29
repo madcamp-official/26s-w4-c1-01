@@ -39,6 +39,9 @@ export function currentUser() {
 
 export function logout() { localStorage.removeItem(KEY); }
 
+// 서명된 원본 토큰 — API 호출 시 Authorization 헤더로 실어 보낼 때 씀(글 수정/삭제 등 소유자 확인 필요한 요청).
+export function authToken() { return localStorage.getItem(KEY); }
+
 export const loginUrl = (provider) => `${API_BASE}/api/auth/${provider}/login`;
 
 // 어떤 플랫폼에 키가 설정돼 있는지 — 미설정이면 프론트가 데모 로그인으로 폴백.

@@ -1,10 +1,11 @@
 import { useMemo, useState, useRef } from 'react';
 import { consumeAuthHash, currentUser, logout } from './lib/auth.js';
-import { toPlacedItem, resolveDims, CATALOG } from './lib/catalog.js';
+import { toPlacedItem, resolveDims, CATALOG, deriveStyle } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation, clampCenterToRoom } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
 import { fetchDims, layoutFurniture, renderScene, chatLayout, postCommunity } from './lib/api.js';
-import { parseCommand, hasPlaceHint } from './lib/chatcmd.js';
+import { parseCommand, parseRecommendCommand, hasPlaceHint } from './lib/chatcmd.js';
+import { MOOD_TO_STYLE } from './lib/appdata.js';
 
 import TabBar from './components/TabBar.jsx';
 import Splash from './components/Splash.jsx';
@@ -76,6 +77,25 @@ export default function App() {
     const it = toPlacedItem(cat, spot.cx, spot.cy);
     setItems((p) => [...p, it]);
     setSelectedId(it.id);
+  }
+  // 배치 도우미의 "추천" 카드에서 하나를 골랐을 때 — 이미 검증된 특정 카탈로그 아이템이라 그대로 addFurniture로.
+  function pickRecommended(id) {
+    const catItem = CATALOG.find((c) => c.id === id);
+    if (catItem) addFurniture(catItem);
+  }
+  // 취향 태그 + 이미 배치된 가구들의 스타일을 모아 "이 방과 어울리는" 후보를 카테고리 안에서 추린다.
+  // 매치되는 스타일이 없으면(취향 미입력·첫 가구) 카테고리 전체 풀로 폴백 — 추천이 아예 안 뜨는 것보단 나음.
+  function recommendCandidates(cat, n = 3) {
+    const wantedStyles = new Set([
+      ...(taste?.moods || []).flatMap((m) => MOOD_TO_STYLE[m] || []),
+      ...items.map((it) => deriveStyle(it)).filter(Boolean),
+    ]);
+    let pool = CATALOG.filter((c) => c.cat === cat);
+    if (wantedStyles.size) {
+      const styled = pool.filter((c) => wantedStyles.has(deriveStyle(c)));
+      if (styled.length) pool = styled;
+    }
+    return [...pool].sort(() => Math.random() - 0.5).slice(0, n);   // 매번 같은 것만 뜨지 않게 섞기
   }
   // 사용자 편집(드래그/회전)은 방 범위를 벗어날 수 없다 — 발자국 기준 클램프.
   function moveItem(id, cx, cy) {
@@ -198,6 +218,16 @@ export default function App() {
   // 반환: { applied, reply } — applied면 결과로 이동(칩/문장 전송 → 로딩 → 결과).
   async function onChatSubmit(text, history = []) {
     if (!room) return { applied: false, reply: '먼저 방을 만들어 주세요.' };
+    const rec = parseRecommendCommand(text);
+    if (rec) {
+      const candidates = recommendCandidates(rec.cat, 3);
+      if (!candidates.length) return { applied: false, reply: `아직 추천할 ${rec.cat} 후보가 없어요.` };
+      return {
+        applied: false,
+        reply: `이 방 분위기에 맞는 ${rec.cat} ${candidates.length}가지를 골라봤어. 마음에 드는 걸 눌러줘 👇`,
+        options: candidates.map((c) => ({ id: c.id, name: c.name })),
+      };
+    }
     const cmd = parseCommand(text);
     if (cmd) {
       const catLabel = cmd.cat;
@@ -259,6 +289,23 @@ export default function App() {
     const meta = estimate > 0 ? `${sizeLabel} · ${estimateIsEst ? '약 ' : ''}${estimate.toLocaleString()}원` : sizeLabel;
     return postCommunity({ cat: 'flex', title, image: renderImg, meta });
   }
+  // 배치함(마이페이지) 저장 — 서버 DB가 아직 없어 로컬(브라우저)에만 저장하는 MVP 폴백(정직 원칙: 완성된 만큼만 제공).
+  const SAVED_ROOMS_KEY = 'bk-saved-rooms';
+  function saveRoom() {
+    if (!room) return { status: 'ERROR', reason: '저장할 방이 없어요' };
+    try {
+      const list = JSON.parse(localStorage.getItem(SAVED_ROOMS_KEY) || '[]');
+      list.unshift({
+        id: `room-${Date.now()}`, savedAt: Date.now(),
+        room, openings, items, renderImg: renderImg || null,
+        roomLabel: `${room.widthM}m × ${room.depthM}m`, estimate, estimateIsEst,
+      });
+      localStorage.setItem(SAVED_ROOMS_KEY, JSON.stringify(list.slice(0, 30)));   // 용량 방지로 최근 30개만
+      return { status: 'OK' };
+    } catch (e) {
+      return { status: 'ERROR', reason: String(e.message || e) };
+    }
+  }
   function navTab(t) {
     setScreen(t);
   }
@@ -302,7 +349,7 @@ export default function App() {
           onAutoLayout={openAutoLayout} moveItem={moveItem} rotateItem={rotateItem}
           onDelete={deleteSel} onRotateSel={rotateSel} onSetDim={setSelDim} onAutoFillDims={autoFillDims}
           dimBusy={dimBusy} addFurniture={addFurniture} cam3d={cam3d}
-          onChatSubmit={onChatSubmit}
+          onChatSubmit={onChatSubmit} onPickChatOption={pickRecommended}
           onBack={() => setScreen('roominput')} onFinish={finishPlanner}
         />
       )}
@@ -314,7 +361,7 @@ export default function App() {
           timePreset={renderPreset} onTime={(p) => renderWith(p, renderView, 'time')}
           view={renderView} onView={(v) => renderWith(renderPreset, v, 'view')}
           onBack={() => setScreen('planner')} onRerender={() => setScreen('planner')} onFindSimilar={findSimilar}
-          onShare={shareToCommunity}
+          onShare={shareToCommunity} onSave={saveRoom}
         />
       )}
 

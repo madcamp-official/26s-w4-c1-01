@@ -30,6 +30,14 @@ export function hasPlaceHint(text) {
   return /창가|창문|문\s?앞|문\s?옆|옆에|앞에|뒤에|맞은편|반대쪽|반대편|구석|코너|모서리|벽에|벽쪽|중앙|가운데|중간|근처|사이|머리맡|헤드|발치|침대\s?옆|책상\s?옆/.test(text || '');
 }
 
+// "이 방에 어울리는 침대 추천해줘"처럼 추천을 요청하는 문장 — add와 달리 바로 넣지 않고 후보 몇 개를 보여준다.
+export function parseRecommendCommand(text) {
+  const t = (text || '').trim();
+  if (!/추천|어울리는|어울릴|골라\s?줘|뭐가\s?좋을까/.test(t)) return null;
+  const cat = matchCategory(t);
+  return cat ? { cat } : null;
+}
+
 // 반환: { op: 'add'|'remove'|'resize', cat, factor? } | null(자연어 재배치로 위임)
 export function parseCommand(text) {
   const t = (text || '').trim();
