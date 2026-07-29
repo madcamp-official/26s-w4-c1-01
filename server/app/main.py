@@ -815,17 +815,25 @@ async def floorplan(req: FloorplanReq):
         async with httpx.AsyncClient(timeout=120) as cx:
             for attempt in (0, 1):
                 r = await cx.post(url, json=body)
-                if r.status_code == 429 and attempt == 0:
-                    delay = 20.0
-                    try:    # {"error":{"details":[{"retryDelay":"17s"}]}}
+                if r.status_code == 429:
+                    # 위반 한도 종류를 구분한다 — PerDay(일일)면 기다려도 소용없으니 재시도 없이 정직하게 안내.
+                    # (겪은 사례: gemini-flash-latest=최신 모델은 무료가 20회/일이라 이 케이스가 흔하다.)
+                    delay, daily = 20.0, False
+                    try:
                         for d in (r.json().get("error", {}).get("details") or []):
+                            for v in (d.get("violations") or []):
+                                if "PerDay" in str(v.get("quotaId", "")):
+                                    daily = True
                             if "retryDelay" in d:
                                 delay = min(45.0, float(str(d["retryDelay"]).rstrip("s")) + 1)
                     except Exception:  # noqa: BLE001
                         pass
-                    await _asyncio.sleep(delay)
-                    continue
-                if r.status_code == 429:
+                    if daily:
+                        return {"status": "RATE_LIMIT",
+                                "reason": "오늘의 무료 AI 한도를 다 썼어요. 내일 다시 시도하거나, 평수/도면 프리셋으로 진행해 주세요."}
+                    if attempt == 0:
+                        await _asyncio.sleep(delay)
+                        continue
                     return {"status": "RATE_LIMIT",
                             "reason": "지금 AI 요청이 몰렸어요. 1분 뒤에 다시 시도하거나, 평수로 먼저 진행해 주세요."}
                 r.raise_for_status()
