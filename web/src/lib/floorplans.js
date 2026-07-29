@@ -197,7 +197,8 @@ export const FLOORPLANS = [
       { kind: 'window', wall: 'right', pos: 2.0, width: 1.5 },
     ],
     cutouts: [
-      { x: 0.05, y: 0, w: 1.6, d: 2.55, kind: 'closet', label: '침실' },  // 분리된 침실
+      // 분리된 침실(좌상단)은 컷아웃에서 뺐다 — 침실은 가구를 '놓는' 공간이지 배치금지가 아니다.
+      // 사이 벽은 언더레이(실제 도면)가 시각 가이드로 보여준다.
       { x: 2.55, y: 0, w: 1.6, d: 0.85, kind: 'closet' },   // 보일러실
       { x: 0.85, y: 2.85, w: 0.8, d: 3.1, kind: 'kitchen' },// 세로 주방 빌트인
       { x: 1.85, y: 4.45, w: 1.0, d: 1.5, kind: 'entry' },  // 현관

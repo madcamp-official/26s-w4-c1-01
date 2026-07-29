@@ -795,6 +795,7 @@ _PLAN_SCHEMA = {
         "imageBox": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
         "cutouts": {"type": "array", "items": {"type": "object", "properties": {
             "kind": {"type": "string"},
+            "label": {"type": "string"},
             "box": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4}},
             "required": ["kind", "box"]}},
         "openings": {"type": "array", "items": {"type": "object", "properties": {
@@ -820,8 +821,10 @@ _PLAN_SYS = (
     "   (욕실·다용도실·발코니처럼 그 세대 '안'의 부속실은 세대에 포함한다.)\n"
     "   - imageBox = 고른 세대의 외곽벽 박스.\n"
     "   - unitLabel = 고른 세대의 라벨(예: '1호'). 없으면 생략. unitsDetected = 이미지에 보이는 주거 세대 수.\n"
-    "1) cutouts = 세대 안에서 가구를 놓을 수 없는 부속실. kind는 bath(욕실)·kitchen(주방)·entry(현관)·closet(붙박이/보일러실/다용도실).\n"
-    "   각 부속실의 '벽 위치 그대로' box를 준다. 전부 imageBox 안에 있어야 하고 서로 겹치면 안 된다.\n"
+    "1) cutouts = 세대 안에서 가구를 '놓을 수 없는' 부속실만. kind는 bath(욕실)·kitchen(주방)·entry(현관)·closet(붙박이/보일러실/다용도실).\n"
+    "   침실·안방·거실·서재처럼 가구를 놓는 '생활 공간'은 절대 cutout이 아니다 — 그 공간이 배치 대상이므로 비워 둔다.\n"
+    "   label = 도면에 그 실 이름이 인쇄돼 있으면 그대로(예: '다용도실'). 각 부속실의 '벽 위치 그대로' box를 준다.\n"
+    "   전부 imageBox 안에 있어야 하고 서로 겹치면 안 된다.\n"
     "2) openings = 세대 외곽벽 위의 문(door)/창(window) 개구부 box.\n"
     "3) widthM/depthM = imageBox가 나타내는 세대 내부의 실제 미터 치수. 도면에 인쇄된 치수(mm)·전용면적을 근거로만 추정한다.\n"
     "- printedAreaM2 = 그 세대에 '전용면적'이 인쇄돼 있으면 그 숫자. 없으면 생략.\n"
@@ -865,8 +868,14 @@ def _clean_plan(p: dict):
         unit = [0, 0, 1000, 1000]
 
     kinds = {"bath", "kitchen", "entry", "closet"}
+    # 생활 공간(침실·거실 등)은 '배치 대상'이지 배치금지가 아니다 — 프롬프트가 놓쳐도 여기서 거른다.
+    # ('주방'의 방, '다용도실'의 실이 걸리지 않게 구체 명사만 매칭.)
+    living_re = re.compile(r"침실|안방|거실|서재|응접|리빙|드레스")
     cuts = []
     for c in p.get("cutouts", []) or []:
+        label = str(c.get("label", "") or "").strip()
+        if label and (living_re.search(label) or label == "방"):
+            continue
         f = _box_frac(c.get("box") or [], unit)
         if not f:
             continue
@@ -877,6 +886,8 @@ def _clean_plan(p: dict):
         if w < 0.3 or d < 0.3:
             continue
         box = {"x": x, "y": y, "w": w, "d": d, "kind": c.get("kind") if c.get("kind") in kinds else "closet"}
+        if label:
+            box["label"] = label[:12]                  # 도면에 적힌 실명 그대로 편집기 칩에 표시
         if any(min(a["x"] + a["w"], x + w) - max(a["x"], x) > 0.05 and
                min(a["y"] + a["d"], y + d) - max(a["y"], y) > 0.05 for a in cuts):
             continue                                              # 겹치면 버림(엔진 면적 계산이 틀어짐)
