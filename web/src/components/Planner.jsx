@@ -5,6 +5,8 @@ import { accuracyMeta } from '../lib/catalog.js';
 
 const PAD = 16;
 const MAX_H = 470;
+// 컷아웃 구역 이름 — 도면(floorplanSvg)과 같은 어휘를 쓴다. 없으면 '배치금지'로만 보인다.
+const CUT_LABEL = { bath: '욕실', closet: '보일러실', kitchen: '주방', entry: '현관' };
 
 // 축척 2D 탑다운 플래너. 배치·스케일·맞음판정은 전부 미터 좌표계 기하(lib/geometry)로 결정.
 // 회전은 90도 스냅이라 시각적 rect 회전과 effectiveFootprint 스왑이 일치한다.
@@ -75,11 +77,22 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
             )
           )}
 
-          {/* 컷아웃(비직사각형 방의 벽체/욕실) — 배치금지 구역을 벽색으로 */}
-          {(room.cutouts || []).map((c, i) => (
-            <Rect key={`cut${i}`} x={PAD + toPx(c.x)} y={PAD + toPx(c.y)} width={toPx(c.w)} height={toPx(c.d)}
-              fill="#e3ddd2" stroke="#8a8172" strokeWidth={2} cornerRadius={1} listening={false} />
-          ))}
+          {/* 컷아웃(비직사각형 방의 벽체/욕실) — 배치금지 구역을 벽색으로 + 구역 이름 */}
+          {(room.cutouts || []).map((c, i) => {
+            const label = c.label || CUT_LABEL[c.kind] || '';
+            const boxW = toPx(c.w), boxH = toPx(c.d);
+            return (
+              <Group key={`cut${i}`} listening={false}>
+                <Rect x={PAD + toPx(c.x)} y={PAD + toPx(c.y)} width={boxW} height={boxH}
+                  fill="#e3ddd2" stroke="#8a8172" strokeWidth={2} cornerRadius={1} />
+                {/* 좁은 구역엔 글자가 안 들어가므로 최소 크기에서만 표시 */}
+                {label && boxW > 34 && boxH > 16 && (
+                  <Text x={PAD + toPx(c.x)} y={PAD + toPx(c.y) + boxH / 2 - 6} width={boxW}
+                    text={label} fontSize={11} fontStyle="bold" fill="#6f6558" align="center" />
+                )}
+              </Group>
+            );
+          })}
 
           {/* 개구부: 문(90° 스윙 부채꼴=접근불가, 빨강) · 창문(벽 표시=가리면 안 됨, 파랑) */}
           {(openings || []).map((o) => {

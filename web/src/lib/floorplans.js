@@ -131,4 +131,93 @@ export const FLOORPLANS = [
     balcony: { d: 1.0 },
     desc: '신축 오피스텔 — 통창 + 보조창 + 발코니',
   },
+  // ── 실제 인허가 도면에서 실측한 세대 (design/화면 캡처 2026-07-29 112406.png) ──
+  // 도면 전체 외곽 15,300×13,000mm에 픽셀↔mm 스케일을 잡아 내벽 위치를 읽고, 인쇄된
+  // 전용면적으로 검산했다. 세대 외곽(벽 포함) → 전용면적 오차 6% = 벽 두께분이라 정합.
+  //   1호 세대외곽 5,500×5,800 (하단체인 3,600+1,900 / 좌측체인 3,700+2,100) → 전용 29.86㎡
+  // 방 사각형은 가구를 놓을 수 있는 주생활공간만 잡고, 욕실·현관·주방은 annex로 뺐다.
+  {
+    // 세대 내부(벽 안쪽) 전체를 방 사각형으로 잡고, 보일러실·주방·현관·욕실을 cutout으로 파낸다.
+    // → 2D 편집기에서 실제 L자 형상 그대로 나오고, 가구가 그 구역을 침범하면 엔진이 잡는다.
+    // 좌표는 세대 좌상단(벽 안쪽) 기준 m. 0.5m 격자를 도면에 얹어 판독했다.
+    id: 'fp-real-1', name: '실측 도면 · 소형주택 1호', pyeong: 9.0, widthM: 5.2, depthM: 5.5,
+    openings: [
+      { kind: 'door', wall: 'right', pos: 2.6, width: 0.9, hinge: 'a' },   // 복도 → 현관
+      { kind: 'window', wall: 'left', pos: 4.4, width: 1.5 },              // 좌측 외벽 창(발코니 쪽)
+    ],
+    cutouts: [
+      { x: 0, y: 0, w: 1.6, d: 1.95, kind: 'closet' },     // 보일러실
+      { x: 1.6, y: 0, w: 1.75, d: 0.75, kind: 'kitchen' }, // 주방 빌트인 카운터
+      { x: 3.35, y: 0, w: 1.85, d: 3.35, kind: 'entry' },  // 현관 + 우상단 벽체
+      { x: 3.35, y: 3.35, w: 1.85, d: 2.15, kind: 'bath' },// 욕실
+    ],
+    // 이 세대는 욕실·주방·현관이 전부 세대 '안'이라 바깥 복도(annex)가 없다.
+    annex: { d: 0, bath: null, kitchen: { x: 0, w: 0 }, entry: { x: 0, w: 0 } },
+    real: { source: '인허가 평면도 실측', areaM2: 29.86, unitMm: '5,500 × 5,800' },
+    desc: '실제 도면 그대로 — 보일러실·주방·현관·욕실이 파인 L자, 가구 놓을 공간 약 14㎡',
+  },
+  {
+    id: 'fp-real-2', name: '실측 도면 · 소형주택 2호', pyeong: 8.3, widthM: 5.1, depthM: 4.4,
+    openings: [
+      { kind: 'door', wall: 'right', pos: 3.6, width: 0.9, hinge: 'a' },
+      { kind: 'window', wall: 'left', pos: 2.2, width: 1.5 },
+    ],
+    cutouts: [
+      { x: 3.4, y: 0, w: 1.7, d: 2.0, kind: 'bath' },       // 욕실(우상단)
+      { x: 0, y: 2.8, w: 1.35, d: 1.6, kind: 'closet' },    // 보일러실(좌하단)
+      { x: 1.5, y: 3.5, w: 2.9, d: 0.9, kind: 'kitchen' },  // 하단 주방 빌트인
+    ],
+    annex: { d: 0, bath: null, kitchen: { x: 0, w: 0 }, entry: { x: 0, w: 0 } },
+    real: { source: '인허가 평면도 실측', areaM2: 27.34, unitMm: '5,100 × 4,400' },
+    desc: '전용 27.34㎡ — 욕실이 우상단, 주방이 아래 벽면. 가로가 넓은 편',
+  },
+  {
+    id: 'fp-real-3', name: '실측 도면 · 소형주택 3호', pyeong: 8.3, widthM: 4.5, depthM: 5.4,
+    openings: [
+      { kind: 'door', wall: 'bottom', pos: 1.0, width: 0.9, hinge: 'a' },
+      { kind: 'window', wall: 'top', pos: 3.0, width: 1.5 },
+    ],
+    cutouts: [
+      { x: 0, y: 0, w: 1.3, d: 0.7, kind: 'closet' },       // 보일러실
+      { x: 0.2, y: 1.0, w: 1.5, d: 1.8, kind: 'bath' },     // 욕실
+      { x: 0.2, y: 4.5, w: 1.3, d: 0.9, kind: 'entry' },    // 현관
+      { x: 3.3, y: 3.2, w: 1.0, d: 2.0, kind: 'kitchen' },  // 우측 세로 주방
+    ],
+    annex: { d: 0, bath: null, kitchen: { x: 0, w: 0 }, entry: { x: 0, w: 0 } },
+    real: { source: '인허가 평면도 실측', areaM2: 27.48, unitMm: '4,500 × 5,400' },
+    desc: '전용 27.48㎡ — 부속실이 한쪽 벽에 몰려 반대쪽이 통으로 남는 세로형',
+  },
+  {
+    id: 'fp-real-4', name: '실측 도면 · 소형주택 4호', pyeong: 10.9, widthM: 5.4, depthM: 5.95,
+    openings: [
+      { kind: 'door', wall: 'bottom', pos: 2.35, width: 0.9, hinge: 'a' },
+      { kind: 'window', wall: 'right', pos: 2.0, width: 1.5 },
+    ],
+    cutouts: [
+      { x: 0.05, y: 0, w: 1.6, d: 2.55, kind: 'closet', label: '침실' },  // 분리된 침실
+      { x: 2.55, y: 0, w: 1.6, d: 0.85, kind: 'closet' },   // 보일러실
+      { x: 0.85, y: 2.85, w: 0.8, d: 3.1, kind: 'kitchen' },// 세로 주방 빌트인
+      { x: 1.85, y: 4.45, w: 1.0, d: 1.5, kind: 'entry' },  // 현관
+      { x: 2.85, y: 4.15, w: 2.0, d: 1.8, kind: 'bath' },   // 욕실
+    ],
+    annex: { d: 0, bath: null, kitchen: { x: 0, w: 0 }, entry: { x: 0, w: 0 } },
+    real: { source: '인허가 평면도 실측', areaM2: 35.91, unitMm: '5,700 × 6,300' },
+    desc: '전용 35.91㎡ — 침실이 벽으로 분리된 1.5룸. 5세대 중 가장 큼',
+  },
+  {
+    id: 'fp-real-5', name: '실측 도면 · 소형주택 5호', pyeong: 8.1, widthM: 4.65, depthM: 6.4,
+    openings: [
+      { kind: 'door', wall: 'left', pos: 1.6, width: 0.9, hinge: 'b' },
+      { kind: 'window', wall: 'bottom', pos: 3.0, width: 1.5 },
+    ],
+    cutouts: [
+      { x: 0, y: 0, w: 1.5, d: 1.5, kind: 'entry' },        // 현관
+      { x: 2.0, y: 0, w: 1.9, d: 1.5, kind: 'bath' },       // 욕실
+      { x: 2.5, y: 1.85, w: 1.5, d: 1.0, kind: 'closet' },  // 보일러실
+      { x: 0, y: 2.55, w: 0.85, d: 3.2, kind: 'kitchen' },  // 좌측 세로 주방
+    ],
+    annex: { d: 0, bath: null, kitchen: { x: 0, w: 0 }, entry: { x: 0, w: 0 } },
+    real: { source: '인허가 평면도 실측', areaM2: 26.86, unitMm: '4,650 × 6,400' },
+    desc: '전용 26.86㎡ — 부속실이 위쪽에 모여 아래가 길게 트인 세로형',
+  },
 ];

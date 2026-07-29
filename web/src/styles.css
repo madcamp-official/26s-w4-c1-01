@@ -83,6 +83,7 @@ input[type="number"], input[type="text"], select {
 .badge.warn { background: #F7E6D6; color: #a9691f; }
 .badge.est { background: #F2E3DC; color: var(--accent); }
 .badge.mid { background: #e4ecf3; color: #3a6b8a; }
+.badge.real { background: #E3E9EF; color: #37546e; }
 .badge.sm { font-size: 10px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
 
 .selbar { display: flex; gap: 6px; margin-top: 8px; }
@@ -555,6 +556,9 @@ img.ava { object-fit: cover; }
 .fpcard:hover { border-color: var(--accent-2); }
 .fpcard.on { border-color: var(--accent); box-shadow: 0 6px 18px rgba(131,81,81,.18); }
 .fpcard .fplan svg { width: 100%; height: auto; display: block; border-radius: 10px; }
+/* 실측 세대: 원본 인허가 도면 크롭을 함께 노출(치수 출처 확인용) */
+.fpreal { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+.fpreal img { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
 .fpmeta { padding: 6px 6px 0; }
 .fpmeta b { display: block; font-size: 12.5px; color: var(--ink); }
 .fpmeta span { display: block; font-size: 10.5px; color: var(--muted2); font-variant-numeric: tabular-nums; margin-top: 1px; }

@@ -49,6 +49,13 @@ export default function RoomInput({ onBack, onNext, photo, onPhoto }) {
             {FLOORPLANS.map((p) => (
               <button key={p.id} className={`fpcard ${sel === p.id ? 'on' : ''}`} onClick={() => setSel(sel === p.id ? null : p.id)}>
                 <FloorPlan plan={p} width={320} />
+                {/* 실제 인허가 도면에서 실측한 세대는 원본 도면을 함께 보여준다(치수 출처를 눈으로 확인). */}
+                {p.real && (
+                  <div className="fpreal">
+                    <img src={`./plans/${p.id.replace('fp-', '')}.png`} alt={`${p.name} 원본 도면`} loading="lazy" />
+                    <span className="badge real">실제 도면 · 전용 {p.real.areaM2}㎡ ({p.real.unitMm}mm)</span>
+                  </div>
+                )}
                 <div className="fpmeta">
                   <b>{p.name}</b>
                   <span>{p.widthM}×{p.depthM}m · 창 {p.openings.filter((o) => o.kind === 'window').length}개</span>

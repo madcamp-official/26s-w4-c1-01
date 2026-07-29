@@ -32,7 +32,9 @@ def load_env():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
-                env[k] = v.strip()
+                # 인라인 주석 제거 — .env.example을 그대로 복사하면 "KAKAO_CLIENT_ID=  # 발급처..."의
+                # 주석이 값으로 잡혀, 키가 비었는데도 /api/auth/providers가 true를 반환한다.
+                env[k] = v.split("#", 1)[0].strip()
     return env
 
 
@@ -269,7 +271,8 @@ def gemini_recommend_queries(item):
     body = json.dumps({
         "system_instruction": {"parts": [{"text": sysmsg}]},
         "contents": [{"role": "user", "parts": [{"text": user}]}],
-        "generationConfig": {"maxOutputTokens": 512, "temperature": 0.6, "responseMimeType": "application/json"},
+        # 512는 부족 — flash 계열은 thinking 토큰(600+)을 먼저 쓰고 답을 내서 MAX_TOKENS로 잘린다.
+        "generationConfig": {"maxOutputTokens": 2048, "temperature": 0.6, "responseMimeType": "application/json"},
     }).encode()
     url = ("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + GEMINI_API_KEY)
     req = urllib.request.Request(url, data=body, headers={"content-type": "application/json"})

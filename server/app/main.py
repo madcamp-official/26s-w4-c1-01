@@ -373,7 +373,8 @@ async def _recommend_queries(item: dict):
             r = await cx.post(f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}",
                               json={"system_instruction": {"parts": [{"text": sysmsg}]},
                                     "contents": [{"role": "user", "parts": [{"text": user}]}],
-                                    "generationConfig": {"maxOutputTokens": 512, "temperature": 0.6, "responseMimeType": "application/json"}})
+                                    # 512는 부족 — flash 계열은 thinking 토큰(600+)을 먼저 쓰고 답을 내서 MAX_TOKENS로 잘린다.
+                                    "generationConfig": {"maxOutputTokens": 2048, "temperature": 0.6, "responseMimeType": "application/json"}})
             r.raise_for_status()
             data = r.json()
         txt = "".join(p.get("text", "") for p in (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
