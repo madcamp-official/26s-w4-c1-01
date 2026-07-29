@@ -50,5 +50,5 @@ export async function fetchProviders() {
     const r = await fetch(`${API_BASE}/api/auth/providers`);
     if (!r.ok) throw new Error();
     return await r.json();
-  } catch { return { kakao: false, naver: false, google: false }; }
+  } catch { return { kakao: false, google: false }; }
 }

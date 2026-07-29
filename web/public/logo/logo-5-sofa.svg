@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="방꾸요정 로고 — 소파">
+  <!-- 5안 '소파' — 가구 앱임이 0.2초에 읽힌다. 가장 안전하고 마켓/커머스와 잘 어울린다. -->
+  <defs>
+    <linearGradient id="s-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F7E3D3"/><stop offset="1" stop-color="#E3B49B"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#s-bg)"/>
+  <!-- 등받이 -->
+  <rect x="104" y="168" width="304" height="112" rx="46" fill="#835151"/>
+  <!-- 팔걸이 -->
+  <rect x="88" y="236" width="66" height="118" rx="30" fill="#6E4343"/>
+  <rect x="358" y="236" width="66" height="118" rx="30" fill="#6E4343"/>
+  <!-- 좌석 -->
+  <rect x="126" y="256" width="260" height="86" rx="26" fill="#C9755F"/>
+  <line x1="256" y1="262" x2="256" y2="336" stroke="#B0654F" stroke-width="10" stroke-linecap="round"/>
+  <!-- 다리 -->
+  <rect x="126" y="352" width="26" height="40" rx="12" fill="#6E4343"/>
+  <rect x="360" y="352" width="26" height="40" rx="12" fill="#6E4343"/>
+  <!-- 쿠션 위 반짝임 -->
+  <path d="M340 132c5 22 12 29 34 34-22 5-29 12-34 34-5-22-12-29-34-34 22-5 29-12 34-34z" fill="#FFF8F3"/>
+</svg>

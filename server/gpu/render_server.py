@@ -169,7 +169,7 @@ def build_scene(p):
             openings.append({"kind": "window", "wall": rw, "pos": pos, "width": width, "h": 1.0, "z": 1.7})
     out = {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI, "cutouts": cutouts,
            "preset": p.get("preset", "day"),           # 시간대 조명 프리셋(blender가 노출·창색·태양광 결정)
-           "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1600)), "ry": int(p.get("ry", 900)),
+           "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1400)), "ry": int(p.get("ry", 1050)),
            "openings": openings, "camera": cam, "hide": hide, "items": items}
     # 앱/하니스가 명시 오버라이드하면 통과(프리셋 기본값을 덮어씀).
     for k in ("hdri_strength", "exposure", "rug", "lampOn", "lampColor"):

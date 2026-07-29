@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import ImageViewer from './ImageViewer.jsx';
 import { getWishlist, removeWish } from '../lib/wishlist.js';
 import { fetchLikedPosts, likeCommunityPost } from '../lib/api.js';
 
-const PROVIDER_LABEL = { kakao: '카카오', naver: '네이버', google: 'Google' };
+const PROVIDER_LABEL = { kakao: '카카오', google: 'Google' };
 const CAT_BADGE = { flex: '🎀 자랑', tip: '💡 꿀팁', question: '❓ 질문' };
 
 // 마이 탭 — 프로필(소셜 로그인 연동) + 취향 태그 + 저장한 배치 + 좋아요/찜 + 계정 리스트.
@@ -12,6 +13,7 @@ export default function MyTab({ taste, savedRooms, user, onEditTaste, onLogout }
   if (taste?.budget) tags.push(`예산 ${taste.budget}`);
   if (taste?.pet) tags.push('반려동물 🐾');
 
+  const [view, setView] = useState(null);   // {src, caption} — 저장 배치·좋아요 글 사진 확대
   const [wishOpen, setWishOpen] = useState(false);
   const [wishlist, setWishlist] = useState(getWishlist);
 
@@ -42,6 +44,7 @@ export default function MyTab({ taste, savedRooms, user, onEditTaste, onLogout }
 
   return (
     <div className="mypage">
+      {view && <ImageViewer src={view.src} caption={view.caption} onClose={() => setView(null)} />}
       <div className="body">
         <div className="profile">
           {user?.avatar
@@ -68,12 +71,24 @@ export default function MyTab({ taste, savedRooms, user, onEditTaste, onLogout }
           <div className="h-sec">배치함</div>
           {rooms.length > 0 ? (
             <div className="savedgrid">
-              {rooms.map((r, i) => (
-                <div key={r.id || i} className="savedcard">
-                  <div className="shot" style={r.renderImg ? { backgroundImage: `url(${r.renderImg})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined} />
-                  <div className="cap">{r.roomLabel || `내 방꾸 #${rooms.length - i}`}</div>
-                </div>
-              ))}
+              {/* image=서버 저장분(URL) · renderImg=예전 로컬 저장분(dataURL) 둘 다 지원 */}
+              {rooms.map((r, i) => {
+                const src = r.image || r.renderImg || null;
+                const cap = r.roomLabel || `내 방꾸 #${rooms.length - i}`;
+                return (
+                  <button key={r.id || i} type="button" className="savedcard"
+                    onClick={() => src && setView({ src, caption: cap })}
+                    title={src ? '크게 보기' : '저장된 사진이 없어요'}>
+                    <div className="shot" style={src ? { backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+                      {!src && <span className="shot-none">사진 없음</span>}
+                    </div>
+                    <div className="cap">
+                      {cap}
+                      {r.estimate > 0 && <span className="cap-sub">{r.estimateIsEst ? '약 ' : ''}{r.estimate.toLocaleString()}원</span>}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="panel-card" style={{ textAlign: 'center', color: 'var(--muted2)', fontSize: 13 }}>
@@ -94,7 +109,11 @@ export default function MyTab({ taste, savedRooms, user, onEditTaste, onLogout }
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {likedPosts.map((p) => (
                 <div key={p.id} className="feedcard">
-                  {p.image && <div className="feedcard-photo"><img src={p.image} alt="" /></div>}
+                  {p.image && (
+                    <div className="feedcard-photo" onClick={() => setView({ src: p.image, caption: p.title })}>
+                      <img src={p.image} alt="" />
+                    </div>
+                  )}
                   <div className="feedcard-body">
                     <span className="feed-badge">{p.badge || CAT_BADGE[p.cat] || p.cat}</span>
                     <div className="feed-title">{p.title}</div>

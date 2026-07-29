@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="방꾸요정 로고 — 요정 반짝임">
+  <!-- 2안 '요정' — 이름 그대로. 마법봉이 지나간 자리의 반짝임. 앱의 말투(요정이 도와줌)와 가장 잘 맞는다. -->
+  <defs>
+    <linearGradient id="f-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F5D9C4"/><stop offset="1" stop-color="#A45E6B"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#f-bg)"/>
+  <!-- 큰 반짝임(4각 별) -->
+  <path d="M232 96c14 62 34 82 96 96-62 14-82 34-96 96-14-62-34-82-96-96 62-14 82-34 96-96z" fill="#FFF8F3"/>
+  <!-- 작은 반짝임 둘 -->
+  <path d="M356 232c8 34 19 45 53 53-34 8-45 19-53 53-8-34-19-45-53-53 34-8 45-19 53-53z" fill="#FFE3A8"/>
+  <path d="M150 300c5 22 12 29 34 34-22 5-29 12-34 34-5-22-12-29-34-34 22-5 29-12 34-34z" fill="#FFF8F3" opacity=".85"/>
+  <!-- 방(사각 프레임)을 아래에 깔아 '방을 꾸민다'를 붙잡는다 -->
+  <rect x="126" y="374" width="260" height="52" rx="18" fill="#FFF8F3" opacity=".95"/>
+  <rect x="152" y="392" width="52" height="16" rx="8" fill="#A45E6B"/>
+  <rect x="220" y="392" width="72" height="16" rx="8" fill="#E8A48C"/>
+  <rect x="308" y="392" width="52" height="16" rx="8" fill="#A45E6B"/>
+</svg>

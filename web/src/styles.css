@@ -19,6 +19,8 @@
   --chip: #F1EDE7;
   --kakao: #FEE500; --kakao-ink: #3A2E00;
   --naver: #03C75A;
+  /* 화면 상단 여백 — 노치 기기만 그만큼 더 내린다(고정 56px은 안드로이드에서 과했음) */
+  --top-pad: calc(20px + env(safe-area-inset-top));
   --r-card: 20px; --r-btn: 16px; --r-pill: 100px;
   --shd-card: 0 4px 14px rgba(43,33,24,0.06);
   --shd-pop: 0 8px 22px rgba(131,81,81,0.20);
@@ -120,7 +122,7 @@ input[type="number"], input[type="text"], select {
 .pbar .sub { font-size: 11px; color: var(--muted); }
 .screen { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .pane { padding: 14px 16px 20px; }
-.pane.center { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 60px; }
+.pane.center { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 28px; }
 .sec { font-size: 13px; margin: 14px 0 8px; }
 
 .autobar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
@@ -297,7 +299,7 @@ input[type="number"], input[type="text"], select {
 
 /* 풀블리드 화면(스플래시/로그인/온보딩/방입력/플래너/결과): .phone를 꽉 채움 */
 .vscreen { flex: 1; min-height: 0; display: flex; flex-direction: column; box-sizing: border-box; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.vscreen.pad { padding: 56px 24px 28px; }
+.vscreen.pad { padding: var(--top-pad) 24px 28px; }
 
 /* 공용 큰 액션 버튼(ywlee CTA) */
 .cta { display: block; width: 100%; border: 0; background: var(--accent); color: #fff;
@@ -345,7 +347,7 @@ input[type="number"], input[type="text"], select {
 .sso.google { background: #fff; color: var(--ink); border: 1px solid rgba(43,33,24,.12); }
 
 /* ── 온보딩 취향·예산 ── */
-.onb { background: #fff; padding: 56px 24px 24px; }
+.onb { background: #fff; padding: var(--top-pad) 24px 24px; }
 .onb .scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 20px; padding-bottom: 8px; }
 
 /* 무드 카드 그리드 */
@@ -387,7 +389,7 @@ input[type="number"], input[type="text"], select {
 
 /* ── 홈 탭 ── */
 .home { background: var(--bg2); }
-.home .head { padding: 56px 22px 14px; font-weight: 800; font-size: 19px; color: var(--ink); }
+.home .head { padding: var(--top-pad) 22px 12px; font-weight: 800; font-size: 19px; color: var(--ink); }
 .home .body { flex: 1; min-height: 0; overflow: auto; padding: 0 22px 16px; display: flex; flex-direction: column; gap: 14px; }
 .hero-card { border-radius: 24px; padding: 22px; background: linear-gradient(135deg, var(--accent-2), var(--accent)); text-align: left; border: 0; cursor: pointer; box-shadow: var(--shd-pop); }
 .hero-card b { display: block; font-weight: 800; font-size: 17px; color: #fff; margin-bottom: 6px; }
@@ -457,7 +459,7 @@ input[type="number"], input[type="text"], select {
 
 /* ── 플래너 화면 chrome ── */
 /* 일반 블록 흐름으로 스크롤 — flex 컬럼이면 .room3d(고정 440px div)가 눌려 3D 뷰가 안 보임 */
-.planner-screen { background: #fff; padding: 56px 16px 16px; display: block; }
+.planner-screen { background: #fff; padding: var(--top-pad) 16px 16px; display: block; }
 .planner-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
 .planner-head b { font-weight: 800; font-size: 15px; color: var(--ink); }
 .planner-head .spacer { flex: 1; }
@@ -512,7 +514,7 @@ input[type="number"], input[type="text"], select {
 
 /* ── 마켓 탭 ── */
 .market { background: #fff; }   /* position:relative 없음 → 바텀시트가 .phone에 스코프되어 탭바까지 덮음(플래너 드로어와 동일) */
-.market .body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 56px 18px 0; display: flex; flex-direction: column; }
+.market .body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: var(--top-pad) 18px 0; display: flex; flex-direction: column; }
 /* 카테고리·검색창·필터칩을 한 블록으로 묶어 스크롤해도 상단에 통째로 고정.
    (카테고리 세그먼트에만 sticky를 걸면 검색창·필터칩은 그냥 콘텐츠처럼 스크롤되어 사라짐 — 버그 재발 방지 주석) */
 .market-head { position: sticky; top: 0; background: #fff; z-index: 2; flex-shrink: 0; }
@@ -548,6 +550,9 @@ input[type="number"], input[type="text"], select {
 .wish-btn.on { color: var(--bad); }
 .pcard .pnm { font-weight: 700; font-size: 12.5px; color: var(--ink); margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pcard .ppr { font-weight: 800; font-size: 12.5px; color: var(--accent); }
+/* 찜 목록은 '내가 고른 것'이라 이름이 온전히 보여야 한다 — 말줄임 대신 두 줄까지 허용.
+   (줄바꿈이라 마켓 그리드처럼 트랙을 늘려 가로 오버플로를 만들지 않는다) */
+.wish-card .pnm { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; }
 .pcard .est { margin-left: 5px; }
 .market-note { font-size: 11.5px; color: var(--muted3); line-height: 1.5; padding: 4px 2px 14px; }
 
@@ -559,7 +564,10 @@ input[type="number"], input[type="text"], select {
 
 /* ── 마이 탭 ── */
 .mypage { background: var(--bg2); }
-.mypage .body { flex: 1; min-height: 0; overflow: auto; padding: 56px 22px 16px; display: flex; flex-direction: column; gap: 18px; }
+.mypage .body { flex: 1; min-height: 0; overflow: auto; padding: var(--top-pad) 22px 24px; display: flex; flex-direction: column; gap: 18px; }
+/* 세로 flex 자식은 기본이 flex-shrink:1 — 내용이 넘치면 스크롤되는 대신 카드가 눌려 찌그러진다.
+   (찜한 상품 그리드의 상품명이 잘리고 아래로 스크롤이 끝까지 안 가던 원인. §마켓탭과 동일 함정) */
+.mypage .body > * { flex: none; }
 .profile { display: flex; align-items: center; gap: 12px; }
 .profile .ava { width: 56px; height: 56px; border-radius: 50%; background: #EAD7CE; flex: none; }
 .profile .nm { font-weight: 800; font-size: 16px; color: var(--ink); }
@@ -607,3 +615,27 @@ img.ava { object-fit: cover; }
   background: var(--accent); color: #fff; font: 700 11px sans-serif; display: flex; align-items: center; justify-content: center; }
 .upload-mini { display: block; text-align: center; font-size: 12px; color: var(--muted2); padding: 12px;
   border: 1.5px dashed var(--line); border-radius: 12px; margin: 4px 0 10px; cursor: pointer; }
+
+/* ── 이미지 확대 뷰어(렌더 결과·배치함·커뮤니티 공용) ── */
+.imgview { position: absolute; inset: 0; z-index: 40; background: rgba(20,15,12,.93); display: flex; flex-direction: column; }
+.imgview-bar { display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; color: #fff; }
+.imgview-bar .rt-circle { background: rgba(255,255,255,.16); color: #fff; }
+.imgview-bar .rt-circle:disabled { opacity: .35; }
+.imgview-cap { flex: 1; font-size: 13px; font-weight: 700; color: #F6EFE9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imgview-zoom { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #E8DCD2; }
+.imgview-zoom span { min-width: 40px; text-align: center; }
+/* touch-action:none — 브라우저 기본 핀치/스크롤을 끄고 우리 핸들러가 배율을 잡는다 */
+.imgview-stage { flex: 1; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
+.imgview-stage img { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center center; will-change: transform; user-select: none; }
+.imgview-hint { text-align: center; color: #B9A99C; font-size: 11.5px; padding: 8px 0 calc(12px + env(safe-area-inset-bottom)); }
+/* 클릭 가능한 저장 이미지 — 눌리는 느낌을 준다 */
+.savedcard { cursor: pointer; transition: transform .12s ease; }
+.savedcard:active { transform: scale(.97); }
+.feedcard-photo { cursor: zoom-in; }
+/* 배치함 카드 — 버튼으로 바뀌어 클릭 가능(사진 없으면 안내) */
+.savedcard { width: 100%; font: inherit; }
+.savedcard .shot { position: relative; display: flex; align-items: center; justify-content: center; }
+.savedcard .shot-none { font-size: 11px; color: var(--muted3); }
+/* 방 치수와 견적을 한 줄에 나란히 두면 2열 그리드 폭에서 치수가 줄바꿈된다 → 위아래로 쌓는다 */
+.savedcard .cap { display: flex; flex-direction: column; gap: 1px; }
+.savedcard .cap-sub { font-weight: 700; font-size: 11px; color: var(--accent); white-space: nowrap; }

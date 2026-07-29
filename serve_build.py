@@ -42,7 +42,8 @@ class Handler(SimpleHTTPRequestHandler):
             pass                                     # 프록시 응답은 백엔드/기본 정책 그대로
         elif p.startswith("/assets/"):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
-        elif p in ("/", "/index.html", "/sw.js") or p.endswith(".html"):
+        elif p in ("/", "/index.html", "/sw.js") or p.endswith(".html") or p.endswith(".apk"):
+            # APK도 매번 재검증 — 파일명이 고정("bangkku.apk")이라 캐시되면 새 빌드를 받지 못한다
             self.send_header("Cache-Control", "no-cache")
         else:
             self.send_header("Cache-Control", "public, max-age=3600")
@@ -85,6 +86,20 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path.startswith("/api/"):
             return self._proxy("POST")
+        self.send_response(404)
+        self.end_headers()
+
+    # PUT/DELETE도 넘겨야 한다 — 글 수정·삭제, 배치함 삭제가 이 메서드를 쓴다.
+    # 없으면 BaseHTTPRequestHandler가 501 Not Implemented로 잘라내 백엔드까지 가지도 못한다.
+    def do_PUT(self):
+        if self.path.startswith("/api/"):
+            return self._proxy("PUT")
+        self.send_response(404)
+        self.end_headers()
+
+    def do_DELETE(self):
+        if self.path.startswith("/api/"):
+            return self._proxy("DELETE")
         self.send_response(404)
         self.end_headers()
 

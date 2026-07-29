@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="방꾸요정 로고 — 방 글자">
+  <!-- 4안 '방' 글자 — 한글 워드마크. 작은 앱 아이콘에서 가장 또렷하고, 국내 서비스 인상이 강하다. -->
+  <defs>
+    <linearGradient id="b-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFF3ED"/><stop offset="1" stop-color="#F3DCD0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#b-bg)"/>
+  <rect x="52" y="52" width="408" height="408" rx="86" fill="none" stroke="#835151" stroke-width="14"/>
+  <text x="256" y="330" text-anchor="middle" font-family="Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+        font-size="248" font-weight="800" fill="#835151">방</text>
+  <!-- 오른쪽 위 반짝임 하나로 '요정'을 남긴다 -->
+  <path d="M372 130c6 26 14 34 40 40-26 6-34 14-40 40-6-26-14-34-40-40 26-6 34-14 40-40z" fill="#E8A48C"/>
+</svg>

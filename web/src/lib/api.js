@@ -262,6 +262,43 @@ export async function fetchLikedPosts() {
   }
 }
 
+// ── 배치함(저장한 방) — 서버 보관. 렌더 PNG는 서버가 파일로 떨어뜨리고 목록엔 URL만 온다.
+// 로그인 안 했으면 NOAUTH → 앱이 localStorage로 폴백(정직 원칙: 되는 만큼만).
+export async function saveRoomServer(payload) {
+  try {
+    const res = await fetch(`${API_BASE}/api/rooms`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(payload), signal: timeout(30000),   // 렌더 PNG가 1~2MB라 넉넉히
+    });
+    if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}` };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', reason: String(e.message || e) };
+  }
+}
+
+export async function fetchRooms() {
+  try {
+    const res = await fetch(`${API_BASE}/api/rooms`, { headers: authHeaders(), signal: timeout(10000) });
+    if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}`, rooms: [] };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', reason: String(e.message || e), rooms: [] };
+  }
+}
+
+export async function deleteRoom(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/rooms/${encodeURIComponent(id)}`, {
+      method: 'DELETE', headers: authHeaders(), signal: timeout(10000),
+    });
+    if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}` };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', reason: String(e.message || e) };
+  }
+}
+
 function localSearch(q) {
   if (!q) return CATALOG;
   // 카테고리 힌트 + 사용자 검색어가 함께 올 수 있어(예: "침대 원목") 단어 단위 AND 매칭.

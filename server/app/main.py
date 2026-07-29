@@ -544,13 +544,10 @@ from fastapi import Request
 
 AUTH_SECRET = os.getenv("AUTH_SECRET", "bangkku-dev-secret-rotate-me")
 AUTH_BASE = os.getenv("AUTH_REDIRECT_BASE", "http://localhost:5173").rstrip("/")
-OAUTH = {
+OAUTH = {   # 네이버 로그인은 제외(2026-07-29) — NAVER_CLIENT_ID/SECRET은 "네이버쇼핑 검색"용이라 별개다
     "kakao": {"id": os.getenv("KAKAO_CLIENT_ID"), "secret": os.getenv("KAKAO_CLIENT_SECRET"),
               "auth": "https://kauth.kakao.com/oauth/authorize", "token": "https://kauth.kakao.com/oauth/token",
               "profile": "https://kapi.kakao.com/v2/user/me", "scope": None},
-    "naver": {"id": os.getenv("NAVER_LOGIN_CLIENT_ID"), "secret": os.getenv("NAVER_LOGIN_CLIENT_SECRET"),
-              "auth": "https://nid.naver.com/oauth2.0/authorize", "token": "https://nid.naver.com/oauth2.0/token",
-              "profile": "https://openapi.naver.com/v1/nid/me", "scope": None},
     "google": {"id": os.getenv("GOOGLE_CLIENT_ID"), "secret": os.getenv("GOOGLE_CLIENT_SECRET"),
                "auth": "https://accounts.google.com/o/oauth2/v2/auth", "token": "https://oauth2.googleapis.com/token",
                "profile": "https://www.googleapis.com/oauth2/v2/userinfo", "scope": "openid profile email"},
@@ -611,8 +608,6 @@ async def auth_callback(provider: str, code: str = "", error: str = ""):
                 "redirect_uri": f"{AUTH_BASE}/api/auth/{provider}/callback", "code": code}
         if conf.get("secret"):
             form["client_secret"] = conf["secret"]
-        if provider == "naver":
-            form["state"] = "bk"
         async with httpx.AsyncClient(timeout=12) as cx:
             tr = await cx.post(conf["token"], data=form)
             access = tr.json().get("access_token")
@@ -623,10 +618,6 @@ async def auth_callback(provider: str, code: str = "", error: str = ""):
             info = (pr.get("kakao_account") or {}).get("profile") or pr.get("properties") or {}
             user = {"provider": "kakao", "id": str(pr.get("id")), "name": info.get("nickname") or "카카오 사용자",
                     "avatar": info.get("profile_image_url") or info.get("profile_image")}
-        elif provider == "naver":
-            r = pr.get("response") or {}
-            user = {"provider": "naver", "id": r.get("id"), "name": r.get("nickname") or r.get("name") or "네이버 사용자",
-                    "avatar": r.get("profile_image"), "email": r.get("email")}
         else:
             user = {"provider": "google", "id": pr.get("id") or pr.get("sub"), "name": pr.get("name") or "Google 사용자",
                     "avatar": pr.get("picture"), "email": pr.get("email")}
@@ -1035,3 +1026,144 @@ async def floorplan(req: FloorplanReq):
         "imageBox": image_box,
         "note": str(obj.get("note", ""))[:200],
     }
+
+
+# ===== 배치함(저장한 방) — 서버 보관 =====
+# 렌더 PNG는 dataURL 그대로 두면 한 장에 1~2MB다. 브라우저 localStorage(5MB)로는 서너 개면 꽉 차고,
+# sqlite에 넣으면 DB가 금방 수백 MB가 된다. 그래서 이미지는 '파일'로 떨어뜨리고 DB엔 경로만 둔다.
+import base64 as _b64
+from fastapi import Request as _Req
+from fastapi.responses import Response as _Resp
+
+ROOMS_DIR = os.getenv("ROOMS_DIR", os.path.join(os.path.dirname(__file__), "uploads", "rooms"))
+ROOM_MAX = 60                     # 계정당 보관 개수 상한(넘으면 오래된 것부터 정리)
+
+
+def _rooms_conn():
+    conn = sqlite3.connect(COMMUNITY_DB)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS saved_rooms ("
+        "id TEXT PRIMARY KEY, owner TEXT NOT NULL, created_at REAL NOT NULL, "
+        "label TEXT, estimate INTEGER DEFAULT 0, estimate_est INTEGER DEFAULT 0, "
+        "room TEXT, openings TEXT, items TEXT, has_image INTEGER DEFAULT 0)"
+    )
+    return conn
+
+
+def _room_png_path(rid: str) -> str:
+    return os.path.join(ROOMS_DIR, f"{rid}.png")
+
+
+def _decode_data_url(s: Optional[str]) -> Optional[bytes]:
+    """dataURL(image/png;base64,...) → bytes. 형식이 아니거나 과대하면 None."""
+    if not s or not isinstance(s, str) or "base64," not in s:
+        return None
+    try:
+        raw = _b64.b64decode(s.split("base64,", 1)[1], validate=False)
+    except Exception:  # noqa: BLE001
+        return None
+    return raw if 0 < len(raw) <= 12 * 1024 * 1024 else None
+
+
+class SaveRoomReq(BaseModel):
+    room: dict
+    openings: list = []
+    items: list = []
+    renderImg: Optional[str] = None    # dataURL — 파일로 저장하고 DB엔 안 넣는다
+    label: Optional[str] = None
+    estimate: int = 0
+    estimateIsEst: bool = False
+
+
+@app.post("/api/rooms")
+async def save_room(req: SaveRoomReq, request: _Req):
+    """배치 저장. 로그인해야 계정에 귀속된다(비로그인은 앱이 localStorage로 폴백)."""
+    user = _verify_token((request.headers.get("Authorization") or "").removeprefix("Bearer ").strip())
+    owner = _owner_key(user)
+    if not owner:
+        return {"status": "NOAUTH"}
+    rid = _uuid.uuid4().hex[:12]
+    png = _decode_data_url(req.renderImg)
+    try:
+        if png:
+            os.makedirs(ROOMS_DIR, exist_ok=True)
+            with open(_room_png_path(rid), "wb") as f:
+                f.write(png)
+        conn = _rooms_conn()
+        conn.execute(
+            "INSERT INTO saved_rooms (id,owner,created_at,label,estimate,estimate_est,room,openings,items,has_image)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (rid, owner, _time.time(), (req.label or "")[:80], int(req.estimate or 0), int(bool(req.estimateIsEst)),
+             json.dumps(req.room), json.dumps(req.openings), json.dumps(req.items), 1 if png else 0),
+        )
+        # 상한 초과분 정리 — DB 행과 PNG 파일을 같이 지운다(고아 파일 방지)
+        old = conn.execute(
+            "SELECT id FROM saved_rooms WHERE owner=? ORDER BY created_at DESC LIMIT -1 OFFSET ?",
+            (owner, ROOM_MAX),
+        ).fetchall()
+        for (oid,) in old:
+            conn.execute("DELETE FROM saved_rooms WHERE id=?", (oid,))
+            try:
+                os.remove(_room_png_path(oid))
+            except OSError:
+                pass
+        conn.commit(); conn.close()
+        return {"status": "OK", "id": rid, "image": f"/api/rooms/{rid}/image" if png else None}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "ERROR", "reason": _safe_err(e, 150)}
+
+
+@app.get("/api/rooms")
+async def list_rooms(request: _Req):
+    """내 배치함 목록. 이미지는 URL로만 준다 — 목록 응답에 dataURL을 담으면 수 MB가 된다."""
+    user = _verify_token((request.headers.get("Authorization") or "").removeprefix("Bearer ").strip())
+    owner = _owner_key(user)
+    if not owner:
+        return {"status": "NOAUTH", "rooms": []}
+    try:
+        conn = _rooms_conn()
+        rows = conn.execute(
+            "SELECT id,created_at,label,estimate,estimate_est,room,openings,items,has_image"
+            " FROM saved_rooms WHERE owner=? ORDER BY created_at DESC", (owner,)
+        ).fetchall()
+        conn.close()
+        return {"status": "OK", "rooms": [
+            {"id": r[0], "savedAt": r[1] * 1000, "roomLabel": r[2], "estimate": r[3], "estimateIsEst": bool(r[4]),
+             "room": json.loads(r[5] or "{}"), "openings": json.loads(r[6] or "[]"), "items": json.loads(r[7] or "[]"),
+             "image": f"/api/rooms/{r[0]}/image" if r[8] else None}
+            for r in rows]}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "ERROR", "reason": _safe_err(e, 150), "rooms": []}
+
+
+@app.get("/api/rooms/{room_id}/image")
+async def room_image(room_id: str):
+    """저장된 렌더 PNG. 경로 조작 방지를 위해 id는 hex만 허용."""
+    if not re.fullmatch(r"[0-9a-f]{6,32}", room_id):
+        return _Resp(status_code=404)
+    path = _room_png_path(room_id)
+    if not os.path.exists(path):
+        return _Resp(status_code=404)
+    with open(path, "rb") as f:
+        return _Resp(content=f.read(), media_type="image/png",
+                     headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
+@app.delete("/api/rooms/{room_id}")
+async def delete_room(room_id: str, request: _Req):
+    user = _verify_token((request.headers.get("Authorization") or "").removeprefix("Bearer ").strip())
+    owner = _owner_key(user)
+    if not owner:
+        return {"status": "NOAUTH"}
+    conn = _rooms_conn()
+    row = conn.execute("SELECT owner FROM saved_rooms WHERE id=?", (room_id,)).fetchone()
+    if not row or row[0] != owner:
+        conn.close()
+        return {"status": "ERROR", "reason": "not found"}
+    conn.execute("DELETE FROM saved_rooms WHERE id=?", (room_id,))
+    conn.commit(); conn.close()
+    try:
+        os.remove(_room_png_path(room_id))
+    except OSError:
+        pass
+    return {"status": "OK"}

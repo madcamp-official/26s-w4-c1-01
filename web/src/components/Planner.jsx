@@ -329,16 +329,32 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                   if (ih > maxh) { ih = maxh; iw = ih * asp; }
                   return <KImage image={im} width={iw} height={ih} offsetX={iw / 2} offsetY={ih / 2} listening={false} />;
                 })()}
-                <Text
-                  text={`${it.name}\n${Math.round(it.wM * 100)}×${Math.round(it.dM * 100)} · ${accuracyMeta(it.dimAccuracy).short}`}
-                  fontSize={11}
-                  fill="#3a352e"
-                  align="center"
-                  width={Math.max(fp.w, 1) * ppm}
-                  offsetX={(Math.max(fp.w, 1) * ppm) / 2}
-                  offsetY={6}
-                  listening={false}
-                />
+                {/* 라벨은 카테고리 한 단어만 — 상품 원문명("Rivet Nova Modern King Bed Frame wit")과
+                    치수·신뢰도까지 얹으면 타일이 글자로 뒤덮인다. 치수는 선택 시 하단바가, 신뢰도는
+                    좌상단 점이 이미 알려준다. 흰 테두리를 둘러 가구 사진 위에서도 읽히게. */}
+                {(() => {
+                  const label = it.cat || (it.name || '').split(/[ ,(]/)[0].slice(0, 8);
+                  if (!label) return null;
+                  const tw = Math.max(fp.w, 0.4) * ppm;
+                  const fs = Math.min(12, Math.max(8.5, tw / 4.4));
+                  return (
+                    <Text
+                      text={label}
+                      fontSize={fs}
+                      fontStyle="bold"
+                      fill="#2B2118"
+                      stroke="#fff"
+                      strokeWidth={3}
+                      fillAfterStrokeEnabled
+                      lineJoin="round"
+                      align="center"
+                      width={tw}
+                      offsetX={tw / 2}
+                      offsetY={fs / 2}
+                      listening={false}
+                    />
+                  );
+                })()}
                 {/* 치수 신뢰도 점 (좌상단) */}
                 <Circle x={-w / 2 + 6} y={-h / 2 + 6} radius={4} fill={accuracyMeta(it.dimAccuracy).hex} listening={false} />
               </Group>

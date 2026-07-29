@@ -58,16 +58,13 @@ GEMINI_API_KEY = ENV.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = ENV.get("GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-flash-latest"
 LLM_PROVIDER = "gemini" if GEMINI_API_KEY else ("anthropic" if ANTHROPIC_API_KEY else None)
 # ── 소셜 로그인(OAuth 2.0 인가코드) — 키는 server/.env, 없으면 프론트가 데모 로그인 폴백 ──
-# 네이버 '로그인' 앱 키는 쇼핑검색 키(NAVER_CLIENT_ID)와 별개 앱이라 이름을 분리한다.
+# 네이버 로그인은 제외(2026-07-29). NAVER_CLIENT_ID/SECRET은 '네이버쇼핑 검색'용이라 그대로 쓴다.
 AUTH_SECRET = ENV.get("AUTH_SECRET") or os.getenv("AUTH_SECRET") or "bangkku-dev-secret-rotate-me"
 AUTH_BASE = (ENV.get("AUTH_REDIRECT_BASE") or os.getenv("AUTH_REDIRECT_BASE") or "http://localhost:5173").rstrip("/")
 OAUTH = {
     "kakao": {"id": (ENV.get("KAKAO_CLIENT_ID") or os.getenv("KAKAO_CLIENT_ID")), "secret": (ENV.get("KAKAO_CLIENT_SECRET") or os.getenv("KAKAO_CLIENT_SECRET")),
               "auth": "https://kauth.kakao.com/oauth/authorize", "token": "https://kauth.kakao.com/oauth/token",
               "profile": "https://kapi.kakao.com/v2/user/me", "scope": None},
-    "naver": {"id": (ENV.get("NAVER_LOGIN_CLIENT_ID") or os.getenv("NAVER_LOGIN_CLIENT_ID")), "secret": (ENV.get("NAVER_LOGIN_CLIENT_SECRET") or os.getenv("NAVER_LOGIN_CLIENT_SECRET")),
-              "auth": "https://nid.naver.com/oauth2.0/authorize", "token": "https://nid.naver.com/oauth2.0/token",
-              "profile": "https://openapi.naver.com/v1/nid/me", "scope": None},
     "google": {"id": (ENV.get("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID")), "secret": (ENV.get("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_CLIENT_SECRET")),
                "auth": "https://accounts.google.com/o/oauth2/v2/auth", "token": "https://oauth2.googleapis.com/token",
                "profile": "https://www.googleapis.com/oauth2/v2/userinfo", "scope": "openid profile email"},
@@ -112,8 +109,6 @@ def oauth_exchange(provider, code, base=None):
             "redirect_uri": f"{base or AUTH_BASE}/api/auth/{provider}/callback", "code": code}
     if conf.get("secret"):
         form["client_secret"] = conf["secret"]
-    if provider == "naver":
-        form["state"] = "bk"
     tok = _http_json(conf["token"], data=urllib.parse.urlencode(form).encode(),
                      headers={"Content-Type": "application/x-www-form-urlencoded"})
     access = tok.get("access_token")
@@ -124,10 +119,6 @@ def oauth_exchange(provider, code, base=None):
         pr = (prof.get("kakao_account") or {}).get("profile") or prof.get("properties") or {}
         return {"provider": "kakao", "id": str(prof.get("id")), "name": pr.get("nickname") or "카카오 사용자",
                 "avatar": pr.get("profile_image_url") or pr.get("profile_image")}
-    if provider == "naver":
-        r = prof.get("response") or {}
-        return {"provider": "naver", "id": r.get("id"), "name": r.get("nickname") or r.get("name") or "네이버 사용자",
-                "avatar": r.get("profile_image"), "email": r.get("email")}
     return {"provider": "google", "id": prof.get("id") or prof.get("sub"), "name": prof.get("name") or "Google 사용자",
             "avatar": prof.get("picture"), "email": prof.get("email")}
 

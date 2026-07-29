@@ -1,6 +1,7 @@
 // 합성 결과 — camp-3 포토리얼 렌더를 After로, 업로드한 빈 방 사진을 Before로.
 // 렌더 서버 미연동/실패 시 빗금 플레이스홀더로 폴백(과잉약속 금지, 흐름 유지).
 import { useState } from 'react';
+import ImageViewer from './ImageViewer.jsx';
 
 const TIMES = [['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['night', '🌙']];
 const VIEWS = [['wide', '와이드'], ['cozy', '아늑'], ['wide2', '반대편']];   // wide2 = 와이드의 대각 반대 코너
@@ -12,6 +13,7 @@ export default function CompositeResult({
   timePreset, onTime, view, onView, onBack, onRerender, onFindSimilar, onShare, onSave,
   hasLamp, lampOn, onLampToggle, lampColor, onLampColor,
 }) {
+  const [zoom, setZoom] = useState(false);   // 결과 사진 확대 보기
   const [shareState, setShareState] = useState('idle');   // idle | busy | done | error
   async function handleShare() {
     if (!onShare || shareState === 'busy') return;
@@ -47,9 +49,9 @@ export default function CompositeResult({
     <div className="vscreen result">
       <div className="canvas">
         {showingBefore ? (
-          <img src={photo} alt="빈 방 (Before)" />
+          <img src={photo} alt="빈 방 (Before)" onClick={() => setZoom(true)} style={{ cursor: 'zoom-in' }} />
         ) : renderImg ? (
-          <img src={renderImg} alt="완성된 배치 (After)" />
+          <img src={renderImg} alt="완성된 배치 (After)" onClick={() => setZoom(true)} style={{ cursor: 'zoom-in' }} />
         ) : (
           <div className="hatch-after">완성된 배치 이미지 (After)</div>
         )}
@@ -57,6 +59,11 @@ export default function CompositeResult({
 
       {renderBusy && renderImg && (
         <div className="rerender-veil"><div className="spinner sm" /><span>{renderTrigger === 'view' ? '새 각도로 다시 찍는 중…' : '새 조명으로 다시 찍는 중…'}</span></div>
+      )}
+
+      {zoom && (
+        <ImageViewer src={showingBefore ? photo : renderImg} alt="완성된 배치"
+          caption={showingBefore ? '빈 방 (Before)' : '완성된 배치 (After)'} onClose={() => setZoom(false)} />
       )}
 
       <div className="topbar">

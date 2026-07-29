@@ -658,9 +658,9 @@ if cd.get("fit"):
     try:
         dg = bpy.context.evaluated_depsgraph_get()
         loc, _sc = cam.camera_fit_coords(dg, flat)
-        # 5% 여백: 시선 방향 반대로 살짝 후퇴
+        # 여백 1.5%만 — 방이 프레임을 최대한 채우게(5%는 사방에 빈 배경이 남아 폰에서 방이 작아 보였다)
         view = (mathutils.Vector(tgt) - loc)
-        cam.location = loc - view.normalized() * (view.length * 0.05)
+        cam.location = loc - view.normalized() * (view.length * 0.015)
     except Exception as e:
         print("fit fail", e)
 

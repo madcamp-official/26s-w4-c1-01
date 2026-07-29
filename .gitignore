@@ -26,3 +26,9 @@ camp3_*
 
 # 폰에 바로 설치할 수 있게 빌드해 둔 APK — 바이너리라 커밋하지 않는다
 web/public/*.apk
+
+# 저장된 배치 렌더 PNG(사용자 데이터) — 커밋 금지
+server/app/uploads/
+
+# 날짜 붙인 APK 사본(캐시 우회용) — 바이너리라 커밋하지 않는다
+web/public/bangkku-*.apk

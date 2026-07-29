@@ -1,9 +1,9 @@
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { consumeAuthHash, currentUser, logout } from './lib/auth.js';
 import { toPlacedItem, resolveDims, CATALOG, deriveStyle } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation, clampCenterFree } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
-import { fetchDims, layoutFurniture, renderScene, chatLayout, postCommunity } from './lib/api.js';
+import { fetchDims, layoutFurniture, renderScene, chatLayout, postCommunity, saveRoomServer, fetchRooms } from './lib/api.js';
 import { parseCommand, parseRecommendCommand, hasPlaceHint } from './lib/chatcmd.js';
 import { MOOD_TO_STYLE } from './lib/appdata.js';
 
@@ -345,24 +345,41 @@ export default function App() {
     const meta = estimate > 0 ? `${sizeLabel} · ${estimateIsEst ? '약 ' : ''}${estimate.toLocaleString()}원` : sizeLabel;
     return postCommunity({ cat: 'flex', title, image: renderImg, meta });
   }
-  // 배치함(마이페이지) 저장 — 서버 DB가 아직 없어 로컬(브라우저)에만 저장하는 MVP 폴백(정직 원칙: 완성된 만큼만 제공).
-  function saveRoom() {
+  // 배치함 저장 — 로그인했으면 서버(계정에 귀속·기기 바뀌어도 남음), 아니면 브라우저 localStorage.
+  // 렌더 PNG는 1~2MB라 localStorage(5MB)엔 서너 개가 한계다. 서버는 PNG를 파일로 두고 URL만 준다.
+  async function saveRoom() {
     if (!room) return { status: 'ERROR', reason: '저장할 방이 없어요' };
+    const label = `${room.widthM}m × ${room.depthM}m`;
+    if (user) {
+      const r = await saveRoomServer({ room, openings, items, renderImg: renderImg || null, label, estimate, estimateIsEst });
+      if (r?.status === 'OK') { await reloadRooms(); return { status: 'OK' }; }
+      if (r?.status !== 'NOAUTH') return { status: 'ERROR', reason: r?.reason || '저장 실패' };
+      // NOAUTH(토큰 만료 등)면 아래 로컬 저장으로 흘려보낸다 — 저장 자체를 잃지 않게.
+    }
     try {
       const list = loadSavedRooms();
       list.unshift({
         id: `room-${Date.now()}`, savedAt: Date.now(),
-        room, openings, items, renderImg: renderImg || null,
-        roomLabel: `${room.widthM}m × ${room.depthM}m`, estimate, estimateIsEst,
+        room, openings, items, image: renderImg || null,
+        roomLabel: label, estimate, estimateIsEst, local: true,
       });
-      const trimmed = list.slice(0, 30);   // 용량 방지로 최근 30개만
+      const trimmed = list.slice(0, 8);   // 렌더 PNG가 커서 localStorage 한도(5MB)에 금방 닿는다
       localStorage.setItem(SAVED_ROOMS_KEY, JSON.stringify(trimmed));
       setSavedRooms(trimmed);
       return { status: 'OK' };
     } catch (e) {
-      return { status: 'ERROR', reason: String(e.message || e) };
+      // 용량 초과가 대부분 — 서버 저장을 권한다(로그인하면 개수 제한이 사실상 사라짐)
+      return { status: 'ERROR', reason: user ? String(e.message || e) : '저장 공간이 꽉 찼어 — 로그인하면 서버에 저장돼' };
     }
   }
+
+  // 로그인 상태면 서버 배치함을 정본으로 쓴다(로컬 저장분은 로그인 전 기록이라 뒤에 붙인다).
+  async function reloadRooms() {
+    if (!user) { setSavedRooms(loadSavedRooms()); return; }
+    const r = await fetchRooms();
+    if (r?.status === 'OK') setSavedRooms([...r.rooms, ...loadSavedRooms()]);
+  }
+  useEffect(() => { reloadRooms(); }, [user]);   // eslint-disable-line react-hooks/exhaustive-deps
   function navTab(t) {
     setScreen(t);
   }

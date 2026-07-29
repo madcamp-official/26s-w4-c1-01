@@ -2,6 +2,7 @@
 // "방꾸 이야기"(커뮤니티)는 별도 탭바 아이템 없이 이 안에서 세그먼트 전환으로만 존재(design/커뮤니티.html 1c안).
 // 피드는 서버(SQLite)에서 불러오되, 서버 미연동/빈 DB일 땐 목업으로 폴백(정직 원칙: fallback은 MVP).
 import { useState, useEffect } from 'react';
+import ImageViewer from './ImageViewer.jsx';
 import { COMMUNITY_CATS, COMMUNITY_POSTS } from '../lib/appdata.js';
 import { fetchCommunityFeed, updateCommunityPost, deleteCommunityPost, likeCommunityPost } from '../lib/api.js';
 
@@ -19,6 +20,7 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
   const [cat, setCat] = useState('all');
   const [serverPosts, setServerPosts] = useState(null);   // null=아직 없음/실패 → 목업 폴백. []=서버 응답했지만 글 없음 → 이때도 목업으로 데모 채움.
   const [feedBusy, setFeedBusy] = useState(false);
+  const [view, setView] = useState(null);   // {src, caption} — 피드 사진 확대 보기
   const [editingId, setEditingId] = useState(null);   // 인라인 수정 중인 글 id
   const [editTitle, setEditTitle] = useState('');
 
@@ -64,6 +66,7 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
 
   return (
     <div className="home">
+      {view && <ImageViewer src={view.src} caption={view.caption} onClose={() => setView(null)} />}
       <div className="head">안녕, 오늘도 방꾸해볼까? 🧡</div>
       <div className="body">
         <div className="seg2 home-seg">
@@ -125,7 +128,8 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
               return (
                 <div key={p.id} className="feedcard">
                   {(p.image || p.photo) && (
-                    <div className="feedcard-photo" style={p.photo ? { background: p.photo } : undefined}>
+                    <div className="feedcard-photo" style={p.photo ? { background: p.photo } : undefined}
+                      onClick={() => p.image && setView({ src: p.image, caption: p.title })}>
                       {p.image && <img src={p.image} alt="" />}
                       <span className="feed-badge on-photo">{badge}</span>
                     </div>
