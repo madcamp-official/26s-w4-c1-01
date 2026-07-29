@@ -7,6 +7,56 @@ const PAD = 16;
 const MAX_H = 470;
 // 컷아웃 구역 이름 — 도면(floorplanSvg)과 같은 어휘를 쓴다. 없으면 '배치금지'로만 보인다.
 const CUT_LABEL = { bath: '욕실', closet: '보일러실', kitchen: '주방', entry: '현관' };
+const ZONE_FILL = { bath: '#E7EFF2', kitchen: '#EAE3D8', closet: '#E9E2D6', entry: '#EFE8DE' };
+
+// 구역을 도면 표기법으로 그린다 — 욕실=타일 격자, 주방=카운터(싱크·화구), 현관/보일러실=사선 해칭.
+// Konva Shape sceneFunc 하나로 클리핑까지 처리(노드 수 절약). dim=언더레이 위에서는 살짝 비치게.
+function drawZone(kctx, kind, x, y, w, h, ppm, dim) {
+  const ctx = kctx._context || kctx;          // roundRect 등 네이티브 API 사용
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  ctx.globalAlpha = dim ? 0.93 : 1;
+  ctx.fillStyle = ZONE_FILL[kind] || ZONE_FILL.closet;
+  ctx.fillRect(x, y, w, h);
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 1;
+  if (kind === 'bath') {
+    ctx.strokeStyle = '#C9D8DE';
+    const step = Math.max(12, 0.35 * ppm);
+    for (let gx = x + step; gx < x + w; gx += step) { ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx, y + h); ctx.stroke(); }
+    for (let gy = y + step; gy < y + h; gy += step) { ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); ctx.stroke(); }
+  } else if (kind === 'kitchen') {
+    const horiz = w >= h, L = horiz ? w : h, T = horiz ? h : w;
+    if (L > 0.9 * ppm && T > 14) {
+      ctx.strokeStyle = '#A9A29A'; ctx.fillStyle = '#FFFFFF';
+      const sw = Math.min(0.42 * ppm, L * 0.28), sh = Math.min(0.3 * ppm, T * 0.62);
+      const sx = horiz ? x + 0.14 * ppm : x + w / 2 - sh / 2;
+      const sy = horiz ? y + h / 2 - sh / 2 : y + 0.14 * ppm;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(sx, sy, horiz ? sw : sh, horiz ? sh : sw, 5);
+      else ctx.rect(sx, sy, horiz ? sw : sh, horiz ? sh : sw);
+      ctx.fill(); ctx.stroke();
+      const r = Math.min(0.09 * ppm, T * 0.28);
+      for (const off of [0.3, 0.58]) {
+        const bx = horiz ? x + w - off * ppm : x + w / 2;
+        const by = horiz ? y + h / 2 : y + h - off * ppm;
+        if ((horiz ? bx - r > sx + sw : by - r > sy + sw)) { ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.stroke(); }
+      }
+    }
+  } else {                                    // closet(성근 사선) / entry(촘촘한 반대 사선 = 현관 매트)
+    ctx.strokeStyle = kind === 'entry' ? '#DCCFBE' : '#DCD2C2';
+    const s = kind === 'entry' ? 9 : 13;
+    for (let k = x - h; k < x + w; k += s) {
+      ctx.beginPath();
+      if (kind === 'entry') { ctx.moveTo(k, y + h); ctx.lineTo(k + h, y); }
+      else { ctx.moveTo(k, y); ctx.lineTo(k + h, y + h); }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+  ctx.strokeStyle = '#4A423A'; ctx.lineWidth = 3;  // 내부 칸막이 벽(외벽보다 한 톤 가볍게)
+  ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+}
 
 // 실제 도면 이미지를 방 좌표에 1:1로 깔기 위한 로더(use-image 의존성 없이).
 function useImageSrc(src) {
@@ -118,21 +168,28 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
             </Group>
           )}
 
-          {/* 컷아웃(비직사각형 방의 벽체/욕실) — 배치금지 구역 + 아이콘·이름.
-              도면을 깔았을 땐 도면이 이미 그 구역을 그리고 있으므로 반투명으로 덮는다. */}
+          {/* 컷아웃(부속실) — 도면 표기법으로: 욕실 타일, 주방 카운터, 현관/보일러실 해칭 + 라벨 칩 */}
           {(room.cutouts || []).map((c, i) => {
             const kind = c.kind || 'bath';
             const label = c.label || CUT_LABEL[kind] || '';
-            const boxW = toPx(c.w), boxH = toPx(c.d);
-            const showText = boxW > 34 && boxH > 16;      // 글자가 들어갈 때만(좁으면 생략)
+            const zx = PAD + toPx(c.x), zy = PAD + toPx(c.y), zw = toPx(c.w), zh = toPx(c.d);
+            const chipW = label.length * 12 + 18, chipH = 21;
+            const chip = label && zw > chipW + 8 && zh > chipH + 6;   // 칩이 들어갈 때만
+            const tiny = !chip && label && zw > 34 && zh > 16;        // 좁으면 글자만
             return (
               <Group key={`cut${i}`} listening={false}>
-                <Rect x={PAD + toPx(c.x)} y={PAD + toPx(c.y)} width={boxW} height={boxH}
-                  fill={planImg ? 'rgba(222,213,199,0.92)' : '#e3ddd2'}
-                  stroke="#6f6558" strokeWidth={2.5} cornerRadius={1} />
-                {showText && label && (
-                  <Text x={PAD + toPx(c.x)} y={PAD + toPx(c.y) + boxH / 2 - 6} width={boxW}
-                    text={label} fontSize={11} fontStyle="bold" fill="#54493d" align="center" />
+                <Shape sceneFunc={(ctx) => drawZone(ctx, kind, zx, zy, zw, zh, ppm, !!planImg)} />
+                {chip && (
+                  <Group>
+                    <Rect x={zx + zw / 2 - chipW / 2} y={zy + zh / 2 - chipH / 2} width={chipW} height={chipH}
+                      fill="rgba(253,252,249,0.95)" stroke="#D8CDBE" strokeWidth={1} cornerRadius={10} />
+                    <Text x={zx} y={zy + zh / 2 - 5.5} width={zw} text={label}
+                      fontSize={11} fontStyle="bold" fill="#5A4F42" align="center" />
+                  </Group>
+                )}
+                {tiny && (
+                  <Text x={zx} y={zy + zh / 2 - 6} width={zw} text={label}
+                    fontSize={11} fontStyle="bold" fill="#54493d" align="center" />
                 )}
               </Group>
             );
