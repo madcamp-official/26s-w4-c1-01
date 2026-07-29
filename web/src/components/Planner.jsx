@@ -13,11 +13,6 @@ const ZONE_FILL = { bath: '#E7EFF2', kitchen: '#EAE3D8', closet: '#E9E2D6', entr
 // Konva Shape sceneFunc 하나로 클리핑까지 처리(노드 수 절약). dim=언더레이 위에서는 살짝 비치게.
 function drawZone(kctx, kind, x, y, w, h, ppm, dim, chipHalf = 0) {
   const ctx = kctx._context || kctx;          // roundRect 등 네이티브 API 사용
-  if (kind === 'void') {                      // 세대 밖(비직사각형 외곽) — 외벽과 같은 덩어리로
-    ctx.fillStyle = '#3A332B';
-    ctx.fillRect(x, y, w, h);
-    return;
-  }
   ctx.save();
   ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
   ctx.globalAlpha = dim ? 0.93 : 1;
@@ -195,10 +190,30 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
             </Group>
           )}
 
-          {/* 컷아웃(부속실) — 도면 표기법으로: 욕실 타일, 주방 카운터, 현관/보일러실 해칭 + 라벨 칩 */}
-          {(room.cutouts || []).map((c, i) => {
+          {/* 컷아웃(부속실) — 도면 표기법으로: 욕실 타일, 주방 카운터, 현관/보일러실 해칭 + 라벨 칩.
+              void(세대 밖)는 마지막에 그려 '바깥'으로 비우고 외곽 벽띠가 L자를 따라가게 한다. */}
+          {[...(room.cutouts || [])].sort((a, b) => (a.kind === 'void') - (b.kind === 'void')).map((c, i) => {
             const kind = c.kind || 'bath';
-            const label = kind === 'void' ? '' : (c.label || CUT_LABEL[kind] || '');   // void는 벽 — 라벨 없음
+            if (kind === 'void') {
+              const zx = PAD + toPx(c.x), zy = PAD + toPx(c.y), zw = toPx(c.w), zh = toPx(c.d);
+              const RX = PAD + toPx(room.widthM), BY = PAD + toPx(room.depthM);
+              const touch = { l: zx - PAD < 2, t: zy - PAD < 2, r: RX - (zx + zw) < 2, b: BY - (zy + zh) < 2 };
+              const o = wallT / 2 + 2, E = wallT / 2;      // o=바깥 밴드까지 지우는 여유, E=모서리 맞물림
+              return (
+                <Group key={`cut${i}`} listening={false}>
+                  {/* 세대 밖 = 배경으로 비움(맞닿은 외벽 밴드까지) → 실루엣이 진짜 L자가 된다 */}
+                  <Rect x={zx - (touch.l ? o : 0)} y={zy - (touch.t ? o : 0)}
+                    width={zw + (touch.l ? o : 0) + (touch.r ? o : 0)}
+                    height={zh + (touch.t ? o : 0) + (touch.b ? o : 0)} fill="#FFFFFF" />
+                  {/* 방을 향한 면에만 외벽과 같은 벽띠 */}
+                  {!touch.t && <Line points={[zx - E, zy, zx + zw + E, zy]} stroke="#3A332B" strokeWidth={wallT} />}
+                  {!touch.b && <Line points={[zx - E, zy + zh, zx + zw + E, zy + zh]} stroke="#3A332B" strokeWidth={wallT} />}
+                  {!touch.l && <Line points={[zx, zy - E, zx, zy + zh + E]} stroke="#3A332B" strokeWidth={wallT} />}
+                  {!touch.r && <Line points={[zx + zw, zy - E, zx + zw, zy + zh + E]} stroke="#3A332B" strokeWidth={wallT} />}
+                </Group>
+              );
+            }
+            const label = c.label || CUT_LABEL[kind] || '';
             const zx = PAD + toPx(c.x), zy = PAD + toPx(c.y), zw = toPx(c.w), zh = toPx(c.d);
             const chipW = label.length * 12 + 18, chipH = 21;
             const chip = label && zw > chipW + 8 && zh > chipH + 6;   // 칩이 들어갈 때만

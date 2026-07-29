@@ -134,8 +134,9 @@ def oauth_exchange(provider, code, base=None):
 
 # 무료 일일 한도는 '모델당' 20회 — 폴백 체인(main.py와 동일 정책). 일일 한도·404는 다음 모델,
 # 분당 한도는 retryDelay 후 같은 모델 1회 재시도. 전부 실패면 RuntimeError.
-GEMINI_CHAIN = ([m.strip() for m in (ENV.get("GEMINI_MODEL_CHAIN") or os.getenv("GEMINI_MODEL_CHAIN") or "").split(",") if m.strip()]
-                or list(dict.fromkeys([GEMINI_MODEL, "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"])))
+# 텍스트 작업(배치·대화·추천)은 lite 체인 — devserver엔 비전 엔드포인트가 없다(main.py와 정책 일치).
+GEMINI_CHAIN = ([m.strip() for m in (ENV.get("GEMINI_CHAIN_TEXT") or os.getenv("GEMINI_CHAIN_TEXT") or "").split(",") if m.strip()]
+                or ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"])
 
 
 def gemini_call(body_dict, timeout=60):

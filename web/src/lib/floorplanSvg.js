@@ -93,11 +93,18 @@ export function floorplanSvg(plan, targetW = 360) {
       line(Math.max(gx, bx), by + Math.max(0, bx - gx), Math.min(gx + bh, bx + bw), by + bh - Math.max(0, gx + bh - (bx + bw)), C.bathLine, 0.6);
     }
   };
-  for (const c of plan.cutouts || []) {
+  for (const c of [...(plan.cutouts || [])].sort((a, b) => (a.kind === 'void') - (b.kind === 'void'))) {
     const cx0 = X(c.x), cy0 = Y(c.y), cw = px(c.w), ch = px(c.d);
     const kind = c.kind || 'bath';
-    if (kind === 'void') {                     // 세대 밖(비직사각형 외곽) — 외벽 덩어리, 라벨·문 없음
-      rect(cx0, cy0, cw, ch, C.wall);
+    if (kind === 'void') {                     // 세대 밖(비직사각형 외곽) — 바깥으로 비우고 안쪽 면만 벽띠
+      const eps = 0.03;
+      const touch = { l: c.x <= eps, t: c.y <= eps, r: c.x + c.w >= W - eps, b: c.y + c.d >= D - eps };
+      const o = px(T) / 2 + 1.5, E = px(T) / 2;
+      el.push(`<rect x="${r(cx0 - (touch.l ? o : 0))}" y="${r(cy0 - (touch.t ? o : 0))}" width="${r(cw + (touch.l ? o : 0) + (touch.r ? o : 0))}" height="${r(ch + (touch.t ? o : 0) + (touch.b ? o : 0))}" fill="${C.paper}"/>`);
+      if (!touch.t) line(cx0 - E, cy0, cx0 + cw + E, cy0, C.wall, px(T));
+      if (!touch.b) line(cx0 - E, cy0 + ch, cx0 + cw + E, cy0 + ch, C.wall, px(T));
+      if (!touch.l) line(cx0, cy0 - E, cx0, cy0 + ch + E, C.wall, px(T));
+      if (!touch.r) line(cx0 + cw, cy0 - E, cx0 + cw, cy0 + ch + E, C.wall, px(T));
       continue;
     }
     if (kind === 'kitchen') drawCounterBox(cx0, cy0, cw, ch, true);

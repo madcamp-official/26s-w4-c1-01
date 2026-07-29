@@ -186,10 +186,16 @@ LLM_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-5")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
 # 무료 티어 일일 한도는 '모델당' 20회(quotaId=...PerProjectPerModel) — 한 모델이 마르면
-# 다음 모델이 새 버킷이다. 체인을 순회해 사실상 예산을 모델 수만큼 확보한다.
-# GEMINI_MODEL_CHAIN(쉼표 구분)으로 오버라이드 가능. 기본: 3.6 → 3.5 → 3.5-lite → 3.1-lite.
-_GEMINI_CHAIN = [m.strip() for m in (os.getenv("GEMINI_MODEL_CHAIN") or "").split(",") if m.strip()] or \
-    list(dict.fromkeys([GEMINI_MODEL, "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]))
+# 다음 모델이 새 버킷이다. 용도별 체인으로 예산을 분리한다:
+#   비전(도면 판독) = flash 체인 — 이미지 판독 품질이 중요하고 호출 빈도가 낮다.
+#   텍스트(배치·대화·추천) = lite 체인 — 호출이 잦아 flash 버킷을 아껴야 하고 lite로 충분하다.
+# GEMINI_CHAIN_VISION / GEMINI_CHAIN_TEXT(쉼표 구분)로 각각 오버라이드 가능.
+def _chain(envkey, default):
+    return [m.strip() for m in (os.getenv(envkey) or "").split(",") if m.strip()] or default
+
+
+_GEMINI_CHAIN_VISION = _chain("GEMINI_CHAIN_VISION", list(dict.fromkeys([GEMINI_MODEL, "gemini-3.5-flash"])))
+_GEMINI_CHAIN_TEXT = _chain("GEMINI_CHAIN_TEXT", ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"])
 
 
 def _quota_429(r):
@@ -207,13 +213,13 @@ def _quota_429(r):
     return daily, delay
 
 
-async def _gemini_call(body: dict, timeout: float = 60):
+async def _gemini_call(body: dict, timeout: float = 60, chain=None):
     """Gemini generateContent + 폴백 체인. 일일 한도·404(모델명 회전)는 다음 모델로,
     분당 한도는 retryDelay만큼 쉬고 같은 모델 1회 재시도. 반환 (응답 JSON, 사용된 모델).
     체인 전부 실패면 RuntimeError('all_models_exhausted') — 호출부가 status로 변환한다."""
     gkey = os.getenv("GEMINI_API_KEY")
     async with httpx.AsyncClient(timeout=timeout) as cx:
-        for model in _GEMINI_CHAIN:
+        for model in (chain or _GEMINI_CHAIN_TEXT):
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gkey}"
             for attempt in (0, 1):
                 r = await cx.post(url, json=body)
@@ -986,8 +992,9 @@ async def floorplan(req: FloorplanReq):
                              "responseMimeType": "application/json", "responseSchema": _PLAN_SCHEMA},
     }
     # 429 처리(분당 재시도·일일 폴백 체인)는 _gemini_call이 담당 — 체인 전부 소진 시에만 안내.
+    # 도면 판독은 '비전 체인'(flash) — 이미지 이해 품질이 중요해 lite로 내리지 않는다.
     try:
-        data, _m = await _gemini_call(body, timeout=120)
+        data, _m = await _gemini_call(body, timeout=120, chain=_GEMINI_CHAIN_VISION)
         obj = json.loads(_gemini_text(data))
     except RuntimeError:
         return {"status": "RATE_LIMIT",
