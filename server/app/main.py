@@ -720,23 +720,25 @@ async def community_delete(post_id: str, request: Request):
 # 정직 원칙: LLM이 읽은 치수는 '초안'이다. 같은 도면을 반복 판독시키면 방 면적이 최대 46%까지
 # 흔들리는 걸 실측으로 확인했다(인허가 도면 기준). 그래서 이 엔드포인트는 확정 치수를 주지 않고,
 # accuracy='estimate'를 달아 돌려주며 앱이 사용자 확인(한 변 실측 보정)을 거치게 한다.
+# 모든 위치는 '이미지 픽셀 박스'([ymin,xmin,ymax,xmax], 0~1000 정규화 — Gemini box 규약)로 받는다.
+# 미터 좌표를 직접 받으면 언더레이(imageBox 크롭)와 컷아웃이 서로 다른 추정이라 화면에서 어긋난다.
+# 픽셀 박스는 그림과 같은 좌표계라 정렬이 구조적으로 보장되고, 미터 변환은 서버가 한다.
 _PLAN_SCHEMA = {
     "type": "object",
     "properties": {
         "widthM": {"type": "number"}, "depthM": {"type": "number"},
+        "imageBox": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
         "cutouts": {"type": "array", "items": {"type": "object", "properties": {
-            "x": {"type": "number"}, "y": {"type": "number"},
-            "w": {"type": "number"}, "d": {"type": "number"},
-            "kind": {"type": "string"}}, "required": ["x", "y", "w", "d", "kind"]}},
+            "kind": {"type": "string"},
+            "box": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4}},
+            "required": ["kind", "box"]}},
         "openings": {"type": "array", "items": {"type": "object", "properties": {
-            "kind": {"type": "string"}, "wall": {"type": "string"},
-            "pos": {"type": "number"}, "width": {"type": "number"}},
-            "required": ["kind", "wall", "pos", "width"]}},
+            "kind": {"type": "string"},
+            "box": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4}},
+            "required": ["kind", "box"]}},
         "printedAreaM2": {"type": "number"},
         "unitLabel": {"type": "string"},
         "unitsDetected": {"type": "number"},
-        # 선택한 세대가 이미지에서 차지하는 영역 [ymin,xmin,ymax,xmax], 0~1000 정규화(Gemini box 규약).
-        "imageBox": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
         "confidence": {"type": "number"},
         "note": {"type": "string"},
     },
@@ -745,17 +747,18 @@ _PLAN_SCHEMA = {
 
 _PLAN_SYS = (
     "너는 한국 원룸 평면도를 읽어 가구배치 앱이 쓸 방 데이터를 만드는 판독기다.\n"
+    "모든 박스는 [ymin,xmin,ymax,xmax], '이미지 전체 크기' 대비 0~1000 정규화 좌표다.\n"
+    "이 박스들은 도면 그림 위에 그대로 오버레이된다 — 그림과 픽셀 단위로 정렬되는 것이 치수 추정보다 중요하다.\n"
     "0) 세대 선택 — 이미지가 '한 세대'가 아닐 수 있다(층 전체 도면, 여러 세대, 계단실·복도·주차·치수선 띠 포함).\n"
     "   읽을 대상은 '주거 세대 하나'뿐이다: 세대 라벨(N호)과 전용면적이 붙은 세대를 우선하고, 여럿이면 가장 크고 완전하게\n"
-    "   보이는 세대 하나만 고른다. 계단실·엘리베이터·공용복도·주차장·기계실·옆 세대는 절대 방에 포함하지 마라.\n"
+    "   보이는 세대 하나만 고른다. 계단실·엘리베이터·공용복도·주차장·기계실·옆 세대는 절대 포함하지 마라.\n"
     "   (욕실·다용도실·발코니처럼 그 세대 '안'의 부속실은 세대에 포함한다.)\n"
-    "   - imageBox = 고른 세대의 외곽벽이 이미지에서 차지하는 영역. [ymin,xmin,ymax,xmax], 각 값은 0~1000(이미지 크기 대비 비율).\n"
+    "   - imageBox = 고른 세대의 외곽벽 박스.\n"
     "   - unitLabel = 고른 세대의 라벨(예: '1호'). 없으면 생략. unitsDetected = 이미지에 보이는 주거 세대 수.\n"
-    "1) 좌표계: 고른 세대의 좌상단이 원점, +x 오른쪽(너비), +y 아래(깊이), 단위는 미터(m).\n"
-    "- widthM/depthM = 그 세대 '내부'(벽 안쪽) 사각형. 도면에 치수(mm)가 적혀 있으면 그 값을 쓴다.\n"
-    "- cutouts = 가구를 놓을 수 없는 구역. kind는 bath(욕실)·kitchen(주방)·entry(현관)·closet(붙박이/보일러실/다용도실) 중 하나.\n"
-    "  방 사각형 안에 들어가야 하고 서로 겹치면 안 된다.\n"
-    "- openings = 문/창. wall은 top|bottom|left|right, pos는 그 벽 시작점에서 개구부 중심까지 거리(m).\n"
+    "1) cutouts = 세대 안에서 가구를 놓을 수 없는 부속실. kind는 bath(욕실)·kitchen(주방)·entry(현관)·closet(붙박이/보일러실/다용도실).\n"
+    "   각 부속실의 '벽 위치 그대로' box를 준다. 전부 imageBox 안에 있어야 하고 서로 겹치면 안 된다.\n"
+    "2) openings = 세대 외곽벽 위의 문(door)/창(window) 개구부 box.\n"
+    "3) widthM/depthM = imageBox가 나타내는 세대 내부의 실제 미터 치수. 도면에 인쇄된 치수(mm)·전용면적을 근거로만 추정한다.\n"
     "- printedAreaM2 = 그 세대에 '전용면적'이 인쇄돼 있으면 그 숫자. 없으면 생략.\n"
     "- confidence 0~1: 치수선 숫자를 직접 읽었으면 높게, 비율로 추정했으면 0.4 이하.\n"
     "- note: 사용자에게 보여줄 한 문장(어느 세대를 골랐고 무엇이 불확실한지).\n"
@@ -768,17 +771,44 @@ class FloorplanReq(BaseModel):
     hintM: Optional[float] = None   # 사용자가 아는 한 변(m) — 있으면 그 값으로 비례 보정
 
 
-def _clean_plan(p: dict) -> dict:
-    """LLM 출력 정규화 — 방 밖 컷아웃 잘라내기, 겹침 제거, 5cm 스냅, 개구부 범위 보정."""
+def _box_frac(box, unit):
+    """이미지 좌표 박스(0~1000) → 세대(unit) 박스 기준 0~1 비율 (fx0,fy0,fx1,fy1). 밖이면 잘라냄."""
+    uy0, ux0, uy1, ux1 = unit
+    uw, uh = ux1 - ux0, uy1 - uy0
+    if uw <= 0 or uh <= 0:
+        return None
+    y0, x0, y1, x1 = [max(0.0, min(1000.0, float(v))) for v in box]
+    fx0 = max(0.0, min(1.0, (x0 - ux0) / uw)); fx1 = max(0.0, min(1.0, (x1 - ux0) / uw))
+    fy0 = max(0.0, min(1.0, (y0 - uy0) / uh)); fy1 = max(0.0, min(1.0, (y1 - uy0) / uh))
+    if fx1 - fx0 <= 0.01 or fy1 - fy0 <= 0.01:
+        return None
+    return fx0, fy0, fx1, fy1
+
+
+def _clean_plan(p: dict):
+    """LLM 픽셀 박스 → 미터 좌표 변환 + 정규화(겹침 제거, 5cm 스냅, 개구부 벽 판정).
+    컷아웃·개구부가 imageBox와 같은 좌표계에서 오므로, 언더레이(=imageBox 크롭)와의 정렬이 보장된다."""
     snap = lambda v: round(float(v) * 20) / 20
     W = max(1.2, min(12.0, snap(p.get("widthM", 3.0))))
     D = max(1.2, min(12.0, snap(p.get("depthM", 4.0))))
+    unit = p.get("imageBox") or [0, 0, 1000, 1000]
+    try:
+        unit = [max(0.0, min(1000.0, float(v))) for v in unit]
+        if unit[2] - unit[0] < 50 or unit[3] - unit[1] < 50:      # 5% 미만 박스 = 무효
+            unit = [0, 0, 1000, 1000]
+    except Exception:  # noqa: BLE001
+        unit = [0, 0, 1000, 1000]
+
     kinds = {"bath", "kitchen", "entry", "closet"}
     cuts = []
     for c in p.get("cutouts", []) or []:
-        x, y = max(0.0, snap(c.get("x", 0))), max(0.0, snap(c.get("y", 0)))
-        w, d = snap(c.get("w", 0)), snap(c.get("d", 0))
-        w, d = min(w, W - x), min(d, D - y)                       # 방 밖으로 못 나가게
+        f = _box_frac(c.get("box") or [], unit)
+        if not f:
+            continue
+        fx0, fy0, fx1, fy1 = f
+        x, y = snap(fx0 * W), snap(fy0 * D)
+        w, d = snap((fx1 - fx0) * W), snap((fy1 - fy0) * D)
+        w, d = min(w, W - x), min(d, D - y)
         if w < 0.3 or d < 0.3:
             continue
         box = {"x": x, "y": y, "w": w, "d": d, "kind": c.get("kind") if c.get("kind") in kinds else "closet"}
@@ -786,13 +816,30 @@ def _clean_plan(p: dict) -> dict:
                min(a["y"] + a["d"], y + d) - max(a["y"], y) > 0.05 for a in cuts):
             continue                                              # 겹치면 버림(엔진 면적 계산이 틀어짐)
         cuts.append(box)
+
     ops = []
-    for o in p.get("openings", []) or []:
-        wall = o.get("wall") if o.get("wall") in {"top", "bottom", "left", "right"} else "bottom"
+    for o in (p.get("openings", []) or [])[:6]:
+        f = _box_frac(o.get("box") or [], unit)
+        if not f:
+            continue
+        fx0, fy0, fx1, fy1 = f
+        cx, cy = (fx0 + fx1) / 2, (fy0 + fy1) / 2
+        ew, eh = fx1 - fx0, fy1 - fy0
+        # 벽 판정: 박스가 납작한 방향 우선(가로로 길면 top/bottom), 애매하면 가장 가까운 외곽벽.
+        if ew > eh * 1.3:
+            wall = "top" if cy < 0.5 else "bottom"
+        elif eh > ew * 1.3:
+            wall = "left" if cx < 0.5 else "right"
+        else:
+            dists = {"top": cy, "bottom": 1 - cy, "left": cx, "right": 1 - cx}
+            wall = min(dists, key=dists.get)
         kind = "door" if o.get("kind") == "door" else "window"
-        wid = max(0.4, min(3.0, snap(o.get("width", 0.9))))
-        span = D if wall in ("left", "right") else W
-        pos = min(max(snap(o.get("pos", span / 2)), wid / 2), span - wid / 2)
+        if wall in ("left", "right"):
+            span, pos_f, wid_f = D, cy, eh
+        else:
+            span, pos_f, wid_f = W, cx, ew
+        wid = max(0.4, min(3.0, snap(wid_f * span)))
+        pos = min(max(snap(pos_f * span), wid / 2), span - wid / 2)
         ops.append({"kind": kind, "wall": wall, "pos": pos, "width": wid,
                     **({"hinge": "a"} if kind == "door" else {})})
     return {"widthM": W, "depthM": D, "cutouts": cuts, "openings": ops}
