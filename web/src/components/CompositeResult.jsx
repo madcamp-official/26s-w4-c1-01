@@ -4,8 +4,8 @@ import { useState } from 'react';
 
 const TIMES = [['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['night', '🌙']];
 const VIEWS = [['wide', '와이드'], ['cozy', '아늑'], ['me', '내 시점']];
-// 조명 색온도 프리셋 — 웜(2700K)/아이보리(3500K)/쿨(5000K)
-const LAMP_COLORS = [['#FFB873', '웜'], ['#FFE3C0', '아이보리'], ['#DDEBFF', '쿨']];
+// 조명 색온도 프리셋 — 웜(2700K)/쿨(5000K)
+const LAMP_COLORS = [['#FFB873', '웜'], ['#DDEBFF', '쿨']];
 
 export default function CompositeResult({
   renderImg, renderBusy, renderTrigger, showBefore, onToggle, photo, estimate, estimateIsEst,

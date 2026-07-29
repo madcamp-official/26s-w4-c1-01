@@ -46,7 +46,10 @@ sc.render.resolution_x = S.get("rx", 1280)
 sc.render.resolution_y = S.get("ry", 720)
 sc.render.image_settings.file_format = 'PNG'
 sc.view_settings.view_transform = 'AgX'
-sc.view_settings.exposure = S.get("exposure", PRE["exp"])
+_exp = PRE["exp"]
+if S.get("preset", "day") == "night" and S.get("lampOn") is not False and any(i.get("lamp") for i in S.get("items", [])):
+    _exp -= 0.22   # 조명만 켠 밤 — 어둠 유지(빛 웅덩이 대비 강화)
+sc.view_settings.exposure = S.get("exposure", _exp)
 sc.render.film_transparent = False
 
 # ---------- 월드 HDRI ----------
@@ -198,7 +201,7 @@ def box(name, sx, sy, sz, loc, m=None):
 
 
 FLOOR = wood_floor_mat('y' if D >= W else 'x')
-WALL = mat("wall", (0.90, 0.88, 0.83), rough=0.95, glow=0.05)
+WALL = mat("wall", (0.90, 0.88, 0.83), rough=0.95, glow=0.05 if PRE.get("sun") else 0.004)
 CEIL = mat("ceil", (0.96, 0.95, 0.93), rough=1.0)
 TRIM = mat("trim", (0.94, 0.93, 0.90), rough=0.6)  # 걸레받이/창틀 페인트
 FRAME = mat("frame", (0.20, 0.16, 0.12), rough=0.5)  # 창틀 목재
@@ -446,7 +449,10 @@ if PRE.get("lamp", 0) > 0:  # 실내 천장등(밤 위주)
     sc.collection.objects.link(lo)
     ld.shape = 'RECTANGLE'; ld.size = min(W, 1.2); ld.size_y = min(D, 1.2)
     _on = LAMPS and _LEFF >= 0.05
-    ld.energy = 60 * PRE["lamp"] * (0.18 if _on else 1.0)
+    # 밤(무태양)+조명ON = 천장 보조광 완전 소등 — "조명만 켠 밤"의 어둠과 빛 웅덩이를 살린다.
+    # 노을(태양 있음)은 잔광이 있으니 약한 보조 유지. 조명 OFF면 기존대로(완전 암흑 방지).
+    _factor = 0.0 if (_on and not PRE.get("sun")) else (0.18 if _on else 1.0)
+    ld.energy = 60 * PRE["lamp"] * _factor
     ld.color = _LC if _on else (1.0, 0.86, 0.66)   # 조명 켜짐 → 보조광도 선택 색온도를 따른다
     lo.location = (W / 2, D / 2, H - 0.05)
 
@@ -462,7 +468,7 @@ if _LEFF >= 0.05:
         sc.collection.objects.link(_po)
         _pl.color = _LC
         _pl.shadow_soft_size = 0.10                    # 부드러운 그림자
-        _pl.energy = 60 * _LEFF                        # 밤 60W · 노을 30W — 무드의 주광
+        _pl.energy = 25 * _LEFF                        # 스탠드 현실 밝기 — 빛 웅덩이 + 자연 감쇠
         _po.location = (_lp["x"], _lp["y"], _bz)
         # 눈에 보이는 전구 글로우(작은 발광 구) — 화면에서 조명이 '켜져 있음'이 읽히게
         bpy.ops.mesh.primitive_uv_sphere_add(radius=0.045, location=(_lp["x"], _lp["y"], _bz))
