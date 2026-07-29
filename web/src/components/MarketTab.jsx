@@ -4,6 +4,8 @@ import { searchFurniture, recommendSimilar } from '../lib/api.js';
 import { MARKET_CATS, MOODS, MOOD_BG, MOOD_TO_STYLE } from '../lib/appdata.js';
 import { getWishlist, toggleWish } from '../lib/wishlist.js';
 
+const SORT_OPTIONS = [['', '가격순'], ['asc', '낮은 가격순'], ['desc', '높은 가격순']];
+
 // 마켓 — 카테고리 세그먼트 + 검색(네이버) + 필터(분위기/가격순/사이즈) + 상품 2열 그리드.
 // 결과에서 '닮은 상품 찾기'로 진입하면 배치한 가구로 recommendSimilar 실행(네이버 실상품).
 export default function MarketTab({ recommendItem, onConsumeRecommend, onBuyClick }) {
@@ -15,6 +17,15 @@ export default function MarketTab({ recommendItem, onConsumeRecommend, onBuyClic
   const [moods, setMoods] = useState([]);
   const [sizeOnly, setSizeOnly] = useState(false);
   const [sort, setSort] = useState(null);          // null | 'asc' | 'desc' — 가격순 정렬
+  const [sortOpen, setSortOpen] = useState(false);
+  const [sortMenuPos, setSortMenuPos] = useState(null);   // {top,right}px — .chiprow가 overflow-x:auto라 absolute로는 잘려서 fixed+좌표계산
+  const sortBtnRef = useRef(null);
+  function toggleSortMenu() {
+    if (sortOpen) { setSortOpen(false); return; }
+    const rect = sortBtnRef.current.getBoundingClientRect();
+    setSortMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+    setSortOpen(true);
+  }
   const [wished, setWished] = useState(() => new Set(getWishlist().map((x) => x.id)));
 
   function onToggleWish(e, it) {
@@ -95,11 +106,23 @@ export default function MarketTab({ recommendItem, onConsumeRecommend, onBuyClic
           <div className="chiprow">
             <button className={chip(moods.length)} onClick={() => setSheet('mood')}>분위기{moods.length ? <span className="cnt">{moods.length}</span> : null}</button>
             <button className={chip(sizeOnly)} onClick={() => setSizeOnly((v) => !v)}>우리 방에 맞는 것만</button>
-            <select className={`fpill sortsel ${sort ? 'on' : ''}`} value={sort || ''} onChange={(e) => setSort(e.target.value || null)}>
-              <option value="">가격순</option>
-              <option value="asc">낮은 가격순</option>
-              <option value="desc">높은 가격순</option>
-            </select>
+            <div className="sortdd">
+              <button ref={sortBtnRef} type="button" className={`fpill sortsel ${sort ? 'on' : ''}`} onClick={toggleSortMenu}>
+                {SORT_OPTIONS.find(([v]) => v === (sort || ''))?.[1]}
+                <span className={`wall-select-arrow ${sortOpen ? 'up' : ''}`}>⌄</span>
+              </button>
+              {sortOpen && sortMenuPos && (
+                <>
+                  <div className="wall-select-backdrop" onClick={() => setSortOpen(false)} />
+                  <div className="wall-select-menu" style={{ position: 'fixed', top: sortMenuPos.top, right: sortMenuPos.right }}>
+                    {SORT_OPTIONS.map(([v, l]) => (
+                      <button key={v || 'none'} type="button" className={`wall-select-opt ${(sort || '') === v ? 'on' : ''}`}
+                        onClick={() => { setSort(v || null); setSortOpen(false); }}>{l}</button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

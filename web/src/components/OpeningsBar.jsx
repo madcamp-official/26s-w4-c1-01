@@ -1,6 +1,6 @@
 // 문·창문 편집기 — 카드 캐러셀. 여러 개를 추가해도 한 번에 1개만 크게 보여줘 슬라이더·입력이 커지고 명확해짐.
 // 좌우 화살표/점으로 항목 전환. 문: 90° 스윙 부채꼴(접근 불가) · 창문: 벽 표시(채광·렌더용, 배치 제약 없음). 좌표는 m, 벽 따라 중심 pos.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { openingOnCutout } from '../lib/geometry.js';
 
 const WALLS = [['top', '위'], ['bottom', '아래'], ['left', '왼쪽'], ['right', '오른쪽']];
@@ -15,11 +15,22 @@ const clampPos = (pos, room, wall, width) => {
 export default function OpeningsBar({ room, openings, setOpenings }) {
   const [idx, setIdx] = useState(0);
   const [expanded, setExpanded] = useState(true);
+  const [wallOpen, setWallOpen] = useState(false);   // 벽 선택 커스텀 드롭다운(네이티브 select는 스타일을 못 입혀서 자체 구현)
+  const [wallMenuPos, setWallMenuPos] = useState(null);   // {top,right}px — fixed 좌표(부모가 overflow여도 안 잘리게)
+  const wallBtnRef = useRef(null);
 
   // 항목이 추가/삭제돼 개수가 바뀌면 범위 밖으로 나가지 않게 보정.
   useEffect(() => {
     setIdx((i) => (openings.length === 0 ? 0 : Math.min(i, openings.length - 1)));
   }, [openings.length]);
+  useEffect(() => setWallOpen(false), [idx]);   // 카드 넘기면 열려있던 드롭다운 닫기
+
+  function toggleWallMenu() {
+    if (wallOpen) { setWallOpen(false); return; }
+    const rect = wallBtnRef.current.getBoundingClientRect();
+    setWallMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+    setWallOpen(true);
+  }
 
   const add = (kind) => {
     const wall = kind === 'door' ? 'bottom' : 'top';
@@ -73,12 +84,23 @@ export default function OpeningsBar({ room, openings, setOpenings }) {
               <button className="opencard-del" title="삭제" onClick={() => remove(cur.id)}>×</button>
             </div>
 
-            <label className="opencard-row">
+            <div className="opencard-row wall-select">
               <span className="opencard-lbl">벽</span>
-              <select value={cur.wall} onChange={(e) => update(cur.id, { wall: e.target.value })}>
-                {WALLS.map(([v, l]) => <option key={v} value={v}>{l}벽</option>)}
-              </select>
-            </label>
+              <button ref={wallBtnRef} type="button" className="wall-select-btn" onClick={toggleWallMenu}>
+                {WALLS.find(([v]) => v === cur.wall)?.[1]}벽 <span className={`wall-select-arrow ${wallOpen ? 'up' : ''}`}>⌄</span>
+              </button>
+              {wallOpen && wallMenuPos && (
+                <>
+                  <div className="wall-select-backdrop" onClick={() => setWallOpen(false)} />
+                  <div className="wall-select-menu" style={{ position: 'fixed', top: wallMenuPos.top, right: wallMenuPos.right }}>
+                    {WALLS.map(([v, l]) => (
+                      <button key={v} type="button" className={`wall-select-opt ${cur.wall === v ? 'on' : ''}`}
+                        onClick={() => { update(cur.id, { wall: v }); setWallOpen(false); }}>{l}벽</button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
 
             <div className="opencard-row op-slide">
               <span className="opencard-lbl">위치</span>

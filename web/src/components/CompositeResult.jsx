@@ -30,7 +30,7 @@ export default function CompositeResult({
     setSaveState(r?.status === 'OK' ? 'done' : 'error');
     setTimeout(() => setSaveState('idle'), 2200);
   }
-  const saveIcon = { idle: '🔖', busy: '⏳', done: '✅', error: '⚠️' }[saveState];
+  const saveLabel = { idle: '저장', busy: '저장 중…', done: '저장 완료 ✓', error: '저장 실패, 다시' }[saveState];
   const saveTitle = { idle: '배치함에 저장', busy: '저장 중…', done: '저장 완료', error: '저장 실패, 다시' }[saveState];
 
   if (renderBusy && !renderImg) {
@@ -73,7 +73,7 @@ export default function CompositeResult({
             ))}
           </div>
           {renderImg && (
-            <button className="rt-circle" disabled={saveState === 'busy'} title={saveTitle} onClick={handleSave}>{saveIcon}</button>
+            <button className="rt-pill" style={{ background: 'var(--accent)' }} disabled={saveState === 'busy'} title={saveTitle} onClick={handleSave}>{saveLabel}</button>
           )}
         </div>
       </div>
