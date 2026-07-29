@@ -72,6 +72,9 @@ export default function OpeningsBar({ room, openings, setOpenings }) {
               <input type="range" min={Math.round(cur.width * 50)} max={Math.round((wallLenOf(room, cur.wall) - cur.width / 2) * 100)}
                 value={Math.round(cur.pos * 100)} onChange={(e) => update(cur.id, { pos: Number(e.target.value) / 100 })} />
               <span className="op-num">{Math.round(cur.pos * 100)}cm</span>
+            </div>
+
+            <div className="opencard-row op-width">
               <span className="opencard-lbl">폭</span>
               <input type="number" min={40} max={Math.round(wallLenOf(room, cur.wall) * 100)} step={5}
                 value={Math.round(cur.width * 100)} onChange={(e) => update(cur.id, { width: Math.max(0.4, Number(e.target.value) / 100) })} />

@@ -3,7 +3,7 @@
 // 피드는 서버(SQLite)에서 불러오되, 서버 미연동/빈 DB일 땐 목업으로 폴백(정직 원칙: fallback은 MVP).
 import { useState, useEffect } from 'react';
 import { COMMUNITY_CATS, COMMUNITY_POSTS } from '../lib/appdata.js';
-import { fetchCommunityFeed } from '../lib/api.js';
+import { fetchCommunityFeed, updateCommunityPost, deleteCommunityPost } from '../lib/api.js';
 
 const STAMP_STEPS = [
   { key: 'taste', label: '취향입력' },
@@ -19,6 +19,8 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
   const [cat, setCat] = useState('all');
   const [serverPosts, setServerPosts] = useState(null);   // null=아직 없음/실패 → 목업 폴백. []=서버 응답했지만 글 없음 → 이때도 목업으로 데모 채움.
   const [feedBusy, setFeedBusy] = useState(false);
+  const [editingId, setEditingId] = useState(null);   // 인라인 수정 중인 글 id
+  const [editTitle, setEditTitle] = useState('');
 
   useEffect(() => {
     if (tab !== 'community') return;
@@ -34,6 +36,23 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
 
   const mockPosts = cat === 'all' ? COMMUNITY_POSTS : COMMUNITY_POSTS.filter((p) => p.cat === cat);
   const posts = serverPosts && serverPosts.length ? serverPosts : mockPosts;
+
+  function startEdit(p) { setEditingId(p.id); setEditTitle(p.title); }
+  function cancelEdit() { setEditingId(null); setEditTitle(''); }
+  async function saveEdit(id) {
+    const title = editTitle.trim();
+    if (!title) return;
+    const r = await updateCommunityPost(id, { title });
+    if (r?.status === 'OK') {
+      setServerPosts((prev) => (prev || []).map((x) => (x.id === id ? { ...x, title } : x)));
+      setEditingId(null);
+    }
+  }
+  async function handleDelete(id) {
+    if (!window.confirm('이 글을 삭제할까요?')) return;
+    const r = await deleteCommunityPost(id);
+    if (r?.status === 'OK') setServerPosts((prev) => (prev || []).filter((x) => x.id !== id));
+  }
 
   return (
     <div className="home">
@@ -105,7 +124,17 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
                   )}
                   <div className="feedcard-body">
                     {!(p.image || p.photo) && <span className="feed-badge">{badge}</span>}
-                    <div className="feed-title">{p.title}</div>
+                    {editingId === p.id ? (
+                      <div className="feed-edit">
+                        <input className="feed-edit-input" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} autoFocus />
+                        <div className="feed-edit-acts">
+                          <button className="tlink" onClick={() => saveEdit(p.id)}>저장</button>
+                          <button className="tlink" onClick={cancelEdit}>취소</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="feed-title">{p.title}</div>
+                    )}
                     {p.meta && <div className="feed-meta">{p.meta}</div>}
                     <div className="feed-meta">
                       {[
@@ -115,6 +144,12 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
                         p.answering && '답변 대기중',
                       ].filter(Boolean).join(' · ')}
                     </div>
+                    {p.mine && editingId !== p.id && (
+                      <div className="feed-own-acts">
+                        <button className="tlink" onClick={() => startEdit(p)}>수정</button>
+                        <button className="tlink" onClick={() => handleDelete(p.id)}>삭제</button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

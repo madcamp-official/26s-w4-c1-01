@@ -7,7 +7,7 @@ const VIEWS = [['wide', '와이드'], ['cozy', '아늑'], ['me', '내 시점']];
 
 export default function CompositeResult({
   renderImg, renderBusy, renderTrigger, showBefore, onToggle, photo, estimate, estimateIsEst,
-  timePreset, onTime, view, onView, onBack, onRerender, onFindSimilar, onShare,
+  timePreset, onTime, view, onView, onBack, onRerender, onFindSimilar, onShare, onSave,
 }) {
   const [shareState, setShareState] = useState('idle');   // idle | busy | done | error
   async function handleShare() {
@@ -18,6 +18,17 @@ export default function CompositeResult({
     setTimeout(() => setShareState('idle'), 2200);
   }
   const shareLabel = { idle: '방꾸 이야기에 공유', busy: '공유 중…', done: '공유 완료 ✓', error: '실패, 다시' }[shareState];
+
+  const [saveState, setSaveState] = useState('idle');   // idle | busy | done | error
+  async function handleSave() {
+    if (!onSave || saveState === 'busy') return;
+    setSaveState('busy');
+    const r = await onSave();
+    setSaveState(r?.status === 'OK' ? 'done' : 'error');
+    setTimeout(() => setSaveState('idle'), 2200);
+  }
+  const saveIcon = { idle: '🔖', busy: '⏳', done: '✅', error: '⚠️' }[saveState];
+  const saveTitle = { idle: '배치함에 저장', busy: '저장 중…', done: '저장 완료', error: '저장 실패, 다시' }[saveState];
 
   if (renderBusy && !renderImg) {
     return (
@@ -47,15 +58,20 @@ export default function CompositeResult({
 
       <div className="topbar">
         <button className="rt-circle" onClick={onBack}>←</button>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {renderImg && photo && (
-            <button className="rt-pill" onClick={onToggle}>{showBefore ? 'After 보기' : 'Before/After'}</button>
+        <div className="topbar-right">
+          <div className="topbar-icons">
+            {renderImg && photo && (
+              <button className="rt-pill" onClick={onToggle}>{showBefore ? 'After 보기' : 'Before/After'}</button>
+            )}
+            {TIMES.map(([p, ic]) => (
+              <button key={p} className={`rt-circle ${renderBusy ? 'busy' : ''}`}
+                style={{ opacity: timePreset === p ? 1 : 0.55, fontSize: 15 }}
+                title={p} onClick={() => onTime(p)}>{ic}</button>
+            ))}
+          </div>
+          {renderImg && (
+            <button className="rt-circle" disabled={saveState === 'busy'} title={saveTitle} onClick={handleSave}>{saveIcon}</button>
           )}
-          {TIMES.map(([p, ic]) => (
-            <button key={p} className={`rt-circle ${renderBusy ? 'busy' : ''}`}
-              style={{ opacity: timePreset === p ? 1 : 0.55, fontSize: 15 }}
-              title={p} onClick={() => onTime(p)}>{ic}</button>
-          ))}
         </div>
       </div>
 

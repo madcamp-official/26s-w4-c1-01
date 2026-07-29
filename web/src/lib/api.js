@@ -1,6 +1,7 @@
 // 마켓 연동 클라이언트 — LLM 래핑 + 네이버쇼핑 grounding은 백엔드가 담당.
 // 백엔드/키가 없으면 로컬 시드 카탈로그로 폴백해 앱이 단독으로 돌아간다(정직 원칙: fallback은 MVP).
 import { CATALOG } from './catalog.js';
+import { authToken } from './auth.js';
 
 const API_BASE = import.meta.env?.VITE_API_BASE ?? '';
 
@@ -171,11 +172,17 @@ export async function fetchDims(url) {
   }
 }
 
+// 로그인돼 있으면 Authorization 헤더를 실어 보낸다(글 소유자 판별 — 서버가 'mine' 플래그로 돌려줌).
+function authHeaders() {
+  const t = authToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
 // 방꾸 이야기(커뮤니티) 피드 조회. 반환: { source: 'server'|'local', posts: [...] | null }.
 // posts:null이면 호출부가 로컬 목업(appdata.COMMUNITY_POSTS)으로 폴백해야 한다는 뜻(searchFurniture와 동일한 폴백 계약).
 export async function fetchCommunityFeed(cat = 'all') {
   try {
-    const res = await fetch(`${API_BASE}/api/community/feed?cat=${encodeURIComponent(cat)}`, { signal: timeout(6000) });
+    const res = await fetch(`${API_BASE}/api/community/feed?cat=${encodeURIComponent(cat)}`, { headers: authHeaders(), signal: timeout(6000) });
     if (!res.ok) throw new Error(`http ${res.status}`);
     const data = await res.json();
     if (data?.status === 'OK' && Array.isArray(data.posts)) return { source: 'server', posts: data.posts };
@@ -189,8 +196,35 @@ export async function fetchCommunityFeed(cat = 'all') {
 export async function postCommunity({ cat, title, image, meta }) {
   try {
     const res = await fetch(`${API_BASE}/api/community/post`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ cat, title, image, meta }), signal: timeout(20000),
+    });
+    if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}` };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', reason: String(e.message || e) };
+  }
+}
+
+// 방꾸 이야기 글 수정(제목/부가정보) — 본인 글만 서버가 허용. 반환: {status:'OK'|'FORBIDDEN'|'NOAUTH'|'ERROR', reason?}.
+export async function updateCommunityPost(id, { title, meta }) {
+  try {
+    const res = await fetch(`${API_BASE}/api/community/post/${encodeURIComponent(id)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ title, meta }), signal: timeout(20000),
+    });
+    if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}` };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', reason: String(e.message || e) };
+  }
+}
+
+// 방꾸 이야기 글 삭제 — 본인 글만 서버가 허용. 반환: {status:'OK'|'FORBIDDEN'|'NOAUTH'|'ERROR', reason?}.
+export async function deleteCommunityPost(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/community/post/${encodeURIComponent(id)}`, {
+      method: 'DELETE', headers: authHeaders(), signal: timeout(20000),
     });
     if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}` };
     return await res.json();

@@ -588,9 +588,17 @@ def _community_conn():
         "CREATE TABLE IF NOT EXISTS posts ("
         "id TEXT PRIMARY KEY, cat TEXT NOT NULL, title TEXT NOT NULL, image TEXT, "
         "author TEXT, meta TEXT, likes INTEGER DEFAULT 0, comments INTEGER DEFAULT 0, "
-        "saves INTEGER DEFAULT 0, created_at REAL NOT NULL)"
+        "saves INTEGER DEFAULT 0, created_at REAL NOT NULL, owner TEXT)"
     )
+    try:
+        conn.execute("ALTER TABLE posts ADD COLUMN owner TEXT")   # 기존 DB 마이그레이션(이미 있으면 무시)
+    except sqlite3.OperationalError:
+        pass
     return conn
+
+
+def _owner_key(user: Optional[dict]) -> Optional[str]:
+    return f"{user.get('provider')}:{user.get('id')}" if user else None
 
 
 class CommunityPostReq(BaseModel):
@@ -609,6 +617,7 @@ async def community_post(req: CommunityPostReq, request: Request):
         return {"status": "ERROR", "reason": "title required"}
     tok = (request.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
     user = _verify_token(tok)
+    owner = _owner_key(user)
     post = {
         "id": _uuid.uuid4().hex[:12], "cat": req.cat, "title": title, "image": req.image,
         "author": (user or {}).get("name") or "익명", "meta": req.meta,
@@ -617,20 +626,22 @@ async def community_post(req: CommunityPostReq, request: Request):
     try:
         conn = _community_conn()
         conn.execute(
-            "INSERT INTO posts (id,cat,title,image,author,meta,likes,comments,saves,created_at) VALUES (?,?,?,?,?,?,0,0,0,?)",
-            (post["id"], post["cat"], post["title"], post["image"], post["author"], post["meta"], post["created_at"]),
+            "INSERT INTO posts (id,cat,title,image,author,meta,likes,comments,saves,created_at,owner) VALUES (?,?,?,?,?,?,0,0,0,?,?)",
+            (post["id"], post["cat"], post["title"], post["image"], post["author"], post["meta"], post["created_at"], owner),
         )
         conn.commit(); conn.close()
-        return {"status": "OK", "post": post}
+        return {"status": "OK", "post": {**post, "mine": owner is not None}}
     except Exception as e:  # noqa: BLE001
         return {"status": "ERROR", "reason": str(e)[:150]}
 
 
 @app.get("/api/community/feed")
-async def community_feed(cat: str = "all"):
+async def community_feed(request: Request, cat: str = "all"):
+    tok = (request.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+    my_owner = _owner_key(_verify_token(tok)) if tok else None
     try:
         conn = _community_conn()
-        q = "SELECT id,cat,title,image,author,meta,likes,comments,saves,created_at FROM posts"
+        q = "SELECT id,cat,title,image,author,meta,likes,comments,saves,created_at,owner FROM posts"
         args = ()
         if cat and cat != "all":
             q += " WHERE cat=?"; args = (cat,)
@@ -639,9 +650,55 @@ async def community_feed(cat: str = "all"):
         conn.close()
         posts = [
             {"id": r[0], "cat": r[1], "title": r[2], "image": r[3], "author": r[4], "meta": r[5],
-             "likes": r[6], "comments": r[7], "saves": r[8], "created_at": r[9]}
+             "likes": r[6], "comments": r[7], "saves": r[8], "created_at": r[9],
+             "mine": bool(my_owner) and r[10] == my_owner}   # owner는 노출 안 하고 본인 글 여부만 전달
             for r in rows
         ]
         return {"status": "OK", "posts": posts}
     except Exception as e:  # noqa: BLE001
         return {"status": "ERROR", "reason": str(e)[:150], "posts": []}
+
+
+class CommunityEditReq(BaseModel):
+    title: Optional[str] = None
+    meta: Optional[str] = None
+
+
+@app.put("/api/community/post/{post_id}")
+async def community_edit(post_id: str, req: CommunityEditReq, request: Request):
+    user = _verify_token((request.headers.get("Authorization") or "").removeprefix("Bearer ").strip())
+    if not user:
+        return {"status": "NOAUTH"}
+    conn = _community_conn()
+    row = conn.execute("SELECT owner FROM posts WHERE id=?", (post_id,)).fetchone()
+    if not row:
+        conn.close()
+        return {"status": "ERROR", "reason": "not found"}
+    if row[0] != _owner_key(user):
+        conn.close()
+        return {"status": "FORBIDDEN"}
+    title = (req.title or "").strip()[:200]
+    if title:
+        conn.execute("UPDATE posts SET title=? WHERE id=?", (title, post_id))
+    if req.meta is not None:
+        conn.execute("UPDATE posts SET meta=? WHERE id=?", (req.meta, post_id))
+    conn.commit(); conn.close()
+    return {"status": "OK"}
+
+
+@app.delete("/api/community/post/{post_id}")
+async def community_delete(post_id: str, request: Request):
+    user = _verify_token((request.headers.get("Authorization") or "").removeprefix("Bearer ").strip())
+    if not user:
+        return {"status": "NOAUTH"}
+    conn = _community_conn()
+    row = conn.execute("SELECT owner FROM posts WHERE id=?", (post_id,)).fetchone()
+    if not row:
+        conn.close()
+        return {"status": "ERROR", "reason": "not found"}
+    if row[0] != _owner_key(user):
+        conn.close()
+        return {"status": "FORBIDDEN"}
+    conn.execute("DELETE FROM posts WHERE id=?", (post_id,))
+    conn.commit(); conn.close()
+    return {"status": "OK"}
