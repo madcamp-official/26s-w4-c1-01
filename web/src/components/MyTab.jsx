@@ -6,7 +6,8 @@ const PROVIDER_LABEL = { kakao: '카카오', naver: '네이버', google: 'Google
 const CAT_BADGE = { flex: '🎀 자랑', tip: '💡 꿀팁', question: '❓ 질문' };
 
 // 마이 탭 — 프로필(소셜 로그인 연동) + 취향 태그 + 저장한 배치 + 좋아요/찜 + 계정 리스트.
-export default function MyTab({ taste, savedCount, user, onEditTaste, onLogout }) {
+export default function MyTab({ taste, savedRooms, user, onEditTaste, onLogout }) {
+  const rooms = savedRooms || [];
   const tags = [...(taste?.moods || [])];
   if (taste?.budget) tags.push(`예산 ${taste.budget}`);
   if (taste?.pet) tags.push('반려동물 🐾');
@@ -65,12 +66,12 @@ export default function MyTab({ taste, savedCount, user, onEditTaste, onLogout }
 
         <div>
           <div className="h-sec">배치함</div>
-          {savedCount > 0 ? (
+          {rooms.length > 0 ? (
             <div className="savedgrid">
-              {Array.from({ length: savedCount }).map((_, i) => (
-                <div key={i} className="savedcard">
-                  <div className="shot" />
-                  <div className="cap">내 방꾸 #{i + 1}</div>
+              {rooms.map((r, i) => (
+                <div key={r.id || i} className="savedcard">
+                  <div className="shot" style={r.renderImg ? { backgroundImage: `url(${r.renderImg})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined} />
+                  <div className="cap">{r.roomLabel || `내 방꾸 #${rooms.length - i}`}</div>
                 </div>
               ))}
             </div>
