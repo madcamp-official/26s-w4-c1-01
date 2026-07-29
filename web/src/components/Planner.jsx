@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Line, Group, Text, Circle, Shape, Image as KImage } from 'react-konva';
-import { effectiveFootprint, clampCenterFree, doorSwing } from '../lib/geometry.js';
+import { effectiveFootprint, clampCenterFree, doorSwing, cutAABBs } from '../lib/geometry.js';
 import { accuracyMeta } from '../lib/catalog.js';
 
 const PAD = 16;
@@ -11,7 +11,7 @@ const ZONE_FILL = { bath: '#E7EFF2', kitchen: '#EAE3D8', closet: '#E9E2D6', entr
 
 // 구역을 도면 표기법으로 그린다 — 욕실=타일 격자, 주방=카운터(싱크·화구), 현관/보일러실=사선 해칭.
 // Konva Shape sceneFunc 하나로 클리핑까지 처리(노드 수 절약). dim=언더레이 위에서는 살짝 비치게.
-function drawZone(kctx, kind, x, y, w, h, ppm, dim) {
+function drawZone(kctx, kind, x, y, w, h, ppm, dim, chipHalf = 0) {
   const ctx = kctx._context || kctx;          // roundRect 등 네이티브 API 사용
   ctx.save();
   ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
@@ -26,21 +26,21 @@ function drawZone(kctx, kind, x, y, w, h, ppm, dim) {
     for (let gx = x + step; gx < x + w; gx += step) { ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx, y + h); ctx.stroke(); }
     for (let gy = y + step; gy < y + h; gy += step) { ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); ctx.stroke(); }
   } else if (kind === 'kitchen') {
-    const horiz = w >= h, L = horiz ? w : h, T = horiz ? h : w;
-    if (L > 0.9 * ppm && T > 14) {
-      ctx.strokeStyle = '#A9A29A'; ctx.fillStyle = '#FFFFFF';
-      const sw = Math.min(0.42 * ppm, L * 0.28), sh = Math.min(0.3 * ppm, T * 0.62);
-      const sx = horiz ? x + 0.14 * ppm : x + w / 2 - sh / 2;
-      const sy = horiz ? y + h / 2 - sh / 2 : y + 0.14 * ppm;
-      ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(sx, sy, horiz ? sw : sh, horiz ? sh : sw, 5);
-      else ctx.rect(sx, sy, horiz ? sw : sh, horiz ? sh : sw);
-      ctx.fill(); ctx.stroke();
-      const r = Math.min(0.09 * ppm, T * 0.28);
-      for (const off of [0.3, 0.58]) {
+    // 카운터 상판 라인(안쪽 인셋) — 싱크 사각형은 어수선해서 뺐다. 화구 2구만, 라벨 칩과 안 겹칠 때.
+    ctx.strokeStyle = '#C7BCAB';
+    ctx.strokeRect(x + 4.5, y + 4.5, w - 9, h - 9);
+    const horiz = w >= h, T = horiz ? h : w;
+    const r = Math.min(0.085 * ppm, T * 0.26);
+    if (r > 3.5) {
+      ctx.strokeStyle = '#A9A29A';
+      const cxm = horiz ? x + w / 2 : y + h / 2;              // 긴 축의 중앙(칩 자리)
+      for (const off of [0.26, 0.52]) {
         const bx = horiz ? x + w - off * ppm : x + w / 2;
         const by = horiz ? y + h / 2 : y + h - off * ppm;
-        if ((horiz ? bx - r > sx + sw : by - r > sy + sw)) { ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.stroke(); }
+        const along = horiz ? bx : by;
+        if (along - r > cxm + chipHalf + 3 && along + r < (horiz ? x + w : y + h) - 3) {
+          ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.stroke();
+        }
       }
     }
   } else {                                    // closet(성근 사선) / entry(촘촘한 반대 사선 = 현관 매트)
@@ -109,6 +109,28 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
   const stageH = room.depthM * ppm + 2 * PAD;
   const wallT = Math.max(5, Math.min(12, room.widthM * ppm * 0.028));   // 외벽 밴드 두께(px) — 도면 느낌의 핵심
 
+  // 빈 상태 안내 위치 — 방 bbox 중앙이 아니라 '배치 가능한 빈 공간'의 중심.
+  // 컷아웃·벽에서 가장 먼 지점(pole of inaccessibility)을 0.15m 격자로 근사한다.
+  const hintPos = useMemo(() => {
+    const W = room.widthM, D = room.depthM;
+    const cuts = cutAABBs(room.cutouts || []);
+    if (!cuts.length) return { cx: W / 2, cy: D / 2 };
+    let best = { cx: W / 2, cy: D / 2, d: -1 };
+    for (let y = 0.2; y < D - 0.1; y += 0.15) {
+      for (let x = 0.2; x < W - 0.1; x += 0.15) {
+        let d = Math.min(x, W - x, y, D - y);
+        for (const b of cuts) {
+          if (x > b.left && x < b.right && y > b.top && y < b.bottom) { d = -1; break; }
+          const dx = Math.max(b.left - x, 0, x - b.right);
+          const dy = Math.max(b.top - y, 0, y - b.bottom);
+          d = Math.min(d, Math.hypot(dx, dy));
+        }
+        if (d > best.d) best = { cx: x, cy: y, d };
+      }
+    }
+    return best;
+  }, [room]);
+
   const toPx = (m) => m * ppm;
   const toM = (px) => px / ppm;
 
@@ -161,9 +183,9 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
           {/* 빈 상태 — 그리드만 있으면 허전하니 도면 라벨처럼 안내를 얹는다(가구가 생기면 사라짐) */}
           {items.length === 0 && (
             <Group listening={false}>
-              <Text x={PAD} y={PAD + toPx(room.depthM) / 2 - 22} width={toPx(room.widthM)}
+              <Text x={PAD + toPx(hintPos.cx) - 110} y={PAD + toPx(hintPos.cy) - 16} width={220}
                 text="가구를 담아 배치해 보세요" fontSize={13} fontStyle="bold" fill="#A8957F" align="center" />
-              <Text x={PAD} y={PAD + toPx(room.depthM) / 2 - 2} width={toPx(room.widthM)}
+              <Text x={PAD + toPx(hintPos.cx) - 110} y={PAD + toPx(hintPos.cy) + 4} width={220}
                 text={`${room.widthM.toFixed(1)} × ${room.depthM.toFixed(1)} m`} fontSize={11} fill="#C0B3A2" align="center" />
             </Group>
           )}
@@ -178,7 +200,7 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
             const tiny = !chip && label && zw > 34 && zh > 16;        // 좁으면 글자만
             return (
               <Group key={`cut${i}`} listening={false}>
-                <Shape sceneFunc={(ctx) => drawZone(ctx, kind, zx, zy, zw, zh, ppm, !!planImg)} />
+                <Shape sceneFunc={(ctx) => drawZone(ctx, kind, zx, zy, zw, zh, ppm, !!planImg, chip ? chipW / 2 : 0)} />
                 {chip && (
                   <Group>
                     <Rect x={zx + zw / 2 - chipW / 2} y={zy + zh / 2 - chipH / 2} width={chipW} height={chipH}
