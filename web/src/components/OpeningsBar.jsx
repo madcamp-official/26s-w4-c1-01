@@ -62,7 +62,7 @@ export default function OpeningsBar({ room, openings, setOpenings }) {
       <div className="openbar-head">
         {cur && (
           <button className="openbar-toggle" onClick={() => setExpanded((v) => !v)} title={expanded ? '접기' : '펼치기'}>
-            {expanded ? '⌄' : '›'}
+            <span className={expanded ? 'ic-down' : 'ic-right'}>{expanded ? '⌄' : '›'}</span>
           </button>
         )}
         <span className="openbar-title">문·창문</span>

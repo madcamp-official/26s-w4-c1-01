@@ -136,9 +136,13 @@ input[type="number"], input[type="text"], select {
 .openbar-title { font-weight: 700; font-size: 14px; }
 .openbar-hint { color: var(--muted); font-size: 12px; }
 .openbar-count { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
-/* 접기/펼치기 토글 — 아이콘을 원 정중앙에 배치. */
+/* 접기/펼치기 토글 — 아이콘을 원 정중앙에 배치.
+   ⌄(U+2304)·›(U+203A)는 글리프 잉크가 폰트 em박스 안에서 아래로 치우쳐 있어(특히 ⌄), flex 중앙정렬만으론
+   눈에 보이는 잉크가 원 아래쪽에 몰림 — 아이콘별로 실측한 translateY로 각각 보정한다(글리프마다 치우침이 달라 공용 보정 불가). */
 .openbar-toggle { width: 28px; height: 28px; border-radius: 50%; border: 0; background: var(--muted-surface); color: var(--ink);
   font-size: 19px; font-weight: 800; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; flex: none; }
+.openbar-toggle .ic-down { display: inline-block; transform: translateY(-5px); }
+.openbar-toggle .ic-right { display: inline-block; transform: translateY(-1.5px); }
 .openbar-summary { cursor: pointer; }
 .op-badge { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
 .op-badge.door { background: rgba(204,91,82,.14); color: #b64b43; }
