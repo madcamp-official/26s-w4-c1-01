@@ -76,22 +76,44 @@ export function floorplanSvg(plan, targetW = 360) {
     line(bdx, bdy, bdx + (bathDoorLeft ? -px(0.6) : px(0.6)), bdy, C.fixtureLine, 1.4);
   }
 
-  // ── 컷아웃(비직사각형 방) — 방 안으로 파인 욕실: L자의 본질 ──
+  // ── 컷아웃(비직사각형 방) — 방 안으로 파인 부속 구역: L자의 본질 ──
+  // kind로 구역 성격을 구분한다(없으면 욕실 — 기존 도면 호환).
+  //   bath=욕실 · closet=보일러실/붙박이 · kitchen=주방 카운터 · entry=현관
+  const drawCounterBox = (bx, by, bw, bh, withSink) => {
+    rect(bx, by, bw, bh, C.counter, `stroke="${C.fixtureLine}" stroke-width="1"`);
+    if (!withSink) return;
+    el.push(`<rect x="${r(bx + px(0.12))}" y="${r(by + px(0.1))}" width="${r(Math.min(px(0.42), bw - px(0.2)))}" height="${r(Math.min(px(0.3), bh - px(0.16)))}" rx="3" fill="${C.fixture}" stroke="${C.fixtureLine}" stroke-width="1"/>`);
+    if (bw > px(1.0)) for (const cx of [bx + bw - px(0.34), bx + bw - px(0.68)]) {
+      el.push(`<circle cx="${r(cx)}" cy="${r(by + bh / 2)}" r="${r(px(0.1))}" fill="none" stroke="${C.fixtureLine}" stroke-width="1.2"/>`);
+    }
+  };
+  const drawEntryBox = (bx, by, bw, bh) => {
+    rect(bx, by, bw, bh, C.corridor);
+    for (let gx = bx - bh; gx < bx + bw; gx += px(0.3)) {          // 45° 해칭 = 현관 바닥
+      line(Math.max(gx, bx), by + Math.max(0, bx - gx), Math.min(gx + bh, bx + bw), by + bh - Math.max(0, gx + bh - (bx + bw)), C.bathLine, 0.6);
+    }
+  };
   for (const c of plan.cutouts || []) {
     const cx0 = X(c.x), cy0 = Y(c.y), cw = px(c.w), ch = px(c.d);
-    drawBathBox(cx0, cy0, cw, ch);
+    const kind = c.kind || 'bath';
+    if (kind === 'kitchen') drawCounterBox(cx0, cy0, cw, ch, true);
+    else if (kind === 'closet') drawCounterBox(cx0, cy0, cw, ch, false);
+    else if (kind === 'entry') drawEntryBox(cx0, cy0, cw, ch);
+    else drawBathBox(cx0, cy0, cw, ch);
     // 방을 향한 면에 칸막이 벽(바운딩 벽과 공유하는 면은 제외)
     if (c.y > EPS_M) line(cx0 - px(T2) / 2, cy0 - px(T2) / 2, cx0 + cw + px(T2) / 2, cy0 - px(T2) / 2, C.wall, px(T2));  // 윗면
     if (c.x > EPS_M) line(cx0 - px(T2) / 2, cy0 - px(T2), cx0 - px(T2) / 2, cy0 + ch, C.wall, px(T2));                    // 좌면
     if (c.x + c.w < W - EPS_M) line(cx0 + cw + px(T2) / 2, cy0 - px(T2), cx0 + cw + px(T2) / 2, cy0 + ch, C.wall, px(T2)); // 우면
     // 아랫면이 방/복도 경계에 닿으면 그 벽을 통해 복도로 문(개구부+호)
-    if (Math.abs((c.y + c.d) - D) < EPS_M) {
+    // 복도(annex)가 있는 도면에서만 — 부속실 문이 복도로 난다. annex가 없으면 외벽이라 문이 없다.
+    if (Math.abs((c.y + c.d) - D) < EPS_M && AN.d > EPS_M) {
       const ddx = cx0 + cw / 2, ddw = px(0.62);
       line(ddx - ddw / 2, Y(D) + px(T2) / 2, ddx + ddw / 2, Y(D) + px(T2) / 2, C.paper, px(T2) + 1.4);
       el.push(`<path d="M ${r(ddx - ddw / 2)} ${r(Y(D) + ddw)} A ${r(ddw)} ${r(ddw)} 0 0 0 ${r(ddx + ddw / 2)} ${r(Y(D))}" fill="none" stroke="${C.arc}" stroke-width="1" stroke-dasharray="3 2"/>`);
       line(ddx - ddw / 2, Y(D), ddx - ddw / 2, Y(D) + ddw, C.fixtureLine, 1.4);
     }
-    text(cx0 + cw / 2, cy0 + ch / 2 + 4, '욕실', 9.5, C.label, 'text-anchor="middle" font-weight="700"');
+    const LABEL = { bath: '욕실', closet: '보일러실', kitchen: '주방', entry: '현관' };
+    text(cx0 + cw / 2, cy0 + ch / 2 + 4, c.label || LABEL[kind], 9.5, C.label, 'text-anchor="middle" font-weight="700"');
   }
 
   // ── 주방 카운터(복도 하단 벽면) ──
@@ -122,12 +144,22 @@ export function floorplanSvg(plan, targetW = 360) {
   for (const o of plan.openings) {
     const w = o.width;
     if (o.kind === 'door') {
-      // 방↔복도 경계벽의 개구부 + 방 안쪽 스윙 호(엔진 스윙존과 동일 방향)
-      const dx1 = X(o.pos - w / 2), dx2 = X(o.pos + w / 2);
-      line(dx1, Y(D) + px(T2) / 2, dx2, Y(D) + px(T2) / 2, C.paper, px(T2) + 1.4);
-      const hingeX = o.hinge === 'b' ? dx2 : dx1, dir = o.hinge === 'b' ? -1 : 1;
-      el.push(`<path d="M ${r(hingeX)} ${r(Y(D) - px(w))} A ${r(px(w))} ${r(px(w))} 0 0 ${o.hinge === 'b' ? 0 : 1} ${r(hingeX + dir * px(w))} ${r(Y(D))}" fill="none" stroke="${C.arc}" stroke-width="1.1" stroke-dasharray="3 2"/>`);
-      line(hingeX, Y(D), hingeX, Y(D) - px(w), C.fixtureLine, 1.5);
+      // 개구부 + 방 안쪽 스윙 호(엔진 스윙존과 동일 방향). 네 벽 모두 지원.
+      // A = 벽을 따라가는 단위벡터, N = 방 안쪽 법선. (창과 달리 문은 예전엔 하단 벽 전용이었다)
+      const wall = o.wall || 'bottom';
+      const A = (wall === 'left' || wall === 'right') ? [0, 1] : [1, 0];
+      const N = { bottom: [0, -1], top: [0, 1], left: [1, 0], right: [-1, 0] }[wall];
+      const cx = wall === 'left' ? X(0) - px(T) / 2 : wall === 'right' ? X(W) + px(T) / 2 : X(o.pos);
+      const cy = wall === 'top' ? Y(0) - px(T) / 2 : wall === 'bottom' ? Y(D) + px(T2) / 2 : Y(o.pos);
+      const half = px(w) / 2, R = px(w);
+      line(cx - A[0] * half, cy - A[1] * half, cx + A[0] * half, cy + A[1] * half, C.paper, px(T2) + 1.4);
+      const s = o.hinge === 'b' ? 1 : -1;                       // 경첩 위치(벽을 따라 어느 끝인가)
+      const hx = cx + A[0] * half * s, hy = cy + A[1] * half * s;
+      const ex2 = hx - A[0] * R * s, ey2 = hy - A[1] * R * s;   // 열린 문짝 끝(벽면 위)
+      const nx = hx + N[0] * R, ny = hy + N[1] * R;             // 호의 반대 끝(방 안쪽)
+      const sweep = ((-A[0] * s) * N[1] - (-A[1] * s) * N[0]) > 0 ? 1 : 0;
+      el.push(`<path d="M ${r(ex2)} ${r(ey2)} A ${r(R)} ${r(R)} 0 0 ${sweep} ${r(nx)} ${r(ny)}" fill="none" stroke="${C.arc}" stroke-width="1.1" stroke-dasharray="3 2"/>`);
+      line(hx, hy, nx, ny, C.fixtureLine, 1.5);
     } else {
       // 창 3선 심볼(벽 위)
       let x1, y1, x2, y2, horiz = o.wall === 'top' || o.wall === 'bottom';

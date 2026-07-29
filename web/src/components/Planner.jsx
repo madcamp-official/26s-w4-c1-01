@@ -1,16 +1,32 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Line, Group, Text, Circle, Shape, Image as KImage } from 'react-konva';
-import { effectiveFootprint, clampCenterToRoom, doorSwing } from '../lib/geometry.js';
+import { effectiveFootprint, clampCenterFree, doorSwing } from '../lib/geometry.js';
 import { accuracyMeta } from '../lib/catalog.js';
 
 const PAD = 16;
 const MAX_H = 470;
+// 컷아웃 구역 이름 — 도면(floorplanSvg)과 같은 어휘를 쓴다. 없으면 '배치금지'로만 보인다.
+const CUT_LABEL = { bath: '욕실', closet: '보일러실', kitchen: '주방', entry: '현관' };
+
+// 실제 도면 이미지를 방 좌표에 1:1로 깔기 위한 로더(use-image 의존성 없이).
+function useImageSrc(src) {
+  const [img, setImg] = useState(null);
+  useEffect(() => {
+    if (!src) { setImg(null); return; }
+    const im = new window.Image();
+    im.onload = () => setImg(im);
+    im.src = src;
+    return () => { im.onload = null; };
+  }, [src]);
+  return img;
+}
 
 // 축척 2D 탑다운 플래너. 배치·스케일·맞음판정은 전부 미터 좌표계 기하(lib/geometry)로 결정.
 // 회전은 90도 스냅이라 시각적 rect 회전과 effectiveFootprint 스왑이 일치한다.
 export default function Planner({ room, items, setItems, selectedId, setSelectedId, flags, openings = [] }) {
   const wrapRef = useRef(null);
   const [wrapW, setWrapW] = useState(600);
+  const planImg = useImageSrc(room.underlay);   // 실측 도면 배경(없으면 null)
   const imgCache = useRef({});
   const [, setImgTick] = useState(0);
   // 제품 썸네일 로더(탑다운 타일 위 오버레이). 로드되면 리렌더.
@@ -41,6 +57,7 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
   const ppm = Math.min((availW - 2 * PAD) / room.widthM, (MAX_H - 2 * PAD) / room.depthM);
   const stageW = room.widthM * ppm + 2 * PAD;
   const stageH = room.depthM * ppm + 2 * PAD;
+  const wallT = Math.max(5, Math.min(12, room.widthM * ppm * 0.028));   // 외벽 밴드 두께(px) — 도면 느낌의 핵심
 
   const toPx = (m) => m * ppm;
   const toM = (px) => px / ppm;
@@ -48,7 +65,9 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
   function moveItem(idx, xPx, yPx, node) {
     const it = items[idx];
     const raw = { cx: toM(xPx - PAD), cy: toM(yPx - PAD) };
-    const c = clampCenterToRoom(it, raw.cx, raw.cy, room.widthM, room.depthM);   // 방 밖 드래그 금지
+    // 방 밖 + 컷아웃(욕실·주방 등) 드래그 금지 — 러그만 예외(soft 정책과 일치)
+    const cuts = it.cat === '러그' ? [] : room.cutouts || [];
+    const c = clampCenterFree(it, raw.cx, raw.cy, room.widthM, room.depthM, cuts, it);
     if (node && (Math.abs(c.cx - raw.cx) > 1e-9 || Math.abs(c.cy - raw.cy) > 1e-9)) {
       node.position({ x: PAD + toPx(c.cx), y: PAD + toPx(c.cy) });               // 노드도 경계 안으로 되돌림
     }
@@ -65,21 +84,59 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
       <Stage width={stageW} height={stageH} onMouseDown={(e) => { if (e.target === e.target.getStage()) setSelectedId(null); }}
         onTouchStart={(e) => { if (e.target === e.target.getStage()) setSelectedId(null); }}>
         <Layer>
-          {/* 바닥 */}
-          <Rect x={PAD} y={PAD} width={toPx(room.widthM)} height={toPx(room.depthM)} fill="#faf7f1" stroke="#cfc7b8" strokeWidth={1.5} cornerRadius={2} />
-          {grid.map(([dir, m], i) =>
-            dir === 'v' ? (
-              <Line key={i} points={[PAD + toPx(m), PAD, PAD + toPx(m), PAD + toPx(room.depthM)]} stroke="#ece5d8" strokeWidth={1} />
+          {/* 바닥 — 도면 카드(floorplanSvg)와 같은 웜 페이퍼 톤. 테두리는 아래 벽체 밴드가 담당. */}
+          <Rect x={PAD} y={PAD} width={toPx(room.widthM)} height={toPx(room.depthM)} fill="#FBF6EF" />
+          {/* 0.5m 격자 — 정수 미터는 살짝 진하게(도면의 보조선 위계) */}
+          {grid.map(([dir, m], i) => {
+            const whole = Math.abs(m - Math.round(m)) < 1e-9;
+            const col = whole ? '#EADFCE' : '#F2EBDF';
+            return dir === 'v' ? (
+              <Line key={i} points={[PAD + toPx(m), PAD, PAD + toPx(m), PAD + toPx(room.depthM)]} stroke={col} strokeWidth={1} />
             ) : (
-              <Line key={i} points={[PAD, PAD + toPx(m), PAD + toPx(room.widthM), PAD + toPx(m)]} stroke="#ece5d8" strokeWidth={1} />
-            )
+              <Line key={i} points={[PAD, PAD + toPx(m), PAD + toPx(room.widthM), PAD + toPx(m)]} stroke={col} strokeWidth={1} />
+            );
+          })}
+
+          {/* 실제 도면(있으면) — 방 사각형에 1:1로 깔아 그 위에서 배치한다. 가구·판정은 그대로 기하가 결정.
+              불투명도 0.16: 도면은 윤곽만 은은하게 — 배치 요소가 주인공. */}
+          {planImg && (
+            <KImage image={planImg} x={PAD} y={PAD} width={toPx(room.widthM)} height={toPx(room.depthM)}
+              opacity={0.16} listening={false} />
           )}
 
-          {/* 컷아웃(비직사각형 방의 벽체/욕실) — 배치금지 구역을 벽색으로 */}
-          {(room.cutouts || []).map((c, i) => (
-            <Rect key={`cut${i}`} x={PAD + toPx(c.x)} y={PAD + toPx(c.y)} width={toPx(c.w)} height={toPx(c.d)}
-              fill="#e3ddd2" stroke="#8a8172" strokeWidth={2} cornerRadius={1} listening={false} />
-          ))}
+          {/* 외벽 — 도면의 두꺼운 벽체 밴드(경계선 중심). 개구부가 이 밴드를 바닥색으로 뚫는다. */}
+          <Rect x={PAD} y={PAD} width={toPx(room.widthM)} height={toPx(room.depthM)}
+            stroke="#3A332B" strokeWidth={wallT} listening={false} />
+
+          {/* 빈 상태 — 그리드만 있으면 허전하니 도면 라벨처럼 안내를 얹는다(가구가 생기면 사라짐) */}
+          {items.length === 0 && (
+            <Group listening={false}>
+              <Text x={PAD} y={PAD + toPx(room.depthM) / 2 - 22} width={toPx(room.widthM)}
+                text="가구를 담아 배치해 보세요" fontSize={13} fontStyle="bold" fill="#A8957F" align="center" />
+              <Text x={PAD} y={PAD + toPx(room.depthM) / 2 - 2} width={toPx(room.widthM)}
+                text={`${room.widthM.toFixed(1)} × ${room.depthM.toFixed(1)} m`} fontSize={11} fill="#C0B3A2" align="center" />
+            </Group>
+          )}
+
+          {/* 컷아웃(비직사각형 방의 벽체/욕실) — 배치금지 구역 + 아이콘·이름.
+              도면을 깔았을 땐 도면이 이미 그 구역을 그리고 있으므로 반투명으로 덮는다. */}
+          {(room.cutouts || []).map((c, i) => {
+            const kind = c.kind || 'bath';
+            const label = c.label || CUT_LABEL[kind] || '';
+            const boxW = toPx(c.w), boxH = toPx(c.d);
+            const showText = boxW > 34 && boxH > 16;      // 글자가 들어갈 때만(좁으면 생략)
+            return (
+              <Group key={`cut${i}`} listening={false}>
+                <Rect x={PAD + toPx(c.x)} y={PAD + toPx(c.y)} width={boxW} height={boxH}
+                  fill={planImg ? 'rgba(222,213,199,0.92)' : '#e3ddd2'}
+                  stroke="#6f6558" strokeWidth={2.5} cornerRadius={1} />
+                {showText && label && (
+                  <Text x={PAD + toPx(c.x)} y={PAD + toPx(c.y) + boxH / 2 - 6} width={boxW}
+                    text={label} fontSize={11} fontStyle="bold" fill="#54493d" align="center" />
+                )}
+              </Group>
+            );
+          })}
 
           {/* 개구부: 문(90° 스윙 부채꼴=접근불가, 빨강) · 창문(벽 표시=가리면 안 됨, 파랑) */}
           {(openings || []).map((o) => {
@@ -107,19 +164,25 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
               const leaf = [hx + into[0] * Rp, hy + into[1] * Rp];
               return (
                 <Group key={o.id} listening={false}>
+                  {/* 벽체 개구부(바닥색으로 뚫기) + 도면식 스윙 호 — 상시 경고색 대신 웜 뉴트럴,
+                      침범하면 가구 쪽이 빨갛게 물들므로 신호는 유지된다 */}
+                  <Line points={[e1[0], e1[1], e2[0], e2[1]]} stroke="#FBF6EF" strokeWidth={wallT + 2} />
                   <Shape sceneFunc={(ctx, sh) => { ctx.beginPath(); ctx.moveTo(hx, hy); ctx.arc(hx, hy, Rp, a1, a2, acw); ctx.closePath(); ctx.fillStrokeShape(sh); }}
-                    fill="rgba(204,91,82,0.12)" stroke="#cc5b52" strokeWidth={1} dash={[4, 3]} />
-                  <Line points={[e1[0], e1[1], e2[0], e2[1]]} stroke="#cc5b52" strokeWidth={4} />
-                  <Line points={[hx, hy, leaf[0], leaf[1]]} stroke="#cc5b52" strokeWidth={2} />
+                    fill="rgba(190,160,138,0.14)" stroke="#B5A79A" strokeWidth={1.1} dash={[4, 3]} />
+                  <Line points={[hx, hy, leaf[0], leaf[1]]} stroke="#835151" strokeWidth={2.2} lineCap="round" />
                 </Group>
               );
             }
-            const off = 5;
-            const n = { top: [0, off], bottom: [0, -off], left: [off, 0], right: [-off, 0] }[o.wall];
+            // 창 — 도면의 3선 유리 심볼(벽 밴드 위)
+            const off = Math.max(2.6, wallT * 0.3);
+            const n = { top: [0, 1], bottom: [0, -1], left: [1, 0], right: [-1, 0] }[o.wall];
             return (
               <Group key={o.id} listening={false}>
-                <Line points={[e1[0], e1[1], e2[0], e2[1]]} stroke="#3b7fb5" strokeWidth={5} />
-                <Line points={[e1[0] + n[0], e1[1] + n[1], e2[0] + n[0], e2[1] + n[1]]} stroke="#7db8e0" strokeWidth={2} />
+                <Line points={[e1[0], e1[1], e2[0], e2[1]]} stroke="#FBF6EF" strokeWidth={wallT + 2} />
+                {[-off, 0, off].map((k) => (
+                  <Line key={k} points={[e1[0] + n[0] * k, e1[1] + n[1] * k, e2[0] + n[0] * k, e2[1] + n[1] * k]}
+                    stroke="#7FA8C9" strokeWidth={1.4} />
+                ))}
               </Group>
             );
           })}

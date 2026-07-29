@@ -1,6 +1,6 @@
 // 방꾸요정 서비스워커 — PWA 설치 요건 + 정적 셸 캐시.
 // 원칙: /api·외부 요청은 절대 캐시하지 않는다(렌더/로그인/검색은 항상 실시간).
-const CACHE = 'bangkku-v1';
+const CACHE = 'bangkku-v2';   // 세대 올리면 activate 때 구캐시 전부 삭제
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

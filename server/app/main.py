@@ -12,6 +12,7 @@
 import os
 import re
 import json
+import asyncio as _asyncio   # 429 재시도 대기
 from typing import Optional
 
 try:
@@ -24,6 +25,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .dims import parse_dims, fetch_dims_from_url
+
+
+# 외부 API 에러 문구에는 요청 URL이 통째로 들어가고, 그 URL에 API 키가 쿼리로 붙어 있다.
+# 그대로 프런트에 내려주면 브라우저 화면에 키가 노출된다 → 항상 이걸로 감싸서 내보낸다.
+_SECRET_RE = re.compile(r"(key=)[^&\s'\"]+|(?:AIza|AQ\.)[A-Za-z0-9_\-]{8,}")
+
+
+def _safe_err(e, n: int = 200) -> str:
+    return _SECRET_RE.sub(lambda m: (m.group(1) or "") + "<REDACTED>", str(e))[:n]
+
 
 app = FastAPI(title="bangkku-api", version="0.1.0")
 app.add_middleware(
@@ -93,7 +104,7 @@ async def search(q: str = ""):
             )
         return {"status": "OK", "items": items}
     except Exception as e:  # noqa: BLE001 — 어떤 실패든 폴백으로
-        return {"status": "FALLBACK", "reason": str(e)[:120], "items": []}
+        return {"status": "FALLBACK", "reason": _safe_err(e, 120), "items": []}
 
 
 @app.get("/api/dims")
@@ -123,7 +134,7 @@ async def composite(req: ComposeReq):
             r.raise_for_status()
             return {"status": "OK", "image": r.json().get("image")}
     except Exception as e:  # noqa: BLE001
-        return {"status": "CLIENT", "reason": str(e)[:120]}
+        return {"status": "CLIENT", "reason": _safe_err(e, 120)}
 
 
 class RelightReq(BaseModel):
@@ -150,7 +161,7 @@ async def relight(req: RelightReq):
             return {"status": "OK", "image": data["image"]}
         return {"status": "CLIENT", "reason": str(data.get("reason", "sd error"))[:120]}
     except Exception as e:  # noqa: BLE001
-        return {"status": "CLIENT", "reason": str(e)[:120]}
+        return {"status": "CLIENT", "reason": _safe_err(e, 120)}
 
 
 @app.post("/api/card")
@@ -164,7 +175,7 @@ async def card(req: ComposeReq):
             r.raise_for_status()
             return {"status": "OK", "image": r.json().get("image")}
     except Exception as e:  # noqa: BLE001
-        return {"status": "TEXT_CARD", "text": _text_card(req), "reason": str(e)[:120]}
+        return {"status": "TEXT_CARD", "text": _text_card(req), "reason": _safe_err(e, 120)}
 
 
 _LAYOUT_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "방꾸요정-배치-LLM-프롬프트.md")
@@ -249,6 +260,7 @@ class RenderReq(BaseModel):
     samples: Optional[int] = None
     preset: Optional[str] = "day"   # 시간대 조명(morning/day/sunset/night) — 선언 안 하면 Pydantic이 버려 항상 day로 렌더되던 회귀 버그
     openings: list = []             # 문/창 위치 — 같은 이유로 버려져 렌더에 안 그려지던 것
+    cutouts: list = []              # 욕실·주방 등 부속실(직육면체 벽체) — 같은 이유로 버려져 렌더에 부속실이 안 서던 것
     view: Optional[str] = None      # 카메라 앵글(wide/cozy) — 없으면 camera/기본 프레이밍
 
 
@@ -266,7 +278,7 @@ async def render(req: RenderReq):
             return {"status": "OK", "image": data["image"]}
         return {"status": "ERROR", "reason": str(data.get("reason", "render error"))[:200]}
     except Exception as e:  # noqa: BLE001
-        return {"status": "ERROR", "reason": str(e)[:200]}
+        return {"status": "ERROR", "reason": _safe_err(e, 200)}
 
 
 class LayoutReq(BaseModel):
@@ -308,7 +320,7 @@ async def layout(req: LayoutReq):
                 text = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
         return {"status": "OK", "candidates": _parse_candidates(text), "provider": provider}
     except Exception as e:  # noqa: BLE001
-        return {"status": "ERROR", "reason": str(e)[:200]}
+        return {"status": "ERROR", "reason": _safe_err(e, 200)}
 
 
 async def shape_query(q: str) -> Optional[str]:
@@ -373,7 +385,8 @@ async def _recommend_queries(item: dict):
             r = await cx.post(f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}",
                               json={"system_instruction": {"parts": [{"text": sysmsg}]},
                                     "contents": [{"role": "user", "parts": [{"text": user}]}],
-                                    "generationConfig": {"maxOutputTokens": 512, "temperature": 0.6, "responseMimeType": "application/json"}})
+                                    # 512는 부족 — flash 계열은 thinking 토큰(600+)을 먼저 쓰고 답을 내서 MAX_TOKENS로 잘린다.
+                                    "generationConfig": {"maxOutputTokens": 2048, "temperature": 0.6, "responseMimeType": "application/json"}})
             r.raise_for_status()
             data = r.json()
         txt = "".join(p.get("text", "") for p in (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
@@ -453,7 +466,7 @@ async def chat_layout(req: ChatReq):
             obj = json.loads(txt[s:e + 1]) if 0 <= s < e else {"decision": "reject", "reason": "이해하지 못했어요."}
         return {"status": "OK", "decision": obj.get("decision", "reject"), "reason": obj.get("reason", ""), "items": obj.get("items", [])}
     except Exception as e:  # noqa: BLE001
-        return {"status": "ERROR", "decision": "reject", "reason": "처리 중 문제가 생겼어요. 다시 시도해 주세요.", "error": str(e)[:150]}
+        return {"status": "ERROR", "decision": "reject", "reason": "처리 중 문제가 생겼어요. 다시 시도해 주세요.", "error": _safe_err(e, 150)}
 
 
 def _text_card(req: ComposeReq) -> str:
@@ -570,7 +583,7 @@ async def auth_callback(provider: str, code: str = "", error: str = ""):
         user["exp"] = int(_time.time()) + 60 * 60 * 24 * 30
         return RedirectResponse(AUTH_BASE + "/#auth=" + _sign_token(user))
     except Exception as e:  # noqa: BLE001
-        return RedirectResponse(AUTH_BASE + "/#auth_error=" + _uparse.quote(str(e)[:80]))
+        return RedirectResponse(AUTH_BASE + "/#auth_error=" + _uparse.quote(_safe_err(e, 80)))
 
 
 # ── 커뮤니티(방꾸 이야기) — 홈 세그먼트 전환용(design/커뮤니티.html 1c안). 이 프로젝트 첫 영구 저장소라 SQLite 파일 하나로 가볍게.
@@ -637,7 +650,7 @@ async def community_post(req: CommunityPostReq, request: Request):
         conn.commit(); conn.close()
         return {"status": "OK", "post": {**post, "mine": owner is not None}}
     except Exception as e:  # noqa: BLE001
-        return {"status": "ERROR", "reason": str(e)[:150]}
+        return {"status": "ERROR", "reason": _safe_err(e, 150)}
 
 
 @app.get("/api/community/feed")
@@ -717,7 +730,7 @@ async def community_liked(request: Request):
         ]
         return {"status": "OK", "posts": posts}
     except Exception as e:  # noqa: BLE001
-        return {"status": "ERROR", "reason": str(e)[:150], "posts": []}
+        return {"status": "ERROR", "reason": _safe_err(e, 150), "posts": []}
 
 
 class CommunityEditReq(BaseModel):
@@ -763,3 +776,222 @@ async def community_delete(post_id: str, request: Request):
     conn.execute("DELETE FROM posts WHERE id=?", (post_id,))
     conn.commit(); conn.close()
     return {"status": "OK"}
+
+
+# ── 도면 사진 → 편집 가능한 방(초안) ────────────────────────────────────────────
+# 정직 원칙: LLM이 읽은 치수는 '초안'이다. 같은 도면을 반복 판독시키면 방 면적이 최대 46%까지
+# 흔들리는 걸 실측으로 확인했다(인허가 도면 기준). 그래서 이 엔드포인트는 확정 치수를 주지 않고,
+# accuracy='estimate'를 달아 돌려주며 앱이 사용자 확인(한 변 실측 보정)을 거치게 한다.
+# 모든 위치는 '이미지 픽셀 박스'([ymin,xmin,ymax,xmax], 0~1000 정규화 — Gemini box 규약)로 받는다.
+# 미터 좌표를 직접 받으면 언더레이(imageBox 크롭)와 컷아웃이 서로 다른 추정이라 화면에서 어긋난다.
+# 픽셀 박스는 그림과 같은 좌표계라 정렬이 구조적으로 보장되고, 미터 변환은 서버가 한다.
+_PLAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "widthM": {"type": "number"}, "depthM": {"type": "number"},
+        "imageBox": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+        "cutouts": {"type": "array", "items": {"type": "object", "properties": {
+            "kind": {"type": "string"},
+            "box": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4}},
+            "required": ["kind", "box"]}},
+        "openings": {"type": "array", "items": {"type": "object", "properties": {
+            "kind": {"type": "string"},
+            "box": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4}},
+            "required": ["kind", "box"]}},
+        "printedAreaM2": {"type": "number"},
+        "unitLabel": {"type": "string"},
+        "unitsDetected": {"type": "number"},
+        "confidence": {"type": "number"},
+        "note": {"type": "string"},
+    },
+    "required": ["widthM", "depthM", "cutouts", "openings", "imageBox", "confidence", "note"],
+}
+
+_PLAN_SYS = (
+    "너는 한국 원룸 평면도를 읽어 가구배치 앱이 쓸 방 데이터를 만드는 판독기다.\n"
+    "모든 박스는 [ymin,xmin,ymax,xmax], '이미지 전체 크기' 대비 0~1000 정규화 좌표다.\n"
+    "이 박스들은 도면 그림 위에 그대로 오버레이된다 — 그림과 픽셀 단위로 정렬되는 것이 치수 추정보다 중요하다.\n"
+    "0) 세대 선택 — 이미지가 '한 세대'가 아닐 수 있다(층 전체 도면, 여러 세대, 계단실·복도·주차·치수선 띠 포함).\n"
+    "   읽을 대상은 '주거 세대 하나'뿐이다: 세대 라벨(N호)과 전용면적이 붙은 세대를 우선하고, 여럿이면 가장 크고 완전하게\n"
+    "   보이는 세대 하나만 고른다. 계단실·엘리베이터·공용복도·주차장·기계실·옆 세대는 절대 포함하지 마라.\n"
+    "   (욕실·다용도실·발코니처럼 그 세대 '안'의 부속실은 세대에 포함한다.)\n"
+    "   - imageBox = 고른 세대의 외곽벽 박스.\n"
+    "   - unitLabel = 고른 세대의 라벨(예: '1호'). 없으면 생략. unitsDetected = 이미지에 보이는 주거 세대 수.\n"
+    "1) cutouts = 세대 안에서 가구를 놓을 수 없는 부속실. kind는 bath(욕실)·kitchen(주방)·entry(현관)·closet(붙박이/보일러실/다용도실).\n"
+    "   각 부속실의 '벽 위치 그대로' box를 준다. 전부 imageBox 안에 있어야 하고 서로 겹치면 안 된다.\n"
+    "2) openings = 세대 외곽벽 위의 문(door)/창(window) 개구부 box.\n"
+    "3) widthM/depthM = imageBox가 나타내는 세대 내부의 실제 미터 치수. 도면에 인쇄된 치수(mm)·전용면적을 근거로만 추정한다.\n"
+    "- printedAreaM2 = 그 세대에 '전용면적'이 인쇄돼 있으면 그 숫자. 없으면 생략.\n"
+    "- confidence 0~1: 치수선 숫자를 직접 읽었으면 높게, 비율로 추정했으면 0.4 이하.\n"
+    "- note: 사용자에게 보여줄 한 문장(어느 세대를 골랐고 무엇이 불확실한지).\n"
+    "치수를 지어내지 마라. 근거가 없으면 confidence를 낮추고 note에 '치수 표기 없음'이라고 적어라."
+)
+
+
+class FloorplanReq(BaseModel):
+    image: str                      # dataURL 또는 base64
+    hintM: Optional[float] = None   # 사용자가 아는 한 변(m) — 있으면 그 값으로 비례 보정
+
+
+def _box_frac(box, unit):
+    """이미지 좌표 박스(0~1000) → 세대(unit) 박스 기준 0~1 비율 (fx0,fy0,fx1,fy1). 밖이면 잘라냄."""
+    uy0, ux0, uy1, ux1 = unit
+    uw, uh = ux1 - ux0, uy1 - uy0
+    if uw <= 0 or uh <= 0:
+        return None
+    y0, x0, y1, x1 = [max(0.0, min(1000.0, float(v))) for v in box]
+    fx0 = max(0.0, min(1.0, (x0 - ux0) / uw)); fx1 = max(0.0, min(1.0, (x1 - ux0) / uw))
+    fy0 = max(0.0, min(1.0, (y0 - uy0) / uh)); fy1 = max(0.0, min(1.0, (y1 - uy0) / uh))
+    if fx1 - fx0 <= 0.01 or fy1 - fy0 <= 0.01:
+        return None
+    return fx0, fy0, fx1, fy1
+
+
+def _clean_plan(p: dict):
+    """LLM 픽셀 박스 → 미터 좌표 변환 + 정규화(겹침 제거, 5cm 스냅, 개구부 벽 판정).
+    컷아웃·개구부가 imageBox와 같은 좌표계에서 오므로, 언더레이(=imageBox 크롭)와의 정렬이 보장된다."""
+    snap = lambda v: round(float(v) * 20) / 20
+    W = max(1.2, min(12.0, snap(p.get("widthM", 3.0))))
+    D = max(1.2, min(12.0, snap(p.get("depthM", 4.0))))
+    unit = p.get("imageBox") or [0, 0, 1000, 1000]
+    try:
+        unit = [max(0.0, min(1000.0, float(v))) for v in unit]
+        if unit[2] - unit[0] < 50 or unit[3] - unit[1] < 50:      # 5% 미만 박스 = 무효
+            unit = [0, 0, 1000, 1000]
+    except Exception:  # noqa: BLE001
+        unit = [0, 0, 1000, 1000]
+
+    kinds = {"bath", "kitchen", "entry", "closet"}
+    cuts = []
+    for c in p.get("cutouts", []) or []:
+        f = _box_frac(c.get("box") or [], unit)
+        if not f:
+            continue
+        fx0, fy0, fx1, fy1 = f
+        x, y = snap(fx0 * W), snap(fy0 * D)
+        w, d = snap((fx1 - fx0) * W), snap((fy1 - fy0) * D)
+        w, d = min(w, W - x), min(d, D - y)
+        if w < 0.3 or d < 0.3:
+            continue
+        box = {"x": x, "y": y, "w": w, "d": d, "kind": c.get("kind") if c.get("kind") in kinds else "closet"}
+        if any(min(a["x"] + a["w"], x + w) - max(a["x"], x) > 0.05 and
+               min(a["y"] + a["d"], y + d) - max(a["y"], y) > 0.05 for a in cuts):
+            continue                                              # 겹치면 버림(엔진 면적 계산이 틀어짐)
+        cuts.append(box)
+
+    ops = []
+    for o in (p.get("openings", []) or [])[:6]:
+        f = _box_frac(o.get("box") or [], unit)
+        if not f:
+            continue
+        fx0, fy0, fx1, fy1 = f
+        cx, cy = (fx0 + fx1) / 2, (fy0 + fy1) / 2
+        ew, eh = fx1 - fx0, fy1 - fy0
+        # 벽 판정: 박스가 납작한 방향 우선(가로로 길면 top/bottom), 애매하면 가장 가까운 외곽벽.
+        if ew > eh * 1.3:
+            wall = "top" if cy < 0.5 else "bottom"
+        elif eh > ew * 1.3:
+            wall = "left" if cx < 0.5 else "right"
+        else:
+            dists = {"top": cy, "bottom": 1 - cy, "left": cx, "right": 1 - cx}
+            wall = min(dists, key=dists.get)
+        kind = "door" if o.get("kind") == "door" else "window"
+        if wall in ("left", "right"):
+            span, pos_f, wid_f = D, cy, eh
+        else:
+            span, pos_f, wid_f = W, cx, ew
+        wid = max(0.4, min(3.0, snap(wid_f * span)))
+        pos = min(max(snap(pos_f * span), wid / 2), span - wid / 2)
+        ops.append({"kind": kind, "wall": wall, "pos": pos, "width": wid,
+                    **({"hinge": "a"} if kind == "door" else {})})
+    return {"widthM": W, "depthM": D, "cutouts": cuts, "openings": ops}
+
+
+@app.post("/api/floorplan")
+async def floorplan(req: FloorplanReq):
+    """도면 사진 → 편집 가능한 방 초안. 반환: {status, room, accuracy, confidence, note}."""
+    gkey = os.getenv("GEMINI_API_KEY")
+    if not (gkey and httpx):
+        return {"status": "NOKEY", "reason": "AI 연결이 안 돼 있어요(키 미설정)."}
+    raw = (req.image or "").split(",", 1)[-1]
+    if len(raw) < 100:
+        return {"status": "ERROR", "reason": "이미지가 비어 있어요."}
+    mime = "image/png" if "image/png" in (req.image or "") else "image/jpeg"
+    body = {
+        "system_instruction": {"parts": [{"text": _PLAN_SYS}]},
+        "contents": [{"role": "user", "parts": [
+            {"inline_data": {"mime_type": mime, "data": raw}},
+            {"text": "이 평면도를 위 규칙대로 읽어 JSON으로만 출력하라."},
+        ]}],
+        # 2048로는 부족 — flash 계열은 thinking 토큰을 먼저 쓰고 답을 낸다(추천 기능에서 겪은 문제).
+        "generationConfig": {"maxOutputTokens": 16384, "temperature": 0.1,
+                             "responseMimeType": "application/json", "responseSchema": _PLAN_SCHEMA},
+    }
+    # 무료 티어는 분당 요청/토큰 한도가 빡빡해 429가 흔하다. 응답이 주는 retryDelay만큼 쉬고 한 번 더.
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}"
+    obj = None
+    try:
+        async with httpx.AsyncClient(timeout=120) as cx:
+            for attempt in (0, 1):
+                r = await cx.post(url, json=body)
+                if r.status_code == 429:
+                    # 위반 한도 종류를 구분한다 — PerDay(일일)면 기다려도 소용없으니 재시도 없이 정직하게 안내.
+                    # (겪은 사례: gemini-flash-latest=최신 모델은 무료가 20회/일이라 이 케이스가 흔하다.)
+                    delay, daily = 20.0, False
+                    try:
+                        for d in (r.json().get("error", {}).get("details") or []):
+                            for v in (d.get("violations") or []):
+                                if "PerDay" in str(v.get("quotaId", "")):
+                                    daily = True
+                            if "retryDelay" in d:
+                                delay = min(45.0, float(str(d["retryDelay"]).rstrip("s")) + 1)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    if daily:
+                        return {"status": "RATE_LIMIT",
+                                "reason": "오늘의 무료 AI 한도를 다 썼어요. 내일 다시 시도하거나, 평수/도면 프리셋으로 진행해 주세요."}
+                    if attempt == 0:
+                        await _asyncio.sleep(delay)
+                        continue
+                    return {"status": "RATE_LIMIT",
+                            "reason": "지금 AI 요청이 몰렸어요. 1분 뒤에 다시 시도하거나, 평수로 먼저 진행해 주세요."}
+                r.raise_for_status()
+                data = r.json()
+                break
+        cand = (data.get("candidates") or [{}])[0]
+        txt = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
+        obj = json.loads(txt)
+    except Exception as e:  # noqa: BLE001 — 실패는 예외가 아니라 status로(프런트가 수동 입력으로 폴백)
+        return {"status": "ERROR", "reason": _safe_err(e, 150)}
+
+    room = _clean_plan(obj)
+    # 사용자가 아는 한 변이 있으면 그 비율로 전체를 보정한다(LLM 절대치수보다 실측이 우선).
+    if req.hintM and req.hintM > 0.5 and room["widthM"] > 0:
+        k = req.hintM / room["widthM"]
+        for key in ("widthM", "depthM"):
+            room[key] = round(room[key] * k, 2)
+        for c in room["cutouts"]:
+            for key in ("x", "y", "w", "d"):
+                c[key] = round(c[key] * k, 2)
+        for o in room["openings"]:
+            for key in ("pos", "width"):
+                o[key] = round(o[key] * k, 2)
+    # imageBox([ymin,xmin,ymax,xmax] 0~1000) → 0~1 비율 {x0,y0,x1,y1}. 프런트가 이 영역만 잘라
+    # 언더레이로 깐다 — 층 도면을 통째로 올려도 계단실·옆세대·치수선 띠가 배경에 안 들어가게.
+    image_box = None
+    try:
+        b = [max(0.0, min(1000.0, float(v))) / 1000.0 for v in (obj.get("imageBox") or [])]
+        if len(b) == 4 and b[2] - b[0] > 0.05 and b[3] - b[1] > 0.05:
+            image_box = {"y0": round(b[0], 4), "x0": round(b[1], 4), "y1": round(b[2], 4), "x1": round(b[3], 4)}
+    except Exception:  # noqa: BLE001 — 박스가 이상하면 없는 것으로(전체 이미지 폴백)
+        image_box = None
+    return {
+        "status": "OK", "room": room,
+        "accuracy": "measured" if req.hintM else "estimate",
+        "confidence": float(obj.get("confidence", 0.0) or 0.0),
+        "printedAreaM2": obj.get("printedAreaM2"),
+        "unitLabel": str(obj.get("unitLabel", "") or "")[:20] or None,
+        "unitsDetected": int(obj.get("unitsDetected", 1) or 1),
+        "imageBox": image_box,
+        "note": str(obj.get("note", ""))[:200],
+    }

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  snapRotation, effectiveFootprint, itemAABB, aabbOverlap, outOfBounds, validateLayout, findFreeSpot,
+  snapRotation, effectiveFootprint, itemAABB, aabbOverlap, outOfBounds, validateLayout, findFreeSpot, clampCenterFree,
 } from './geometry.js';
 
 test('snapRotation snaps to 0/90/180/270', () => {
@@ -74,4 +74,37 @@ test('findFreeSpot returns non-overlapping placement or null', () => {
   // 방보다 큰 가구는 자리 없음
   const none = findFreeSpot({ wM: 10, dM: 10, rotationDeg: 0 }, [], 4, 3, 0.5);
   assert.equal(none, null);
+});
+
+test('clampCenterFree pushes item out of a cutout (nearest edge)', () => {
+  // 방 5x5, 컷아웃 (2,2)~(3,3). 컷아웃 왼쪽 근처를 노리면 왼쪽으로 밀려나야 한다.
+  const it = { wM: 1, dM: 1, rotationDeg: 0 };
+  const cuts = [{ x: 2, y: 2, w: 1, d: 1 }];
+  const c = clampCenterFree(it, 2.1, 2.5, 5, 5, cuts);
+  assert.ok(c.cx <= 1.5 + 1e-6, `왼쪽 탈출 기대, got cx=${c.cx}`);
+  // 탈출 후엔 컷아웃과 안 겹친다
+  const b = itemAABB({ ...c, ...it });
+  assert.ok(b.right <= 2 + 1e-6 || b.left >= 3 - 1e-6 || b.bottom <= 2 + 1e-6 || b.top >= 3 - 1e-6);
+});
+
+test('clampCenterFree keeps prev when item cannot fit (stuck)', () => {
+  // 방 3x3을 컷아웃이 거의 다 덮음 — 2x2 가구는 어디로도 탈출 불가 → prev 유지
+  const it = { wM: 2, dM: 2, rotationDeg: 0 };
+  const cuts = [{ x: 0, y: 0, w: 3, d: 3 }];
+  const c = clampCenterFree(it, 1.5, 1.5, 3, 3, cuts, { cx: 9, cy: 9 });
+  assert.deepEqual(c, { cx: 9, cy: 9 });
+});
+
+test('clampCenterFree respects walls while escaping', () => {
+  // 컷아웃이 왼벽에 붙음 — 왼쪽 탈출은 방 밖이라 불가, 오른쪽으로 나와야 한다.
+  const it = { wM: 1, dM: 1, rotationDeg: 0 };
+  const cuts = [{ x: 0, y: 0, w: 1.5, d: 5 }];
+  const c = clampCenterFree(it, 0.6, 2.5, 5, 5, cuts);
+  assert.ok(c.cx >= 2 - 1e-6, `오른쪽 탈출 기대, got cx=${c.cx}`);
+});
+
+test('clampCenterFree without cutouts equals wall clamp', () => {
+  const it = { wM: 1, dM: 1, rotationDeg: 0 };
+  const a = clampCenterFree(it, -3, 9, 4, 3, []);
+  assert.deepEqual(a, { cx: 0.5, cy: 2.5 });
 });
