@@ -183,7 +183,56 @@ _LAYOUT_PROMPT = (open(_LAYOUT_PROMPT_PATH, encoding="utf-8").read()
                   if os.path.exists(_LAYOUT_PROMPT_PATH)
                   else "원룸 가구를 겹치지 않게 대부분 벽에 붙여 배치. candidates[] JSON으로 3개 이상. cm 정수, (cx,cy)=중심, rotation 0/90/180/270.")
 LLM_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-5")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+
+# 무료 티어 일일 한도는 '모델당' 20회(quotaId=...PerProjectPerModel) — 한 모델이 마르면
+# 다음 모델이 새 버킷이다. 체인을 순회해 사실상 예산을 모델 수만큼 확보한다.
+# GEMINI_MODEL_CHAIN(쉼표 구분)으로 오버라이드 가능. 기본: 3.6 → 3.5 → 3.5-lite → 3.1-lite.
+_GEMINI_CHAIN = [m.strip() for m in (os.getenv("GEMINI_MODEL_CHAIN") or "").split(",") if m.strip()] or \
+    list(dict.fromkeys([GEMINI_MODEL, "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]))
+
+
+def _quota_429(r):
+    """429 응답 해석 → (일일 한도인가, 분당 재시도 대기초)."""
+    daily, delay = False, 20.0
+    try:
+        for det in r.json().get("error", {}).get("details", []) or []:
+            for v in det.get("violations", []) or []:
+                if "PerDay" in str(v.get("quotaId", "")):
+                    daily = True
+            if "retryDelay" in det:
+                delay = min(45.0, float(str(det["retryDelay"]).rstrip("s")) + 1)
+    except Exception:  # noqa: BLE001
+        pass
+    return daily, delay
+
+
+async def _gemini_call(body: dict, timeout: float = 60):
+    """Gemini generateContent + 폴백 체인. 일일 한도·404(모델명 회전)는 다음 모델로,
+    분당 한도는 retryDelay만큼 쉬고 같은 모델 1회 재시도. 반환 (응답 JSON, 사용된 모델).
+    체인 전부 실패면 RuntimeError('all_models_exhausted') — 호출부가 status로 변환한다."""
+    gkey = os.getenv("GEMINI_API_KEY")
+    async with httpx.AsyncClient(timeout=timeout) as cx:
+        for model in _GEMINI_CHAIN:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gkey}"
+            for attempt in (0, 1):
+                r = await cx.post(url, json=body)
+                if r.status_code == 429:
+                    daily, delay = _quota_429(r)
+                    if daily or attempt:
+                        break                          # 이 모델 포기 → 체인의 다음 모델
+                    await _asyncio.sleep(delay)
+                    continue
+                if r.status_code == 404:
+                    break                              # 모델명이 사라짐 → 다음 모델
+                r.raise_for_status()
+                return r.json(), model
+    raise RuntimeError("all_models_exhausted")
+
+
+def _gemini_text(data: dict) -> str:
+    cand = (data.get("candidates") or [{}])[0]
+    return "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
 
 
 def _layout_user_msg(payload: dict) -> str:
@@ -297,19 +346,15 @@ async def layout(req: LayoutReq):
         return {"status": "NOKEY"}
     user = _layout_user_msg(req.model_dump())
     try:
-        async with httpx.AsyncClient(timeout=90) as cx:
-            if provider == "gemini":
-                r = await cx.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}",
-                    json={"system_instruction": {"parts": [{"text": _LAYOUT_PROMPT}]},
-                          "contents": [{"role": "user", "parts": [{"text": user}]}],
-                          "generationConfig": {"maxOutputTokens": 24576, "temperature": 0.7,
-                                               "responseMimeType": "application/json"}},
-                )
-                r.raise_for_status()
-                cand = (r.json().get("candidates") or [{}])[0]
-                text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
-            else:
+        if provider == "gemini":
+            data, _m = await _gemini_call(
+                {"system_instruction": {"parts": [{"text": _LAYOUT_PROMPT}]},
+                 "contents": [{"role": "user", "parts": [{"text": user}]}],
+                 "generationConfig": {"maxOutputTokens": 24576, "temperature": 0.7,
+                                      "responseMimeType": "application/json"}}, timeout=90)
+            text = _gemini_text(data)
+        else:
+            async with httpx.AsyncClient(timeout=90) as cx:
                 r = await cx.post(
                     "https://api.anthropic.com/v1/messages",
                     headers={"x-api-key": akey, "anthropic-version": "2023-06-01", "content-type": "application/json"},
@@ -381,15 +426,12 @@ async def _recommend_queries(item: dict):
     user = (f"참조 가구 - 이름:'{item.get('name', '')}', 종류:'{item.get('cat', '')}', "
             f"분위기:'{item.get('style', '')}', 크기:{item.get('w')}x{item.get('d')}cm")
     try:
-        async with httpx.AsyncClient(timeout=30) as cx:
-            r = await cx.post(f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}",
-                              json={"system_instruction": {"parts": [{"text": sysmsg}]},
-                                    "contents": [{"role": "user", "parts": [{"text": user}]}],
-                                    # 512는 부족 — flash 계열은 thinking 토큰(600+)을 먼저 쓰고 답을 내서 MAX_TOKENS로 잘린다.
-                                    "generationConfig": {"maxOutputTokens": 2048, "temperature": 0.6, "responseMimeType": "application/json"}})
-            r.raise_for_status()
-            data = r.json()
-        txt = "".join(p.get("text", "") for p in (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
+        data, _m = await _gemini_call(
+            {"system_instruction": {"parts": [{"text": sysmsg}]},
+             "contents": [{"role": "user", "parts": [{"text": user}]}],
+             # 512는 부족 — flash 계열은 thinking 토큰(600+)을 먼저 쓰고 답을 내서 MAX_TOKENS로 잘린다.
+             "generationConfig": {"maxOutputTokens": 2048, "temperature": 0.6, "responseMimeType": "application/json"}}, timeout=30)
+        txt = _gemini_text(data)
         m = re.search(r"\[.*\]", txt, re.S)
         arr = json.loads(m.group(0) if m else txt)
         return [str(q).strip() for q in arr if str(q).strip()][:3]
@@ -454,13 +496,10 @@ async def chat_layout(req: ChatReq):
         contents.append({"role": "model" if h.get("role") == "assistant" else "user", "parts": [{"text": str(h.get("text", ""))[:500]}]})
     contents.append({"role": "user", "parts": [{"text": f"[현재 배치]\n{ctx}\n\n[사용자 요청]\n{req.message}"}]})
     try:
-        async with httpx.AsyncClient(timeout=60) as cx:
-            r = await cx.post(f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}",
-                              json={"system_instruction": {"parts": [{"text": _CHAT_SYS}]}, "contents": contents,
-                                    "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.5, "responseMimeType": "application/json"}})
-            r.raise_for_status()
-            data = r.json()
-        txt = "".join(p.get("text", "") for p in (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
+        data, _m = await _gemini_call(
+            {"system_instruction": {"parts": [{"text": _CHAT_SYS}]}, "contents": contents,
+             "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.5, "responseMimeType": "application/json"}}, timeout=60)
+        txt = _gemini_text(data)
         try:
             obj = json.loads(txt)
         except Exception:  # noqa: BLE001
@@ -946,40 +985,13 @@ async def floorplan(req: FloorplanReq):
         "generationConfig": {"maxOutputTokens": 16384, "temperature": 0.1,
                              "responseMimeType": "application/json", "responseSchema": _PLAN_SCHEMA},
     }
-    # 무료 티어는 분당 요청/토큰 한도가 빡빡해 429가 흔하다. 응답이 주는 retryDelay만큼 쉬고 한 번 더.
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gkey}"
-    obj = None
+    # 429 처리(분당 재시도·일일 폴백 체인)는 _gemini_call이 담당 — 체인 전부 소진 시에만 안내.
     try:
-        async with httpx.AsyncClient(timeout=120) as cx:
-            for attempt in (0, 1):
-                r = await cx.post(url, json=body)
-                if r.status_code == 429:
-                    # 위반 한도 종류를 구분한다 — PerDay(일일)면 기다려도 소용없으니 재시도 없이 정직하게 안내.
-                    # (겪은 사례: gemini-flash-latest=최신 모델은 무료가 20회/일이라 이 케이스가 흔하다.)
-                    delay, daily = 20.0, False
-                    try:
-                        for d in (r.json().get("error", {}).get("details") or []):
-                            for v in (d.get("violations") or []):
-                                if "PerDay" in str(v.get("quotaId", "")):
-                                    daily = True
-                            if "retryDelay" in d:
-                                delay = min(45.0, float(str(d["retryDelay"]).rstrip("s")) + 1)
-                    except Exception:  # noqa: BLE001
-                        pass
-                    if daily:
-                        return {"status": "RATE_LIMIT",
-                                "reason": "오늘의 무료 AI 한도를 다 썼어요. 내일 다시 시도하거나, 평수/도면 프리셋으로 진행해 주세요."}
-                    if attempt == 0:
-                        await _asyncio.sleep(delay)
-                        continue
-                    return {"status": "RATE_LIMIT",
-                            "reason": "지금 AI 요청이 몰렸어요. 1분 뒤에 다시 시도하거나, 평수로 먼저 진행해 주세요."}
-                r.raise_for_status()
-                data = r.json()
-                break
-        cand = (data.get("candidates") or [{}])[0]
-        txt = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
-        obj = json.loads(txt)
+        data, _m = await _gemini_call(body, timeout=120)
+        obj = json.loads(_gemini_text(data))
+    except RuntimeError:
+        return {"status": "RATE_LIMIT",
+                "reason": "오늘의 무료 AI 한도를(예비 모델까지) 다 썼어요. 내일 다시 시도하거나, 평수/도면 프리셋으로 진행해 주세요."}
     except Exception as e:  # noqa: BLE001 — 실패는 예외가 아니라 status로(프런트가 수동 입력으로 폴백)
         return {"status": "ERROR", "reason": _safe_err(e, 150)}
 

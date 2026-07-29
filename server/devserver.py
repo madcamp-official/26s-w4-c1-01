@@ -132,6 +132,42 @@ def oauth_exchange(provider, code, base=None):
             "avatar": prof.get("picture"), "email": prof.get("email")}
 
 
+# 무료 일일 한도는 '모델당' 20회 — 폴백 체인(main.py와 동일 정책). 일일 한도·404는 다음 모델,
+# 분당 한도는 retryDelay 후 같은 모델 1회 재시도. 전부 실패면 RuntimeError.
+GEMINI_CHAIN = ([m.strip() for m in (ENV.get("GEMINI_MODEL_CHAIN") or os.getenv("GEMINI_MODEL_CHAIN") or "").split(",") if m.strip()]
+                or list(dict.fromkeys([GEMINI_MODEL, "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"])))
+
+
+def gemini_call(body_dict, timeout=60):
+    payload = json.dumps(body_dict).encode()
+    for model in GEMINI_CHAIN:
+        url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + GEMINI_API_KEY
+        for attempt in (0, 1):
+            req = urllib.request.Request(url, data=payload, headers={"content-type": "application/json"})
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as r:
+                    return json.load(r)
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    break
+                if e.code != 429:
+                    raise
+                daily, delay = False, 20.0
+                try:
+                    for det in json.load(e).get("error", {}).get("details", []) or []:
+                        for v in det.get("violations", []) or []:
+                            if "PerDay" in str(v.get("quotaId", "")):
+                                daily = True
+                        if "retryDelay" in det:
+                            delay = min(45.0, float(str(det["retryDelay"]).rstrip("s")) + 1)
+                except Exception:  # noqa: BLE001
+                    pass
+                if daily or attempt:
+                    break
+                time.sleep(delay)
+    raise RuntimeError("all_models_exhausted")
+
+
 _PROMPT_PATH = os.path.join(HERE, "..", "docs", "방꾸요정-배치-LLM-프롬프트.md")
 LAYOUT_PROMPT = (open(_PROMPT_PATH, encoding="utf-8").read()
                  if os.path.exists(_PROMPT_PATH)
@@ -213,11 +249,7 @@ def gemini_layout(payload):
         "contents": [{"role": "user", "parts": [{"text": _layout_user_msg(payload)}]}],
         "generationConfig": {"maxOutputTokens": 24576, "temperature": 0.7, "responseMimeType": "application/json"},
     }).encode()
-    url = ("https://generativelanguage.googleapis.com/v1beta/models/"
-           + GEMINI_MODEL + ":generateContent?key=" + GEMINI_API_KEY)
-    req = urllib.request.Request(url, data=body, headers={"content-type": "application/json"})
-    with urllib.request.urlopen(req, timeout=90) as r:
-        data = json.load(r)
+    data = gemini_call(json.loads(body.decode()), timeout=90)
     cand = (data.get("candidates") or [{}])[0]
     text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
     return parse_layout_json(text)
@@ -283,10 +315,7 @@ def gemini_recommend_queries(item):
         # 512는 부족 — flash 계열은 thinking 토큰(600+)을 먼저 쓰고 답을 내서 MAX_TOKENS로 잘린다.
         "generationConfig": {"maxOutputTokens": 2048, "temperature": 0.6, "responseMimeType": "application/json"},
     }).encode()
-    url = ("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + GEMINI_API_KEY)
-    req = urllib.request.Request(url, data=body, headers={"content-type": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        data = json.load(r)
+    data = gemini_call(json.loads(body.decode()), timeout=30)
     txt = "".join(p.get("text", "") for p in (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
     m = re.search(r"\[.*\]", txt, re.S)
     arr = json.loads(m.group(0) if m else txt)
@@ -347,10 +376,7 @@ def gemini_chat_layout(payload):
         "contents": contents,
         "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.5, "responseMimeType": "application/json"},
     }).encode()
-    url = ("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + GEMINI_API_KEY)
-    req = urllib.request.Request(url, data=body, headers={"content-type": "application/json"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        data = json.load(r)
+    data = gemini_call(json.loads(body.decode()), timeout=60)
     txt = "".join(p.get("text", "") for p in (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
     try:
         obj = json.loads(txt)
