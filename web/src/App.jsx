@@ -179,22 +179,23 @@ export default function App() {
     doRenderItems(items, preset, viewMode);
   }
   // 빠른 명령(추가/삭제/크기)을 로컬로 적용 → 새 배치 배열 반환(불가하면 null).
-  function applyChatCommand(cmd) {
+  // base를 받아 순수하게 동작 — "침대랑 소파 넣어줘"처럼 복수 대상을 연쇄 적용할 수 있게.
+  function applyChatCommand(cmd, base = items) {
     if (cmd.op === 'add') {
       const catItem = CATALOG.find((c) => c.cat === cmd.cat);
       if (!catItem || !room) return null;
       const d = resolveDims(catItem);
       const probe = { wM: d.w / 100, dM: d.d / 100, rotationDeg: 0 };
-      const spot = findFreeSpot(probe, items, room.widthM, room.depthM, 0.1, room.cutouts) || { cx: room.widthM / 2, cy: room.depthM / 2 };
-      return [...items, toPlacedItem(catItem, spot.cx, spot.cy)];
+      const spot = findFreeSpot(probe, base, room.widthM, room.depthM, 0.1, room.cutouts) || { cx: room.widthM / 2, cy: room.depthM / 2 };
+      return [...base, toPlacedItem(catItem, spot.cx, spot.cy)];
     }
     if (cmd.op === 'remove') {
-      const idx = items.map((it) => it.cat).lastIndexOf(cmd.cat);
-      return idx < 0 ? null : items.filter((_, i) => i !== idx);
+      const idx = base.map((it) => it.cat).lastIndexOf(cmd.cat);
+      return idx < 0 ? null : base.filter((_, i) => i !== idx);
     }
     if (cmd.op === 'resize') {
       let hit = false;
-      const next = items.map((it) => (!hit && it.cat === cmd.cat
+      const next = base.map((it) => (!hit && it.cat === cmd.cat
         ? (hit = true, { ...it, wM: it.wM * cmd.factor, dM: it.dM * cmd.factor, hM: it.hM * cmd.factor, dimAccuracy: '사용자입력' })
         : it));
       return hit ? next : null;
@@ -233,22 +234,31 @@ export default function App() {
     }
     const cmd = parseCommand(text);
     if (cmd) {
-      const catLabel = cmd.cat;
-      if (cmd.op !== 'add' && !items.some((it) => it.cat === catLabel)) {
-        return { applied: false, reply: `${catLabel}이(가) 아직 없어요.` };
+      // 복수 대상("침대랑 소파 넣어줘") — 카테고리별로 연쇄 적용, 안 되는 것만 건너뛰고 안내.
+      const cats = cmd.cats?.length ? cmd.cats : [cmd.cat];
+      let next = items;
+      const done = [], skipped = [];
+      for (const c of cats) {
+        if (cmd.op !== 'add' && !next.some((it) => it.cat === c)) { skipped.push(c); continue; }
+        const r2 = applyChatCommand({ ...cmd, cat: c }, next);
+        if (r2) { next = r2; done.push(c); } else skipped.push(c);
       }
-      const next = applyChatCommand(cmd);
-      if (!next) return { applied: false, reply: '그 요청은 반영하기 어려워요.' };
+      if (!done.length) {
+        return { applied: false, reply: cmd.op !== 'add' ? `${skipped.join('·')}이(가) 아직 없어요.` : '그 요청은 반영하기 어려워요.' };
+      }
+      const label = done.join('·');
+      const tail = skipped.length ? ` (${skipped.join('·')}은(는) 못 했어요)` : '';
       if (cmd.op === 'add' && hasPlaceHint(text)) {
-        // 위치 표현이 있으면 LLM에게 방금 추가한 가구를 문장대로 옮기게 함(실패해도 추가 자체는 유지).
-        const added = next[next.length - 1];
-        const r = await chatLayout(room, openings, next, `${text} — 방금 추가한 '${added.name}'(id: ${added.id})의 위치를 이 문장대로 조정해줘.`, history);
+        // 위치 표현이 있으면 LLM에게 방금 추가한 가구들을 문장대로 옮기게 함(실패해도 추가 자체는 유지).
+        const added = next.slice(-done.length);
+        const who = added.map((a) => `'${a.name}'(id: ${a.id})`).join(', ');
+        const r = await chatLayout(room, openings, next, `${text} — 방금 추가한 ${who}의 위치를 이 문장대로 조정해줘.`, history);
         const moved = r?.decision === 'apply' ? applyLLMPositions(next, r.items) : null;
         setItems(moved || next); setSelectedId(null);   // 도면(플래너)에만 반영 — 사진은 '방 채우기' 눌렀을 때
-        return { applied: true, reply: '반영했어! 도면에서 위치 확인해봐 ✏️' };
+        return { applied: true, reply: `${label} 반영했어! 도면에서 위치 확인해봐 ✏️${tail}` };
       }
       setItems(next); setSelectedId(null);
-      return { applied: true, reply: cmd.op === 'add' ? '도면에 추가했어 ✏️ 위치는 드래그로 조정해봐' : '반영했어! 도면에서 확인해봐 ✏️' };
+      return { applied: true, reply: cmd.op === 'add' ? `${label} 추가했어 ✏️ 위치는 드래그로 조정해봐${tail}` : `${label} 반영했어! 도면에서 확인해봐 ✏️${tail}` };
     }
     // 자연어 → LLM 재배치(기존 위치 재검증 후에만 반영)
     const r = await chatLayout(room, openings, items, text, history);

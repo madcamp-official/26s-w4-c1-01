@@ -38,14 +38,34 @@ export function parseRecommendCommand(text) {
   return cat ? { cat } : null;
 }
 
-// 반환: { op: 'add'|'remove'|'resize', cat, factor? } | null(자연어 재배치로 위임)
+// 문장에 등장한 '모든' 가구 카테고리(등장 순, 중복 제거) — "침대랑 소파 넣어줘" 같은 복수 대상용.
+export function matchCategories(text) {
+  const hits = [];
+  for (const [cat, kws] of CAT_KW) {
+    let pos = -1;
+    for (const k of kws) { const p = text.lastIndexOf(k); if (p > pos) pos = p; }
+    if (pos >= 0) hits.push({ cat, pos });
+  }
+  return hits.sort((a, b) => a.pos - b.pos);
+}
+
+// 반환: { op: 'add'|'remove'|'resize', cat, cats, factor? } | null(자연어 재배치로 위임)
+// cats: 명령 대상 전부(등장 순). cat: 마지막 것(기존 호출부 호환).
 export function parseCommand(text) {
   const t = (text || '').trim();
-  const cat = matchCategory(t);
-  if (!cat) return null;
-  if (/(빼|제거|없애|지워|삭제|치워)/.test(t)) return { op: 'remove', cat };
-  if (/(더\s*작게|작게|줄여|작게해|작아)/.test(t)) return { op: 'resize', cat, factor: 0.82 };
-  if (/(더\s*크게|크게|키워|크게해|커)/.test(t)) return { op: 'resize', cat, factor: 1.22 };
-  if (/(넣|추가|놓|놔|둬|배치|생성|만들|깔)/.test(t)) return { op: 'add', cat };
+  const hits = matchCategories(t);
+  if (!hits.length) return null;
+  // "침대 옆에 협탁 놔줘"처럼 카테고리 '사이'에 위치 조사가 있으면 앞엣것은 참조 가구 → 뒤엣것만 대상.
+  // "침대랑 소파 넣어줘"처럼 단순 나열이면 전부 대상.
+  let cats = [...new Set(hits.map((h) => h.cat))];
+  if (hits.length > 1) {
+    const between = t.slice(hits[0].pos, hits[hits.length - 1].pos);
+    if (/옆|앞|뒤|위에|아래|근처|사이|맞은편|반대|머리맡|발치/.test(between)) cats = [hits[hits.length - 1].cat];
+  }
+  const cat = cats[cats.length - 1];
+  if (/(빼|제거|없애|지워|삭제|치워)/.test(t)) return { op: 'remove', cat, cats };
+  if (/(더\s*작게|작게|줄여|작게해|작아)/.test(t)) return { op: 'resize', cat, cats, factor: 0.82 };
+  if (/(더\s*크게|크게|키워|크게해|커)/.test(t)) return { op: 'resize', cat, cats, factor: 1.22 };
+  if (/(넣|추가|놓|놔|둬|배치|생성|만들|깔)/.test(t)) return { op: 'add', cat, cats };
   return null;
 }
