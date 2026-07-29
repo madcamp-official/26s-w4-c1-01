@@ -54,7 +54,9 @@ def build_scene(p):
         # 깊이축 뒤집기(blender_y = D - cy): three.js→Blender 손대칭 방지(렌더가 3D의 거울상이 되지 않게).
         items.append({"glb": path, "x": float(it.get("x", W / 2)),
                       "y": D - float(it.get("y", D / 2)), "rot": int(it.get("rot", 0)),
-                      "elev": float(it.get("elev", 0))})
+                      "elev": float(it.get("elev", 0)),
+                      # 조명 가구 마커 — blender가 전구 위치에 실제 광원을 심는다
+                      **({"lamp": True, "h": float(it.get("h", 1.5))} if it.get("lamp") else {})})
     # 컷아웃(부속실 벽체)을 카메라 결정 '전에' 계산 — 자동 카메라가 가림이 적은 코너를 고르는 근거.
     cutouts = []
     for c in p.get("cutouts", []):

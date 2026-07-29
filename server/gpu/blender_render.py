@@ -339,12 +339,30 @@ if sun:
             _wo.location = (_off, _o["pos"], _wz); _wo.rotation_euler = (math.radians(90), 0, math.radians(-90))
         else:
             _wo.location = (W - _off, _o["pos"], _wz); _wo.rotation_euler = (math.radians(90), 0, math.radians(90))
+# 조명 '가구'가 있으면 그게 빛의 주인공 — 천장등은 보조로 줄인다(무드의 핵심).
+LAMPS = [it for it in S["items"] if it.get("lamp")]
 if PRE.get("lamp", 0) > 0:  # 실내 천장등(밤 위주)
     ld = bpy.data.lights.new("lamp", 'AREA'); lo = bpy.data.objects.new("lamp", ld)
     sc.collection.objects.link(lo)
     ld.shape = 'RECTANGLE'; ld.size = min(W, 1.2); ld.size_y = min(D, 1.2)
-    ld.energy = 60 * PRE["lamp"]; ld.color = (1.0, 0.86, 0.66)
+    ld.energy = 60 * PRE["lamp"] * (0.30 if LAMPS else 1.0); ld.color = (1.0, 0.86, 0.66)
     lo.location = (W / 2, D / 2, H - 0.05)
+
+# ---------- 조명 가구 = 실제 광원 ----------
+# 전구를 갓 상단 림 높이(h*0.92)에 둬 위·아래로 빛이 새는 고전적 무드샷 구도.
+# 세기는 프리셋 lamp 계수에 비례(밤 최대) + 낮에도 은은한 최소치 — "조명이 빛의 원천".
+for _li, _lp in enumerate(LAMPS):
+    _bz = float(_lp.get("elev", 0)) + float(_lp.get("h", 1.5)) * 0.92
+    _pl = bpy.data.lights.new(f"bulb{_li}", 'POINT'); _po = bpy.data.objects.new(f"bulb{_li}", _pl)
+    sc.collection.objects.link(_po)
+    _pl.color = (1.0, 0.72, 0.45)                      # ~2700K 웜톤
+    _pl.shadow_soft_size = 0.10                        # 부드러운 그림자
+    _pl.energy = 20 * (0.25 + 1.6 * PRE.get("lamp", 0))   # 밤 37W · 노을 21W · 낮 5W
+    _po.location = (_lp["x"], _lp["y"], _bz)
+    # 눈에 보이는 전구 글로우(작은 발광 구) — 화면에서 조명이 '켜져 있음'이 읽히게
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.045, location=(_lp["x"], _lp["y"], _bz))
+    _bo = bpy.context.active_object
+    _bo.data.materials.append(emission(f"bulbmat{_li}", (1.0, 0.78, 0.50), 4 + 26 * PRE.get("lamp", 0)))
 
 
 # ---------- 가구 배치 ----------

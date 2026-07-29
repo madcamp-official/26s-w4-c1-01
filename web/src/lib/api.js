@@ -71,6 +71,8 @@ export async function renderScene(room, items, cam3d, preset = 'day', view = nul
     items: items.filter((it) => it.glb).map((it) => ({
       glb: it.glb, x: it.cx, y: it.cy, rot: (it.rotationDeg || 0) + (it.orient || 0),   // orient=모델 정면 보정각
       ...(it.elevM ? { elev: it.elevM } : {}),   // 탁상 조명 등 '가구 위' 배치 높이(m)
+      // 조명 가구 = 실제 광원 — 렌더가 전구 위치(h 기준)에 웜톤 라이트를 심는다(분위기 사진의 핵심)
+      ...(it.cat === '조명' ? { lamp: true, h: it.hM || 1.5 } : {}),
     })),
   };
   if (view) {
