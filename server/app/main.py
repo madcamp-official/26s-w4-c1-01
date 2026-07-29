@@ -316,6 +316,8 @@ class RenderReq(BaseModel):
     preset: Optional[str] = "day"   # 시간대 조명(morning/day/sunset/night) — 선언 안 하면 Pydantic이 버려 항상 day로 렌더되던 회귀 버그
     openings: list = []             # 문/창 위치 — 같은 이유로 버려져 렌더에 안 그려지던 것
     cutouts: list = []              # 욕실·주방 등 부속실(직육면체 벽체) — 같은 이유로 버려져 렌더에 부속실이 안 서던 것
+    lampOn: Optional[bool] = None   # 조명 수동 토글(null=프리셋 정책: 밤/노을 ON)
+    lampColor: Optional[str] = None # 조명 색(hex) — 웜/아이보리/쿨
     view: Optional[str] = None      # 카메라 앵글(wide/cozy) — 없으면 camera/기본 프레이밍
 
 

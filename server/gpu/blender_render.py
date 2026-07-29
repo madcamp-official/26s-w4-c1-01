@@ -302,11 +302,17 @@ FR = 0.05  # 창틀 두께
 
 
 def build_window(wall, c, w, h, z):
+    # 숨김(컷어웨이) 벽의 창: 공중에 뜬 창이 구도를 가리므로 카메라에서 숨긴다 —
+    # 유리는 visible_camera=False로 '빛만' 내고, 프레임·창살은 아예 만들지 않는다.
+    _hidden = wall in hide
     if wall in ("far", "near"):
         yb = (D - 0.02) if wall == "far" else 0.02
         yf = yb + (-0.02 if wall == "far" else 0.02)   # 프레임/창살은 방 안쪽으로 살짝
         _pane = plane("win_pane", w, h, (c, yb, z), rot=(math.radians(90), 0, 0), m=WM)
         _pane.visible_shadow = False   # 유리는 태양을 통과시킨다(발광은 유지)
+        if _hidden:
+            _pane.visible_camera = False
+            return
         box("win_t", w + 2 * FR, 0.06, FR, (c, yf, z + h / 2 + FR / 2), m=TRIM)
         box("win_b", w + 2 * FR, 0.06, FR, (c, yf, z - h / 2 - FR / 2), m=TRIM)
         box("win_l", FR, 0.06, h + 2 * FR, (c - w / 2 - FR / 2, yf, z), m=TRIM)
@@ -318,6 +324,9 @@ def build_window(wall, c, w, h, z):
         xf = xb + (0.02 if wall == "left" else -0.02)
         _pane = plane("win_pane", h, w, (xb, c, z), rot=(0, math.radians(90), 0), m=WM)
         _pane.visible_shadow = False
+        if _hidden:
+            _pane.visible_camera = False
+            return
         box("win_t", 0.06, w + 2 * FR, FR, (xf, c, z + h / 2 + FR / 2), m=TRIM)
         box("win_b", 0.06, w + 2 * FR, FR, (xf, c, z - h / 2 - FR / 2), m=TRIM)
         box("win_l", 0.06, FR, h + 2 * FR, (xf, c - w / 2 - FR / 2, z), m=TRIM)
@@ -430,20 +439,33 @@ if PRE.get("lamp", 0) > 0:  # 실내 천장등(밤 위주)
 # ---------- 조명 가구 = 실제 광원 ----------
 # 전구를 갓 상단 림 높이(h*0.92)에 둬 위·아래로 빛이 새는 고전적 무드샷 구도.
 # 세기는 프리셋 lamp 계수에 비례(밤 최대) + 낮에도 은은한 최소치 — "조명이 빛의 원천".
-# 시간대 정책(사용자 지시): 밤/노을 = 조명이 켜져 무드를 만들고, 낮/아침 = 조명 OFF·태양이 주인공.
-if PRE.get("lamp", 0) >= 0.05:
+# 시간대 정책(기본): 밤/노을 = 조명 ON, 낮/아침 = OFF. 사용자가 lampOn(true/false)으로 강제
+# 오버라이드할 수 있고(낮에 켜기·밤에 끄기), lampColor(hex)로 색온도를 고른다.
+def _hex_rgb(hx):
+    try:
+        hx = str(hx).lstrip("#")
+        return tuple(int(hx[i:i + 2], 16) / 255.0 for i in (0, 2, 4)) if len(hx) == 6 else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+_lampOn = S.get("lampOn", None)
+_LEFF = PRE.get("lamp", 0) if _lampOn is None else (0.0 if not _lampOn else max(PRE.get("lamp", 0), 0.85))
+_LC = _hex_rgb(S.get("lampColor")) or (1.0, 0.72, 0.45)   # 기본 ~2700K 웜톤
+if _LEFF >= 0.05:
     for _li, _lp in enumerate(LAMPS):
         _bz = float(_lp.get("elev", 0)) + float(_lp.get("h", 1.5)) * 0.92
         _pl = bpy.data.lights.new(f"bulb{_li}", 'POINT'); _po = bpy.data.objects.new(f"bulb{_li}", _pl)
         sc.collection.objects.link(_po)
-        _pl.color = (1.0, 0.72, 0.45)                  # ~2700K 웜톤
+        _pl.color = _LC
         _pl.shadow_soft_size = 0.10                    # 부드러운 그림자
-        _pl.energy = 60 * PRE["lamp"]                  # 밤 60W · 노을 30W — 무드의 주광
+        _pl.energy = 60 * _LEFF                        # 밤 60W · 노을 30W — 무드의 주광
         _po.location = (_lp["x"], _lp["y"], _bz)
         # 눈에 보이는 전구 글로우(작은 발광 구) — 화면에서 조명이 '켜져 있음'이 읽히게
         bpy.ops.mesh.primitive_uv_sphere_add(radius=0.045, location=(_lp["x"], _lp["y"], _bz))
         _bo = bpy.context.active_object
-        _bo.data.materials.append(emission(f"bulbmat{_li}", (1.0, 0.78, 0.50), 6 + 30 * PRE["lamp"]))
+        _glow = tuple(min(1.0, c + 0.12) for c in _LC)
+        _bo.data.materials.append(emission(f"bulbmat{_li}", _glow, 6 + 30 * _LEFF))
 
 
 # ---------- 가구 배치 ----------

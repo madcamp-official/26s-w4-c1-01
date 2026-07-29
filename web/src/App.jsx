@@ -54,6 +54,10 @@ export default function App() {
   const [renderBusy, setRenderBusy] = useState(false);
   const [renderPreset, setRenderPreset] = useState('day');
   const [renderView, setRenderView] = useState('wide');   // 'wide' | 'cozy' | 'me'(내 3D 시점) — 렌더 카메라 고정
+  // 조명 수동 제어 — on: null(자동=프리셋 정책)/true/false, color: hex. ref로 최신값 보장(연타 시 stale 방지).
+  const [lampOn, setLampOn] = useState(null);
+  const [lampColor, setLampColor] = useState('#FFB873');
+  const lampRef = useRef({ on: null, color: '#FFB873' });
   const [renderTrigger, setRenderTrigger] = useState(null);   // 'time' | 'view' | null — 로딩 문구를 원인별로 구분하는 용도
   const [showBefore, setShowBefore] = useState(false);
 
@@ -164,7 +168,7 @@ export default function App() {
     if (!its.some((it) => it.glb)) { setRenderImg(null); return; }
     busyRef.current = true; setRenderBusy(true);
     try {
-      const r = await renderScene(room, its, cam3d.current, preset, viewMode === 'me' ? null : viewMode, openings);
+      const r = await renderScene(room, its, cam3d.current, preset, viewMode === 'me' ? null : viewMode, openings, lampRef.current);
       setRenderImg(r?.status === 'OK' && r.image ? r.image : null);
     } catch { setRenderImg(null); } finally {
       busyRef.current = false; setRenderBusy(false);
@@ -177,6 +181,18 @@ export default function App() {
   function renderWith(preset, viewMode, trigger = null) {
     setRenderPreset(preset); setRenderView(viewMode); setRenderTrigger(trigger);
     doRenderItems(items, preset, viewMode);
+  }
+  // 조명 토글(자동→ON→OFF→자동) / 색 변경 — 즉시 같은 구도로 다시 렌더.
+  function cycleLamp() {
+    const next = lampRef.current.on === null ? true : lampRef.current.on ? false : null;
+    lampRef.current = { ...lampRef.current, on: next };
+    setLampOn(next); setRenderTrigger('lamp');
+    doRenderItems(items, renderPreset, renderView);
+  }
+  function pickLampColor(c) {
+    lampRef.current = { ...lampRef.current, color: c };
+    setLampColor(c); setRenderTrigger('lamp');
+    doRenderItems(items, renderPreset, renderView);
   }
   // 빠른 명령(추가/삭제/크기)을 로컬로 적용 → 새 배치 배열 반환(불가하면 null).
   // base를 받아 순수하게 동작 — "침대랑 소파 넣어줘"처럼 복수 대상을 연쇄 적용할 수 있게.
@@ -397,6 +413,8 @@ export default function App() {
           view={renderView} onView={(v) => renderWith(renderPreset, v, 'view')}
           onBack={() => setScreen('planner')} onRerender={() => setScreen('planner')} onFindSimilar={findSimilar}
           onShare={shareToCommunity} onSave={saveRoom}
+          hasLamp={items.some((it) => it.cat === '조명' && it.glb)}
+          lampOn={lampOn} onLampToggle={cycleLamp} lampColor={lampColor} onLampColor={pickLampColor}
         />
       )}
 

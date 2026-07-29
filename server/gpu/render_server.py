@@ -103,7 +103,7 @@ def build_scene(p):
            "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1600)), "ry": int(p.get("ry", 900)),
            "openings": openings, "camera": cam, "hide": hide, "items": items}
     # 앱/하니스가 명시 오버라이드하면 통과(프리셋 기본값을 덮어씀).
-    for k in ("hdri_strength", "exposure", "rug"):
+    for k in ("hdri_strength", "exposure", "rug", "lampOn", "lampColor"):
         if k in p:
             out[k] = p[k]
     return out

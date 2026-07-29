@@ -59,7 +59,7 @@ export async function relightImage(dataUrl, strength = 0.3) {
 
 // 포토리얼 렌더 — 현재 3D 배치 → camp-3 Blender 사진. 반환: {status:'OK'|'CLIENT'|'ERROR', image}.
 // glb 있는 아이템만 보낸다(치수·위치는 미터·room 좌표 그대로 → 서버가 blender 좌표로 사용).
-export async function renderScene(room, items, cam3d, preset = 'day', view = null, openings = []) {
+export async function renderScene(room, items, cam3d, preset = 'day', view = null, openings = [], lamp = {}) {
   const W = room.widthM, D = room.depthM;
   const payload = {
     room: { w: W, d: D, h: 2.6 },
@@ -68,6 +68,9 @@ export async function renderScene(room, items, cam3d, preset = 'day', view = nul
     openings: (openings || []).map((o) => ({ kind: o.kind, wall: o.wall, pos: o.pos, width: o.width })),
     // 비직사각형 방: 컷아웃(m) — 렌더가 바닥부터 천장까지 벽체 박스로 세운다.
     cutouts: (room.cutouts || []).map((c) => ({ x: c.x, y: c.y, w: c.w, d: c.d })),
+    // 조명 수동 제어 — lampOn(null=프리셋 정책: 밤/노을 ON), lampColor(hex 색온도)
+    ...(lamp.on !== undefined && lamp.on !== null ? { lampOn: lamp.on } : {}),
+    ...(lamp.color ? { lampColor: lamp.color } : {}),
     items: items.filter((it) => it.glb).map((it) => ({
       glb: it.glb, x: it.cx, y: it.cy, rot: (it.rotationDeg || 0) + (it.orient || 0),   // orient=모델 정면 보정각
       ...(it.elevM ? { elev: it.elevM } : {}),   // 탁상 조명 등 '가구 위' 배치 높이(m)

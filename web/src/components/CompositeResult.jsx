@@ -4,10 +4,13 @@ import { useState } from 'react';
 
 const TIMES = [['morning', '🌅'], ['day', '☀️'], ['sunset', '🌇'], ['night', '🌙']];
 const VIEWS = [['wide', '와이드'], ['cozy', '아늑'], ['me', '내 시점']];
+// 조명 색온도 프리셋 — 웜(2700K)/아이보리(3500K)/쿨(5000K)
+const LAMP_COLORS = [['#FFB873', '웜'], ['#FFE3C0', '아이보리'], ['#DDEBFF', '쿨']];
 
 export default function CompositeResult({
   renderImg, renderBusy, renderTrigger, showBefore, onToggle, photo, estimate, estimateIsEst,
   timePreset, onTime, view, onView, onBack, onRerender, onFindSimilar, onShare, onSave,
+  hasLamp, lampOn, onLampToggle, lampColor, onLampColor,
 }) {
   const [shareState, setShareState] = useState('idle');   // idle | busy | done | error
   async function handleShare() {
@@ -89,6 +92,20 @@ export default function CompositeResult({
           ))}
           <span className="angle-hint">각도</span>
         </div>
+        {hasLamp && (
+          <div className="angle-row">
+            <button className={`angle-pill ${lampOn !== null ? 'on' : ''}`} disabled={renderBusy} onClick={onLampToggle}>
+              💡 {lampOn === null ? '자동' : lampOn ? 'ON' : 'OFF'}
+            </button>
+            {LAMP_COLORS.map(([c, label]) => (
+              <button key={c} className={`angle-pill ${lampColor === c ? 'on' : ''}`} disabled={renderBusy || lampOn === false}
+                title={label} onClick={() => onLampColor(c)}>
+                <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 999, background: c, border: '1px solid rgba(0,0,0,.15)', verticalAlign: -1, marginRight: 4 }} />{label}
+              </button>
+            ))}
+            <span className="angle-hint">조명</span>
+          </div>
+        )}
         <div className="estimate">
           <span className="k">예상 견적 💰{estimateIsEst && <span className="badge est sm">추정</span>}</span>
           <span className="v">{estimate > 0 ? `${estimateIsEst ? '약 ' : ''}${estimate.toLocaleString()}원` : '추정 견적 준비 중'}</span>
