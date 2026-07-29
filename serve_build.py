@@ -30,6 +30,24 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **k):
         super().__init__(*a, directory=DIST, **k)
 
+    def end_headers(self):
+        """캐시 정책 — SimpleHTTPRequestHandler는 Cache-Control을 안 보내서 브라우저가 휴리스틱으로
+        HTML을 캐시할 수 있다(배포 후에도 폰에 구버전이 보이는 원인). 명시한다:
+        - index.html/sw.js: no-cache(매번 재검증) → 새 배포가 즉시 보임
+        - /assets/(해시 파일명): 1년 immutable → 재방문 빠름(내용 바뀌면 파일명이 바뀜)
+        - 그 외(glb, plans 등): 1시간
+        """
+        p = self.path.split("?")[0]
+        if p.startswith("/api/"):
+            pass                                     # 프록시 응답은 백엔드/기본 정책 그대로
+        elif p.startswith("/assets/"):
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        elif p in ("/", "/index.html", "/sw.js") or p.endswith(".html"):
+            self.send_header("Cache-Control", "no-cache")
+        else:
+            self.send_header("Cache-Control", "public, max-age=3600")
+        super().end_headers()
+
     def _proxy(self, method):
         n = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(n) if n else None
