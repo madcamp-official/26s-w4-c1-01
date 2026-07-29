@@ -3,6 +3,12 @@ web/node_modules/
 web/dist/
 *.log
 
+# android — SDK 경로(기기마다 다름)와 빌드 산출물
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+
 # python
 server/__pycache__/
 server/app/__pycache__/
@@ -17,3 +23,6 @@ server/.env
 # SSH 키 — 절대 커밋 금지
 *.pem
 camp3_*
+
+# 폰에 바로 설치할 수 있게 빌드해 둔 APK — 바이너리라 커밋하지 않는다
+web/public/*.apk
