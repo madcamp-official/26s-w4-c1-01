@@ -14,6 +14,7 @@ const clampPos = (pos, room, wall, width) => {
 
 export default function OpeningsBar({ room, openings, setOpenings }) {
   const [idx, setIdx] = useState(0);
+  const [expanded, setExpanded] = useState(true);
 
   // 항목이 추가/삭제돼 개수가 바뀌면 범위 밖으로 나가지 않게 보정.
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function OpeningsBar({ room, openings, setOpenings }) {
     if (kind === 'door') o.hinge = 'a';
     setOpenings((prev) => [...prev, o]);
     setIdx(openings.length);   // 새로 추가한 카드로 바로 이동
+    setExpanded(true);         // 접혀있었어도 방금 추가한 카드가 바로 보이게
   };
   const update = (id, patch) => setOpenings((prev) => prev.map((o) => {
     if (o.id !== id) return o;
@@ -41,17 +43,28 @@ export default function OpeningsBar({ room, openings, setOpenings }) {
   const cur = openings[idx];
   const kindLabel = cur ? (cur.kind === 'door' ? '🚪 문' : '🪟 창') : '';
   const kindNo = cur ? openings.slice(0, idx + 1).filter((o) => o.kind === cur.kind).length : 0;
+  const doorCount = openings.filter((o) => o.kind === 'door').length;
+  const windowCount = openings.filter((o) => o.kind === 'window').length;
 
   return (
     <div className="openbar">
       <div className="openbar-head">
+        {cur && (
+          <button className="openbar-toggle" onClick={() => setExpanded((v) => !v)} title={expanded ? '접기' : '펼치기'}>
+            {expanded ? '⌄' : '›'}
+          </button>
+        )}
         <span className="openbar-title">문·창문</span>
-        <span className="openbar-hint">문=90° 스윙(접근 불가) · 창=가리면 안 됨</span>
+        {(!cur || expanded) && <span className="openbar-hint">문=90° 스윙(접근 불가) · 창=가리면 안 됨</span>}
         {openings.length > 0 && <span className="openbar-count">{idx + 1} / {openings.length}</span>}
       </div>
 
       {!cur ? (
         <p className="mockup-note" style={{ margin: '6px 2px 0' }}>문·창문을 추가하면 평면도에 표시되고, 자동 배치가 그 앞을 비워 둬요.</p>
+      ) : !expanded ? (
+        <p className="mockup-note openbar-summary" style={{ margin: '6px 2px 0' }} onClick={() => setExpanded(true)}>
+          문 {doorCount}개 · 창문 {windowCount}개 접혀 있어요 — 펼쳐서 위치/폭을 조절해줘
+        </p>
       ) : (
         <>
           <div className="opencard">

@@ -233,6 +233,30 @@ export async function deleteCommunityPost(id) {
   }
 }
 
+// 방꾸 이야기 글 좋아요 토글 — 로그인 필요. 반환: {status:'OK', liked, likes} | {status:'NOAUTH'|'ERROR', reason?}.
+export async function likeCommunityPost(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/community/post/${encodeURIComponent(id)}/like`, {
+      method: 'POST', headers: authHeaders(), signal: timeout(15000),
+    });
+    if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}` };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', reason: String(e.message || e) };
+  }
+}
+
+// 내가 좋아요한 글 목록(마이 탭) — 로그인 필요. 반환: {status:'OK', posts:[...]} | {status:'NOAUTH'|'ERROR', posts:[]}.
+export async function fetchLikedPosts() {
+  try {
+    const res = await fetch(`${API_BASE}/api/community/liked`, { headers: authHeaders(), signal: timeout(10000) });
+    if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}`, posts: [] };
+    return await res.json();
+  } catch (e) {
+    return { status: 'ERROR', reason: String(e.message || e), posts: [] };
+  }
+}
+
 function localSearch(q) {
   if (!q) return CATALOG;
   // 카테고리 힌트 + 사용자 검색어가 함께 올 수 있어(예: "침대 원목") 단어 단위 AND 매칭.

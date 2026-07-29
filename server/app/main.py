@@ -607,6 +607,11 @@ def _community_conn():
         conn.execute("ALTER TABLE posts ADD COLUMN owner TEXT")   # 기존 DB 마이그레이션(이미 있으면 무시)
     except sqlite3.OperationalError:
         pass
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS post_likes ("
+        "post_id TEXT NOT NULL, owner TEXT NOT NULL, created_at REAL NOT NULL, "
+        "PRIMARY KEY (post_id, owner))"
+    )
     return conn
 
 
@@ -660,11 +665,67 @@ async def community_feed(request: Request, cat: str = "all"):
             q += " WHERE cat=?"; args = (cat,)
         q += " ORDER BY created_at DESC LIMIT 50"
         rows = conn.execute(q, args).fetchall()
+        liked_ids = set()
+        if my_owner:
+            liked_ids = {r[0] for r in conn.execute("SELECT post_id FROM post_likes WHERE owner=?", (my_owner,)).fetchall()}
         conn.close()
         posts = [
             {"id": r[0], "cat": r[1], "title": r[2], "image": r[3], "author": r[4], "meta": r[5],
              "likes": r[6], "comments": r[7], "saves": r[8], "created_at": r[9],
-             "mine": bool(my_owner) and r[10] == my_owner}   # owner는 노출 안 하고 본인 글 여부만 전달
+             "mine": bool(my_owner) and r[10] == my_owner,   # owner는 노출 안 하고 본인 글 여부만 전달
+             "liked": r[0] in liked_ids}
+            for r in rows
+        ]
+        return {"status": "OK", "posts": posts}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "ERROR", "reason": str(e)[:150], "posts": []}
+
+
+@app.post("/api/community/post/{post_id}/like")
+async def community_like(post_id: str, request: Request):
+    """좋아요 토글 — 로그인 필요(owner 없으면 '내가 좋아요한 글'을 기록할 방법이 없음)."""
+    user = _verify_token((request.headers.get("Authorization") or "").removeprefix("Bearer ").strip())
+    if not user:
+        return {"status": "NOAUTH"}
+    owner = _owner_key(user)
+    conn = _community_conn()
+    if not conn.execute("SELECT 1 FROM posts WHERE id=?", (post_id,)).fetchone():
+        conn.close()
+        return {"status": "ERROR", "reason": "not found"}
+    if conn.execute("SELECT 1 FROM post_likes WHERE post_id=? AND owner=?", (post_id, owner)).fetchone():
+        conn.execute("DELETE FROM post_likes WHERE post_id=? AND owner=?", (post_id, owner))
+        conn.execute("UPDATE posts SET likes = MAX(likes - 1, 0) WHERE id=?", (post_id,))
+        liked = False
+    else:
+        conn.execute("INSERT INTO post_likes (post_id, owner, created_at) VALUES (?,?,?)", (post_id, owner, _time.time()))
+        conn.execute("UPDATE posts SET likes = likes + 1 WHERE id=?", (post_id,))
+        liked = True
+    conn.commit()
+    likes = conn.execute("SELECT likes FROM posts WHERE id=?", (post_id,)).fetchone()[0]
+    conn.close()
+    return {"status": "OK", "liked": liked, "likes": likes}
+
+
+@app.get("/api/community/liked")
+async def community_liked(request: Request):
+    """내가 좋아요한 글 목록(마이 탭). 로그인 필요."""
+    user = _verify_token((request.headers.get("Authorization") or "").removeprefix("Bearer ").strip())
+    if not user:
+        return {"status": "NOAUTH", "posts": []}
+    owner = _owner_key(user)
+    try:
+        conn = _community_conn()
+        rows = conn.execute(
+            "SELECT p.id,p.cat,p.title,p.image,p.author,p.meta,p.likes,p.comments,p.saves,p.created_at,p.owner "
+            "FROM posts p JOIN post_likes l ON p.id = l.post_id "
+            "WHERE l.owner=? ORDER BY l.created_at DESC LIMIT 50",
+            (owner,),
+        ).fetchall()
+        conn.close()
+        posts = [
+            {"id": r[0], "cat": r[1], "title": r[2], "image": r[3], "author": r[4], "meta": r[5],
+             "likes": r[6], "comments": r[7], "saves": r[8], "created_at": r[9],
+             "mine": r[10] == owner, "liked": True}
             for r in rows
         ]
         return {"status": "OK", "posts": posts}

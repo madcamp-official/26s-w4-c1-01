@@ -136,6 +136,10 @@ input[type="number"], input[type="text"], select {
 .openbar-title { font-weight: 700; font-size: 14px; }
 .openbar-hint { color: var(--muted); font-size: 12px; }
 .openbar-count { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* 접기/펼치기 토글 — 아이콘을 원 정중앙에 배치. */
+.openbar-toggle { width: 22px; height: 22px; border-radius: 50%; border: 0; background: var(--muted-surface); color: var(--muted);
+  font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; flex: none; }
+.openbar-summary { cursor: pointer; }
 .op-badge { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
 .op-badge.door { background: rgba(204,91,82,.14); color: #b64b43; }
 .op-badge.window { background: rgba(59,127,181,.14); color: #2f6a97; }
@@ -422,6 +426,9 @@ input[type="number"], input[type="text"], select {
 .feed-edit-acts .tlink { padding: 2px 6px; }
 .feed-own-acts { display: flex; gap: 10px; margin-top: 2px; }
 .feed-own-acts .tlink { padding: 0; font-size: 11px; }
+.feed-meta-row { display: flex; align-items: center; gap: 10px; }
+.feed-like { border: 0; background: none; padding: 0; font-size: 11px; color: var(--muted2); font-weight: 700; }
+.feed-like.on { color: var(--bad); }
 
 /* ── 방 입력 ── */
 .dims-panel { flex: 1; min-height: 0; background: var(--bg2); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow: auto; }
@@ -521,6 +528,10 @@ input[type="number"], input[type="text"], select {
 .pcard .thumb { width: 100%; border-radius: 18px; aspect-ratio: 1; position: relative; overflow: hidden; background: var(--muted-surface); display: block; }
 .pcard .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .pcard .nbadge { position: absolute; bottom: 8px; left: 8px; width: 18px; height: 18px; border-radius: 50%; background: var(--naver); color: #fff; font: 700 10px sans-serif; display: flex; align-items: center; justify-content: center; }
+/* 찜 하트 — 카드 썸네일 우상단. 카드 자체가 <a>라 z-index로 클릭 영역 확실히 위에 오게. */
+.wish-btn { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%; border: 0;
+  background: rgba(255,255,255,.9); color: var(--muted2); font-size: 14px; display: flex; align-items: center; justify-content: center; z-index: 1; }
+.wish-btn.on { color: var(--bad); }
 .pcard .pnm { font-weight: 700; font-size: 12.5px; color: var(--ink); margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pcard .ppr { font-weight: 800; font-size: 12.5px; color: var(--accent); }
 .pcard .est { margin-left: 5px; }
