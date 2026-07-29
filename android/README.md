@@ -1,6 +1,6 @@
 # 방꾸요정 안드로이드 앱 (WebView 셸)
 
-배포된 웹앱(`https://bangkku.madcamp-kaist.org`)을 감싸는 네이티브 안드로이드 앱.
+배포된 웹앱(`https://bangkku-fairy.madcamp-kaist.org`)을 감싸는 네이티브 안드로이드 앱.
 1주차에 쓰던 **Android Studio 그대로** 열어서 빌드하면 APK가 나온다.
 
 ## 빌드 순서 (팀원 노트북에서)
