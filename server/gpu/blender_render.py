@@ -212,7 +212,85 @@ HANDLE = mat("handle", (0.62, 0.60, 0.55), rough=0.35, metal=0.9)  # 문 손잡�
 # 쏟아졌다(햇빛이 엉뚱한 방향에서 들어오는 원인). 이제 전부 '얇은 박스'로 세우되 숨김 면은
 # visible_camera=False — 카메라엔 안 보여도 빛은 막는다 → 빛은 오직 창 구멍으로만 들어온다.
 hide = set(S.get("hide", []))
-plane("floor", W, D, (W / 2, D / 2, 0), m=FLOOR)
+
+# ---------- 바닥 = '실제 방'만 ----------
+# 욕실·주방·현관·보일러실(컷아웃)은 우리가 꾸미는 공간이 아니다 → 바닥에서 아예 파낸다.
+# 예전엔 방 전체 사각형에 바닥을 깔아, 컷어웨이된 부속실 안쪽 바닥이 어두운 판으로 드러났다.
+_CUTS = [c for c in S.get("cutouts", []) if c.get("w", 0) > 0 and c.get("d", 0) > 0]
+_CBOX = [(c["x"] - c["w"] / 2, c["x"] + c["w"] / 2, c["y"] - c["d"] / 2, c["y"] + c["d"] / 2) for c in _CUTS]
+_EPSB = 0.03   # 방 경계에 '닿았다'로 볼 여유(3cm)
+
+
+def _rect_minus(w, d, boxes):
+    """w×d 사각형 − 축정렬 boxes = 남은 사각형 목록 [(x0,x1,y0,y1)]. x 슬랩으로 자르고 슬랩마다 y구간을 뺀다."""
+    xs = sorted({0.0, w} | {v for b in boxes for v in b[:2] if 0.0 < v < w})
+    out = []
+    for i in range(len(xs) - 1):
+        x0, x1 = xs[i], xs[i + 1]
+        if x1 - x0 < 1e-4:
+            continue
+        xm = (x0 + x1) / 2
+        y = 0.0
+        for (a, b1) in sorted((b[2], b[3]) for b in boxes if b[0] <= xm <= b[1]):
+            if a > y + 1e-4:
+                out.append((x0, x1, y, a))
+            y = max(y, b1)
+        if y < d - 1e-4:
+            out.append((x0, x1, y, d))
+    return out
+
+
+def _slab(name, rects, z, m, origin):
+    """여러 사각형을 '한 오브젝트'로 — Object 텍스처좌표가 이어져야 마루 판자가 조각마다 끊기지 않는다."""
+    ox, oy = origin
+    verts, faces = [], []
+    for (x0, x1, y0, y1) in rects:
+        i = len(verts)
+        verts += [(x0 - ox, y0 - oy, 0), (x1 - ox, y0 - oy, 0), (x1 - ox, y1 - oy, 0), (x0 - ox, y1 - oy, 0)]
+        faces.append((i, i + 1, i + 2, i + 3))
+    me = bpy.data.meshes.new(name); me.from_pydata(verts, [], faces); me.update()
+    ob = bpy.data.objects.new(name, me); ob.location = (ox, oy, z)
+    bpy.context.collection.objects.link(ob)
+    ob.data.materials.append(m)
+    return ob
+
+
+def _spans(lo, hi, blocked):
+    """[lo,hi]를 blocked(컷아웃이 물고 있는 구간)로 쪼개 [(a,b,가려짐)]로 — 벽/걸레받이를 구간별로 다루려고."""
+    merged = []
+    for (a, b) in sorted(blocked):
+        a, b = max(lo, a), min(hi, b)
+        if b <= a:
+            continue
+        if merged and a <= merged[-1][1] + 1e-3:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    out, p = [], lo
+    for (a, b) in merged:
+        if a > p + 1e-3:
+            out.append((p, a, False))
+        out.append((max(p, a), b, True)); p = b
+    if p < hi - 1e-3:
+        out.append((p, hi, False))
+    return out or [(lo, hi, False)]
+
+
+# 각 외벽이 부속실에 '먹힌' 구간 — 그 구간의 벽은 방에서 보이지 않는다(부속실 너머라서).
+_BLOCK = {
+    "far":   [(b[0], b[1]) for b in _CBOX if b[3] >= D - _EPSB],
+    "near":  [(b[0], b[1]) for b in _CBOX if b[2] <= _EPSB],
+    "left":  [(b[2], b[3]) for b in _CBOX if b[0] <= _EPSB],
+    "right": [(b[2], b[3]) for b in _CBOX if b[1] >= W - _EPSB],
+}
+
+# 컷아웃이 방을 통째로 덮는 이상 입력이면 파내지 않는다(빈 바닥 렌더 방지).
+_FLOOR_RECTS = (_rect_minus(W, D, _CBOX) if _CBOX else None) or [(0.0, W, 0.0, D)]
+_slab("floor", _FLOOR_RECTS, 0.0, FLOOR, (W / 2, D / 2))
+# '실제 방'의 경계상자 — 카메라 프레이밍의 기준(건물 외곽이 아니라 우리가 꾸미는 공간).
+LX0 = min(r[0] for r in _FLOOR_RECTS); LX1 = max(r[1] for r in _FLOOR_RECTS)
+LY0 = min(r[2] for r in _FLOOR_RECTS); LY1 = max(r[3] for r in _FLOOR_RECTS)
+LCX, LCY = (LX0 + LX1) / 2, (LY0 + LY1) / 2   # 보조광도 방 중심에 — 건물 중심은 욕실 안일 수 있다
 # 광차단 규칙: ① 천장 항상 존재(숨김이면 카메라만 통과) ② 창 달린 벽 항상 존재(〃) — 태양이
 # '창 구멍으로만' 들어온다. ③ 창 없는 숨김 벽은 생략(부드러운 앰비언트·가장자리 미관).
 # 구멍은 불리언이 아니라 '창 주위 4분할 세그먼트'로 뚫는다(불리언은 무재질 검은 면을 남겼다).
@@ -241,23 +319,30 @@ def _wall_rects(L, wins):
 
 
 def _build_wall(kind):
+    """벽을 창 구멍 + 부속실 구간으로 쪼개 세운다. 부속실 뒤 구간은 '방의 벽'이 아니므로
+    카메라에서 감춘다(빛은 계속 막는다) — 안 그러면 욕실 너머 외벽이 방 벽인 척 화면에 남는다."""
     wins = _wins_by_wall.get(kind, [])
     L = W if kind in ("far", "near") else D
+    segs = _spans(0.0, L, _BLOCK.get(kind, []))
     n = 0
     for (a0, a1, z0, z1) in (_wall_rects(L, wins) if wins else [(0.0, L, 0.0, H)]):
-        sa, sz = a1 - a0, z1 - z0
-        ca, cz = (a0 + a1) / 2, (z0 + z1) / 2
-        if kind == "far":
-            o = plane(f"wall_far_{n}", sa, sz, (ca, D, cz), rot=(math.radians(90), 0, 0), m=WALL)
-        elif kind == "near":
-            o = plane(f"wall_near_{n}", sa, sz, (ca, 0, cz), rot=(math.radians(90), 0, 0), m=WALL)
-        elif kind == "left":
-            o = plane(f"wall_left_{n}", sz, sa, (0, ca, cz), rot=(0, math.radians(90), 0), m=WALL)
-        else:
-            o = plane(f"wall_right_{n}", sz, sa, (W, ca, cz), rot=(0, math.radians(-90), 0), m=WALL)
-        if kind in hide:
-            o.visible_camera = False
-        n += 1
+        for (s0, s1, covered) in segs:
+            b0, b1 = max(a0, s0), min(a1, s1)
+            if b1 - b0 < 1e-3:
+                continue
+            sa, sz = b1 - b0, z1 - z0
+            ca, cz = (b0 + b1) / 2, (z0 + z1) / 2
+            if kind == "far":
+                o = plane(f"wall_far_{n}", sa, sz, (ca, D, cz), rot=(math.radians(90), 0, 0), m=WALL)
+            elif kind == "near":
+                o = plane(f"wall_near_{n}", sa, sz, (ca, 0, cz), rot=(math.radians(90), 0, 0), m=WALL)
+            elif kind == "left":
+                o = plane(f"wall_left_{n}", sz, sa, (0, ca, cz), rot=(0, math.radians(90), 0), m=WALL)
+            else:
+                o = plane(f"wall_right_{n}", sz, sa, (W, ca, cz), rot=(0, math.radians(-90), 0), m=WALL)
+            if covered or kind in hide:
+                o.visible_camera = False
+            n += 1
 
 
 for _k in ("far", "near", "left", "right"):
@@ -269,44 +354,65 @@ if "ceil" in hide:
     _ceil.visible_camera = False
 
 # ---------- 걸레받이(baseboard) — 그려진 벽 하단에 얇은 띠 ----------
+# 컷아웃이 물고 있는 구간은 건너뛴다(바닥이 없는 자리에 띠만 떠 있으면 안 되므로).
 BB_H, BB_T = 0.085, 0.012  # 높이 8.5cm, 두께
-if "far" not in hide:
-    box("bb_far", W, BB_T, BB_H, (W / 2, D - BB_T / 2, BB_H / 2), m=TRIM)
-if "near" not in hide:
-    box("bb_near", W, BB_T, BB_H, (W / 2, BB_T / 2, BB_H / 2), m=TRIM)
-if "left" not in hide:
-    box("bb_left", BB_T, D, BB_H, (BB_T / 2, D / 2, BB_H / 2), m=TRIM)
-if "right" not in hide:
-    box("bb_right", BB_T, D, BB_H, (W - BB_T / 2, D / 2, BB_H / 2), m=TRIM)
+_BB_WALLS = {   # 벽 → (길이, 걸레받이 박스 만드는 함수)
+    "far":   (W, lambda n, a, b: box(n, b - a, BB_T, BB_H, ((a + b) / 2, D - BB_T / 2, BB_H / 2), m=TRIM)),
+    "near":  (W, lambda n, a, b: box(n, b - a, BB_T, BB_H, ((a + b) / 2, BB_T / 2, BB_H / 2), m=TRIM)),
+    "left":  (D, lambda n, a, b: box(n, BB_T, b - a, BB_H, (BB_T / 2, (a + b) / 2, BB_H / 2), m=TRIM)),
+    "right": (D, lambda n, a, b: box(n, BB_T, b - a, BB_H, (W - BB_T / 2, (a + b) / 2, BB_H / 2), m=TRIM)),
+}
+for _wk, (_wl, _wfn) in _BB_WALLS.items():
+    if _wk in hide:
+        continue
+    for _i, (_a, _b, _cov) in enumerate(_spans(0.0, _wl, _BLOCK.get(_wk, []))):
+        if not _cov:
+            _wfn(f"bb_{_wk}{_i}", _a, _b)
 
-# ---------- 컷아웃(비직사각형 방) — 배치금지 구역을 바닥~천장 벽체로 ----------
-# 박스가 아니라 '면 단위'로 세운다: 방 경계와 겹치는 면은 만들지 않는다(그 자리는 외벽·천장이
-# 이미 담당). 박스 시절엔 겹친 바깥면이 숨김 벽 뒤에서 빛을 못 받아 새까만 판으로 보였다.
-_EPSB = 0.03
-for _ci, _c in enumerate(S.get("cutouts", [])):
+# ---------- 컷아웃(비직사각형 방)의 경계 = 방의 벽 ----------
+# 부속실 '박스'를 세우는 게 아니라, 방과 맞닿는 면만 세워 그 자리가 그냥 방 벽으로 보이게 한다.
+# (방 경계와 겹치는 면은 만들지 않는다 — 그 자리는 외벽·천장이 이미 담당.)
+# 부속실 안쪽 바닥은 위에서 파냈으므로 벽 너머엔 아무것도 없다 = 실제 방만 남는다.
+_FACE_HIDE = {"f": "near", "n": "far", "r": "left", "l": "right"}   # 그 벽이 숨겨졌다 = 카메라가 이 면의 '뒤'에 있다
+for _ci, _c in enumerate(_CUTS):
     _hw, _hd = _c["w"] / 2, _c["d"] / 2
     _x0, _x1 = _c["x"] - _hw, _c["x"] + _hw
     _y0, _y1 = _c["y"] - _hd, _c["y"] + _hd
-    # 컷어웨이 일관성: '숨김 벽에 붙은' 부속실은 그 벽과 함께 통째로 잘려나간 것으로 취급 —
-    # 모든 면을 카메라에서 숨긴다(빛·그림자는 유지). 아니면 반대편(wide2) 등에서 부속실 벽의
-    # 뒷면이 화면을 가려 '벽만 보이는 그림'이 된다. 카메라 반대쪽 부속실은 그대로 보인다.
-    _touch = set()
-    if _y0 <= _EPSB: _touch.add("near")
-    if _y1 >= D - _EPSB: _touch.add("far")
-    if _x0 <= _EPSB: _touch.add("left")
-    if _x1 >= W - _EPSB: _touch.add("right")
-    _cut_hidden = bool(_touch & hide)
-    for _nm, _cond, _args in (
-        ("n", _y0 > _EPSB, (_c["w"], H, (_c["x"], _y0, H / 2), (math.radians(90), 0, 0))),
-        ("f", _y1 < D - _EPSB, (_c["w"], H, (_c["x"], _y1, H / 2), (math.radians(90), 0, 0))),
-        ("l", _x0 > _EPSB, (H, _c["d"], (_x0, _c["y"], H / 2), (0, math.radians(90), 0))),
-        ("r", _x1 < W - _EPSB, (H, _c["d"], (_x1, _c["y"], H / 2), (0, math.radians(-90), 0))),
+    for _nm, _cond, _at, _rng in (
+        ("n", _y0 > _EPSB, _y0 - 0.02, (_x0, _x1)),
+        ("f", _y1 < D - _EPSB, _y1 + 0.02, (_x0, _x1)),
+        ("l", _x0 > _EPSB, _x0 - 0.02, (_y0, _y1)),
+        ("r", _x1 < W - _EPSB, _x1 + 0.02, (_y0, _y1)),
     ):
         if not _cond:
             continue
-        _fo = plane(f"cut{_ci}_{_nm}", _args[0], _args[1], _args[2], rot=_args[3], m=WALL)
-        if _cut_hidden:
-            _fo.visible_camera = False
+        _vert = _nm in ("n", "f")
+        # 이 면 바깥이 '또 다른 부속실'인 구간은 방에서 안 보이는 내부 칸막이 — 만들지 않는다.
+        _adj = [((o[0], o[1]) if _vert else (o[2], o[3])) for o in _CBOX
+                if (o[2] <= _at <= o[3] if _vert else o[0] <= _at <= o[1])]
+        # 컷어웨이 일관성: 카메라가 면의 뒤쪽에 있으면(=대응 외벽이 숨김) 그 면도 함께 잘라낸다.
+        # 통째로 숨기면 안 된다 — 욕실의 옆면은 카메라를 가려도, 안쪽 면은 '방의 벽'이기 때문.
+        _fhide = _FACE_HIDE[_nm] in hide
+        for _si, (_a, _b, _cov) in enumerate(_spans(_rng[0], _rng[1], _adj)):
+            if _cov or _b - _a < 1e-3:
+                continue
+            _mid = (_a + _b) / 2
+            if _vert:
+                _fo = plane(f"cut{_ci}_{_nm}{_si}", _b - _a, H, (_mid, _y0 if _nm == "n" else _y1, H / 2),
+                            rot=(math.radians(90), 0, 0), m=WALL)
+            else:
+                _fo = plane(f"cut{_ci}_{_nm}{_si}", H, _b - _a, (_x0 if _nm == "l" else _x1, _mid, H / 2),
+                            rot=(0, math.radians(90 if _nm == "l" else -90), 0), m=WALL)
+            if _fhide:
+                _fo.visible_camera = False
+                continue
+            # 방 쪽 하단에 걸레받이 — 외벽과 같은 마감이라야 '떠 있는 판'이 아니라 방 벽으로 읽힌다.
+            if _vert:
+                box(f"cut{_ci}_{_nm}{_si}_bb", _b - _a, BB_T, BB_H,
+                    (_mid, (_y0 - BB_T / 2) if _nm == "n" else (_y1 + BB_T / 2), BB_H / 2), m=TRIM)
+            else:
+                box(f"cut{_ci}_{_nm}{_si}_bb", BB_T, _b - _a, BB_H,
+                    ((_x0 - BB_T / 2) if _nm == "l" else (_x1 + BB_T / 2), _mid, BB_H / 2), m=TRIM)
     # 윗면은 천장(z=H)과 동일 평면 — 생성하지 않는다(천장이 담당)
 
 # ---------- 개구부(창문·문) — 벽별 임의 위치. 2D 평면의 문/창을 렌더에 반영 ----------
@@ -440,7 +546,7 @@ if PRE.get("sun") and any(o.get("kind") == "window" for o in S.get("openings", [
     sc.collection.objects.link(_fo)
     _fd.energy = 120; _fd.color = (1.0, 0.97, 0.92)
     _fd.shadow_soft_size = 0.9                       # 큰 소프트 반경 — 그림자 없는 앰비언트처럼
-    _fo.location = (W / 2, D / 2, H * 0.55)          # 방 중심 높이 — 수직면(벽체 옆면)도 밝힌다
+    _fo.location = (LCX, LCY, H * 0.55)              # 방 중심 높이 — 수직면(벽체 옆면)도 밝힌다
 
 def _hex_rgb(hx):
     try:
@@ -459,14 +565,14 @@ LAMPS = [it for it in S["items"] if it.get("lamp")]
 if PRE.get("lamp", 0) > 0:  # 실내 천장등(밤 위주)
     ld = bpy.data.lights.new("lamp", 'AREA'); lo = bpy.data.objects.new("lamp", ld)
     sc.collection.objects.link(lo)
-    ld.shape = 'RECTANGLE'; ld.size = min(W, 1.2); ld.size_y = min(D, 1.2)
+    ld.shape = 'RECTANGLE'; ld.size = min(LX1 - LX0, 1.2); ld.size_y = min(LY1 - LY0, 1.2)
     _on = LAMPS and _LEFF >= 0.05
     # 밤(무태양)+조명ON = 천장 보조광 완전 소등 — "조명만 켠 밤"의 어둠과 빛 웅덩이를 살린다.
     # 노을(태양 있음)은 잔광이 있으니 약한 보조 유지. 조명 OFF면 기존대로(완전 암흑 방지).
     _factor = 0.0 if (_on and not PRE.get("sun")) else (0.18 if _on else 1.0)
     ld.energy = 60 * PRE["lamp"] * _factor
     ld.color = _LC if _on else (1.0, 0.86, 0.66)   # 조명 켜짐 → 보조광도 선택 색온도를 따른다
-    lo.location = (W / 2, D / 2, H - 0.05)
+    lo.location = (LCX, LCY, H - 0.05)
 
 # ---------- 조명 가구 = 실제 광원 ----------
 # 전구를 갓 상단 림 높이(h*0.92)에 둬 위·아래로 빛이 새는 고전적 무드샷 구도.
@@ -542,8 +648,12 @@ cam.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler()
 # fit: 방 지오메트리(보이는 코너들)에 맞춰 타이트 프레이밍 — 잉여 배경 최소화, 방이 프레임을 채움.
 # 컷어웨이로 숨는 near/left 벽의 '천장 코너'는 제외(빈 공간까지 여백으로 잡지 않게).
 if cd.get("fit"):
-    pts = [(0, 0, 0), (W, 0, 0), (0, D, 0), (W, D, 0),          # 바닥 4코너
-           (0, D, H), (W, D, H), (W, 0, H)]                      # 보이는 벽 상단 코너(far·right)
+    # 프레이밍 기준은 건물 외곽이 아니라 '실제 방'(부속실 제외) — 욕실·현관까지 넣으면 방이 작게 나온다.
+    _hx = LX0 if "left" in hide else LX1      # 컷어웨이된 코너 = 빈 공간이라 여백으로 잡지 않는다
+    _hy = LY0 if "near" in hide else LY1
+    pts = [(LX0, LY0, 0), (LX1, LY0, 0), (LX0, LY1, 0), (LX1, LY1, 0)]          # 방 바닥 4코너
+    pts += [(x, y, H) for x in (LX0, LX1) for y in (LY0, LY1)                    # 보이는 벽 상단 코너
+            if not (abs(x - _hx) < 1e-6 and abs(y - _hy) < 1e-6)]
     flat = [c for pt in pts for c in pt]
     try:
         dg = bpy.context.evaluated_depsgraph_get()
