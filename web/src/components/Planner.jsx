@@ -57,6 +57,7 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
   const ppm = Math.min((availW - 2 * PAD) / room.widthM, (MAX_H - 2 * PAD) / room.depthM);
   const stageW = room.widthM * ppm + 2 * PAD;
   const stageH = room.depthM * ppm + 2 * PAD;
+  const wallT = Math.max(5, Math.min(12, room.widthM * ppm * 0.028));   // 외벽 밴드 두께(px) — 도면 느낌의 핵심
 
   const toPx = (m) => m * ppm;
   const toM = (px) => px / ppm;
@@ -83,21 +84,38 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
       <Stage width={stageW} height={stageH} onMouseDown={(e) => { if (e.target === e.target.getStage()) setSelectedId(null); }}
         onTouchStart={(e) => { if (e.target === e.target.getStage()) setSelectedId(null); }}>
         <Layer>
-          {/* 바닥 */}
-          <Rect x={PAD} y={PAD} width={toPx(room.widthM)} height={toPx(room.depthM)} fill="#faf7f1" stroke="#cfc7b8" strokeWidth={1.5} cornerRadius={2} />
-          {grid.map(([dir, m], i) =>
-            dir === 'v' ? (
-              <Line key={i} points={[PAD + toPx(m), PAD, PAD + toPx(m), PAD + toPx(room.depthM)]} stroke="#ece5d8" strokeWidth={1} />
+          {/* 바닥 — 도면 카드(floorplanSvg)와 같은 웜 페이퍼 톤. 테두리는 아래 벽체 밴드가 담당. */}
+          <Rect x={PAD} y={PAD} width={toPx(room.widthM)} height={toPx(room.depthM)} fill="#FBF6EF" />
+          {/* 0.5m 격자 — 정수 미터는 살짝 진하게(도면의 보조선 위계) */}
+          {grid.map(([dir, m], i) => {
+            const whole = Math.abs(m - Math.round(m)) < 1e-9;
+            const col = whole ? '#EADFCE' : '#F2EBDF';
+            return dir === 'v' ? (
+              <Line key={i} points={[PAD + toPx(m), PAD, PAD + toPx(m), PAD + toPx(room.depthM)]} stroke={col} strokeWidth={1} />
             ) : (
-              <Line key={i} points={[PAD, PAD + toPx(m), PAD + toPx(room.widthM), PAD + toPx(m)]} stroke="#ece5d8" strokeWidth={1} />
-            )
-          )}
+              <Line key={i} points={[PAD, PAD + toPx(m), PAD + toPx(room.widthM), PAD + toPx(m)]} stroke={col} strokeWidth={1} />
+            );
+          })}
 
           {/* 실제 도면(있으면) — 방 사각형에 1:1로 깔아 그 위에서 배치한다. 가구·판정은 그대로 기하가 결정.
               불투명도 0.16: 도면은 윤곽만 은은하게 — 배치 요소가 주인공. */}
           {planImg && (
             <KImage image={planImg} x={PAD} y={PAD} width={toPx(room.widthM)} height={toPx(room.depthM)}
               opacity={0.16} listening={false} />
+          )}
+
+          {/* 외벽 — 도면의 두꺼운 벽체 밴드(경계선 중심). 개구부가 이 밴드를 바닥색으로 뚫는다. */}
+          <Rect x={PAD} y={PAD} width={toPx(room.widthM)} height={toPx(room.depthM)}
+            stroke="#3A332B" strokeWidth={wallT} listening={false} />
+
+          {/* 빈 상태 — 그리드만 있으면 허전하니 도면 라벨처럼 안내를 얹는다(가구가 생기면 사라짐) */}
+          {items.length === 0 && (
+            <Group listening={false}>
+              <Text x={PAD} y={PAD + toPx(room.depthM) / 2 - 22} width={toPx(room.widthM)}
+                text="가구를 담아 배치해 보세요" fontSize={13} fontStyle="bold" fill="#A8957F" align="center" />
+              <Text x={PAD} y={PAD + toPx(room.depthM) / 2 - 2} width={toPx(room.widthM)}
+                text={`${room.widthM.toFixed(1)} × ${room.depthM.toFixed(1)} m`} fontSize={11} fill="#C0B3A2" align="center" />
+            </Group>
           )}
 
           {/* 컷아웃(비직사각형 방의 벽체/욕실) — 배치금지 구역 + 아이콘·이름.
@@ -146,19 +164,25 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
               const leaf = [hx + into[0] * Rp, hy + into[1] * Rp];
               return (
                 <Group key={o.id} listening={false}>
+                  {/* 벽체 개구부(바닥색으로 뚫기) + 도면식 스윙 호 — 상시 경고색 대신 웜 뉴트럴,
+                      침범하면 가구 쪽이 빨갛게 물들므로 신호는 유지된다 */}
+                  <Line points={[e1[0], e1[1], e2[0], e2[1]]} stroke="#FBF6EF" strokeWidth={wallT + 2} />
                   <Shape sceneFunc={(ctx, sh) => { ctx.beginPath(); ctx.moveTo(hx, hy); ctx.arc(hx, hy, Rp, a1, a2, acw); ctx.closePath(); ctx.fillStrokeShape(sh); }}
-                    fill="rgba(204,91,82,0.12)" stroke="#cc5b52" strokeWidth={1} dash={[4, 3]} />
-                  <Line points={[e1[0], e1[1], e2[0], e2[1]]} stroke="#cc5b52" strokeWidth={4} />
-                  <Line points={[hx, hy, leaf[0], leaf[1]]} stroke="#cc5b52" strokeWidth={2} />
+                    fill="rgba(190,160,138,0.14)" stroke="#B5A79A" strokeWidth={1.1} dash={[4, 3]} />
+                  <Line points={[hx, hy, leaf[0], leaf[1]]} stroke="#835151" strokeWidth={2.2} lineCap="round" />
                 </Group>
               );
             }
-            const off = 5;
-            const n = { top: [0, off], bottom: [0, -off], left: [off, 0], right: [-off, 0] }[o.wall];
+            // 창 — 도면의 3선 유리 심볼(벽 밴드 위)
+            const off = Math.max(2.6, wallT * 0.3);
+            const n = { top: [0, 1], bottom: [0, -1], left: [1, 0], right: [-1, 0] }[o.wall];
             return (
               <Group key={o.id} listening={false}>
-                <Line points={[e1[0], e1[1], e2[0], e2[1]]} stroke="#3b7fb5" strokeWidth={5} />
-                <Line points={[e1[0] + n[0], e1[1] + n[1], e2[0] + n[0], e2[1] + n[1]]} stroke="#7db8e0" strokeWidth={2} />
+                <Line points={[e1[0], e1[1], e2[0], e2[1]]} stroke="#FBF6EF" strokeWidth={wallT + 2} />
+                {[-off, 0, off].map((k) => (
+                  <Line key={k} points={[e1[0] + n[0] * k, e1[1] + n[1] * k, e2[0] + n[0] * k, e2[1] + n[1] * k]}
+                    stroke="#7FA8C9" strokeWidth={1.4} />
+                ))}
               </Group>
             );
           })}
