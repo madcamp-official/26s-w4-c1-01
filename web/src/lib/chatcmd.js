@@ -54,7 +54,14 @@ export function matchCategories(text) {
 export function parseCommand(text) {
   const t = (text || '').trim();
   const hits = matchCategories(t);
-  if (!hits.length) return null;
+  // "침대만 남기고 다 빼줘" 같은 예외 조건부 — 로컬로 오판하지 말고 LLM(remove 프로토콜)에 위임
+  if (/(남기고|남겨|제외|빼고\s)/.test(t)) return null;
+  const wantAll = /(?:^|\s)(?:다|전부|전부다|모두|몽땅|싹|전체)(?:\s|,|$)/.test(t);
+  if (!hits.length) {
+    // 카테고리 없이 "다 빼줘/전부 비워줘/초기화" — 전체 삭제
+    if (wantAll && /(빼|비워|치워|지워|삭제|제거|없애|초기화|리셋)/.test(t)) return { op: 'clear' };
+    return null;
+  }
   // "침대 옆에 협탁 놔줘"처럼 카테고리 '사이'에 위치 조사가 있으면 앞엣것은 참조 가구 → 뒤엣것만 대상.
   // "침대랑 소파 넣어줘"처럼 단순 나열이면 전부 대상.
   let cats = [...new Set(hits.map((h) => h.cat))];
@@ -63,7 +70,8 @@ export function parseCommand(text) {
     if (/옆|앞|뒤|위에|아래|근처|사이|맞은편|반대|머리맡|발치/.test(between)) cats = [hits[hits.length - 1].cat];
   }
   const cat = cats[cats.length - 1];
-  if (/(빼|제거|없애|지워|삭제|치워)/.test(t)) return { op: 'remove', cat, cats };
+  // all: "침대 다 빼줘" — 그 카테고리 전부 삭제
+  if (/(빼|제거|없애|지워|삭제|치워|비워)/.test(t)) return { op: 'remove', cat, cats, all: wantAll };
   if (/(더\s*작게|작게|줄여|작게해|작아)/.test(t)) return { op: 'resize', cat, cats, factor: 0.82 };
   if (/(더\s*크게|크게|키워|크게해|커)/.test(t)) return { op: 'resize', cat, cats, factor: 1.22 };
   if (/(넣|추가|놓|놔|둬|배치|생성|만들|깔)/.test(t)) return { op: 'add', cat, cats };

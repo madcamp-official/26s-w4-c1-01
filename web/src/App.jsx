@@ -190,6 +190,10 @@ export default function App() {
       return [...base, toPlacedItem(catItem, spot.cx, spot.cy)];
     }
     if (cmd.op === 'remove') {
+      if (cmd.all) {                                   // "침대 다 빼줘" — 그 카테고리 전부
+        const next = base.filter((it) => it.cat !== cmd.cat);
+        return next.length === base.length ? null : next;
+      }
       const idx = base.map((it) => it.cat).lastIndexOf(cmd.cat);
       return idx < 0 ? null : base.filter((_, i) => i !== idx);
     }
@@ -234,6 +238,11 @@ export default function App() {
     }
     const cmd = parseCommand(text);
     if (cmd) {
+      if (cmd.op === 'clear') {                        // "다 빼줘/전부 비워줘" — LLM 갈 것 없이 즉시
+        if (!items.length) return { applied: false, reply: '방이 이미 비어 있어요.' };
+        setItems([]); setSelectedId(null);
+        return { applied: true, reply: '전부 비웠어! 처음부터 다시 배치해 보자 ✨' };
+      }
       // 복수 대상("침대랑 소파 넣어줘") — 카테고리별로 연쇄 적용, 안 되는 것만 건너뛰고 안내.
       const cats = cmd.cats?.length ? cmd.cats : [cmd.cat];
       let next = items;
@@ -263,7 +272,20 @@ export default function App() {
     // 자연어 → LLM 재배치(기존 위치 재검증 후에만 반영)
     const r = await chatLayout(room, openings, items, text, history);
     if (r.decision === 'apply') {
-      const next = applyLLMPositions(items, r.items);
+      // 삭제 프로토콜(remove:[id...]) — "침대만 남기고 다 빼줘" 등. 삭제는 가구가 줄어드는
+      // 변화라 기하 제약을 새로 깰 수 없으므로 검증 없이 반영한다.
+      const removeIds = new Set(Array.isArray(r.remove) ? r.remove : []);
+      const base = removeIds.size ? items.filter((it) => !removeIds.has(it.id)) : items;
+      const hasCoords = Array.isArray(r.items) && r.items.length > 0;
+      if (!hasCoords) {
+        if (base.length < items.length) {              // 순수 삭제
+          setItems(base); setSelectedId(null);
+          return { applied: true, reply: (r.reason || '정리했어') + ' ✅ (도면에 반영)' };
+        }
+        // apply라면서 좌표도 삭제도 없음 — 겹침 탓으로 오진하지 말고 정직하게.
+        return { applied: false, reply: (r.reason || '') + ' — 그런데 반영할 변경 내용을 못 받아서 배치는 그대로예요. 🤔 다시 말해줄래?' };
+      }
+      const next = applyLLMPositions(base, r.items);
       if (next) { setItems(next); setSelectedId(null); return { applied: true, reply: (r.reason || '재배치했어') + ' ✅ (도면에 반영)' }; }
       return { applied: false, reply: (r.reason || '') + ' — 다만 겹치거나 문을 막아서 반영하진 않았어요. 🚫' };
     }

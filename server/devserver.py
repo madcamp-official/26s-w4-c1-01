@@ -325,9 +325,10 @@ CHAT_SYS = (
     "선호: 대형가구는 벽 밀착. TV장은 침대 정면 마주봄. 책상+의자는 의자가 책상 앞면 마주봄. 조명은 침대 헤드 옆.\n"
     "판단 규칙:\n"
     "- 이행 가능(물리적 가능 + 하드제약 안 깨짐): decision=\"apply\", 요청을 반영한 '모든 가구의 새 위치'를 items로.\n"
+    "- 삭제 요청('침대 빼줘','침대만 남기고 다 빼줘')도 이행: 없앨 가구 id를 remove 배열로, items에는 남는 가구만.\n"
     "- 불가능/위험/제약위반(예: 문을 막게 됨, 겹칠 수밖에 없음, 방 밖으로 나감, 모순된 요청): decision=\"reject\", 배치 그대로.\n"
     "어느 경우든 reason에 한국어로 친근하게 1~3문장으로 이유·결과를 설명한다.\n"
-    "출력은 JSON만: {\"decision\":\"apply\"|\"reject\",\"reason\":\"...\",\"items\":[{\"id\":\"...\",\"cx\":0,\"cy\":0,\"rotation\":0}]}\n"
+    "출력은 JSON만: {\"decision\":\"apply\"|\"reject\",\"reason\":\"...\",\"remove\":[\"id\"...],\"items\":[{\"id\":\"...\",\"cx\":0,\"cy\":0,\"rotation\":0}]}\n"
     "apply면 items에 모든 가구(변경 없는 것 포함)를 넣는다. reject면 items는 생략/무시. id는 입력 그대로 사용."
 )
 
@@ -356,7 +357,7 @@ def gemini_chat_layout(payload):
     except Exception:
         s, e = txt.find("{"), txt.rfind("}")
         obj = json.loads(txt[s:e + 1]) if 0 <= s < e else {"decision": "reject", "reason": "이해하지 못했어요. 다시 말씀해 주세요."}
-    return {"decision": obj.get("decision", "reject"), "reason": obj.get("reason", ""), "items": obj.get("items", [])}
+    return {"decision": obj.get("decision", "reject"), "reason": obj.get("reason", ""), "remove": obj.get("remove", []), "items": obj.get("items", [])}
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
