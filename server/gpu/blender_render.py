@@ -58,7 +58,7 @@ for n in list(nt.nodes): nt.nodes.remove(n)
 env = nt.nodes.new("ShaderNodeTexEnvironment")
 env.image = bpy.data.images.load(S["hdri"])
 bg_hdri = nt.nodes.new("ShaderNodeBackground")
-bg_hdri.inputs["Strength"].default_value = S.get("hdri_strength", PRE["hdri"] * (0.62 if any(o.get("kind") == "window" for o in S.get("openings", [])) else 1.0))
+bg_hdri.inputs["Strength"].default_value = S.get("hdri_strength", PRE["hdri"] * (0.95 if any(o.get("kind") == "window" for o in S.get("openings", [])) else 1.0))   # 천장·창벽이 빛을 막게 된 뒤 실내 바운스 보충
 nt.links.new(env.outputs["Color"], bg_hdri.inputs["Color"])
 bg_white = nt.nodes.new("ShaderNodeBackground")
 # 카메라 배경은 프리셋 무드 색(bg) — 아침 웜화이트/낮 화이트/노을 주황빛/밤 어두운 남색.
@@ -74,12 +74,15 @@ wout = nt.nodes.new("ShaderNodeOutputWorld")
 nt.links.new(mix.outputs["Shader"], wout.inputs["Surface"])
 
 
-def mat(name, color, rough=0.85, metal=0.0):
+def mat(name, color, rough=0.85, metal=0.0, glow=0.0):
     m = bpy.data.materials.new(name); m.use_nodes = True
     b = m.node_tree.nodes.get("Principled BSDF")
     b.inputs["Base Color"].default_value = (*color, 1)
     b.inputs["Roughness"].default_value = rough
     b.inputs["Metallic"].default_value = metal
+    if glow:                                    # 극미광 — 광원 각도가 다 빗나간 면이 '완전 검정'으로 무너지는 것 방지
+        b.inputs["Emission Color"].default_value = (*color, 1)
+        b.inputs["Emission Strength"].default_value = glow
     return m
 
 
@@ -195,26 +198,72 @@ def box(name, sx, sy, sz, loc, m=None):
 
 
 FLOOR = wood_floor_mat('y' if D >= W else 'x')
-WALL = mat("wall", (0.90, 0.88, 0.83), rough=0.95)
+WALL = mat("wall", (0.90, 0.88, 0.83), rough=0.95, glow=0.05)
 CEIL = mat("ceil", (0.96, 0.95, 0.93), rough=1.0)
 TRIM = mat("trim", (0.94, 0.93, 0.90), rough=0.6)  # 걸레받이/창틀 페인트
 FRAME = mat("frame", (0.20, 0.16, 0.12), rough=0.5)  # 창틀 목재
 DOORMAT = mat("door", (0.46, 0.31, 0.19), rough=0.55)  # 문짝 목재
 HANDLE = mat("handle", (0.62, 0.60, 0.55), rough=0.35, metal=0.9)  # 문 손잡이
 
-# hide: 카메라 쪽 벽/천장을 생략(코너 컷어웨이 — 방 안이 다 보이게). 예: ["near","left","ceil"]
+# hide: 카메라 쪽 벽/천장 컷어웨이. 예전엔 아예 안 만들어서 태양·HDRI가 그 뚫린 면으로
+# 쏟아졌다(햇빛이 엉뚱한 방향에서 들어오는 원인). 이제 전부 '얇은 박스'로 세우되 숨김 면은
+# visible_camera=False — 카메라엔 안 보여도 빛은 막는다 → 빛은 오직 창 구멍으로만 들어온다.
 hide = set(S.get("hide", []))
 plane("floor", W, D, (W / 2, D / 2, 0), m=FLOOR)
-if "ceil" not in hide:
-    plane("ceil", W, D, (W / 2, D / 2, H), rot=(math.pi, 0, 0), m=CEIL)
-if "far" not in hide:
-    plane("wall_far", W, H, (W / 2, D, H / 2), rot=(math.radians(90), 0, 0), m=WALL)    # y=D
-if "near" not in hide:
-    plane("wall_near", W, H, (W / 2, 0, H / 2), rot=(math.radians(90), 0, 0), m=WALL)   # y=0
-if "left" not in hide:
-    plane("wall_left", H, D, (0, D / 2, H / 2), rot=(0, math.radians(90), 0), m=WALL)   # x=0
-if "right" not in hide:
-    plane("wall_right", H, D, (W, D / 2, H / 2), rot=(0, math.radians(-90), 0), m=WALL) # x=W
+# 광차단 규칙: ① 천장 항상 존재(숨김이면 카메라만 통과) ② 창 달린 벽 항상 존재(〃) — 태양이
+# '창 구멍으로만' 들어온다. ③ 창 없는 숨김 벽은 생략(부드러운 앰비언트·가장자리 미관).
+# 구멍은 불리언이 아니라 '창 주위 4분할 세그먼트'로 뚫는다(불리언은 무재질 검은 면을 남겼다).
+_wins_by_wall = {}
+for _o in S.get("openings", []):
+    if _o.get("kind") == "window":
+        _wins_by_wall.setdefault(_o.get("wall"), []).append(
+            (float(_o.get("pos", 0)), float(_o.get("width", 1.2)), float(_o.get("z", 1.7)), float(_o.get("h", 1.0))))
+
+
+def _wall_rects(L, wins):
+    """벽(길이 L×높이 H)을 창 구멍을 비우고 채우는 사각형들 [(a0,a1,z0,z1)]."""
+    rects, prev = [], 0.0
+    for c, wd, z, hh in sorted(wins):
+        a0, a1 = max(0.0, c - wd / 2), min(L, c + wd / 2)
+        if a0 > prev + 1e-4:
+            rects.append((prev, a0, 0.0, H))
+        if z - hh / 2 > 1e-4:
+            rects.append((a0, a1, 0.0, z - hh / 2))
+        if z + hh / 2 < H - 1e-4:
+            rects.append((a0, a1, z + hh / 2, H))
+        prev = a1
+    if prev < L - 1e-4:
+        rects.append((prev, L, 0.0, H))
+    return rects
+
+
+def _build_wall(kind):
+    wins = _wins_by_wall.get(kind, [])
+    L = W if kind in ("far", "near") else D
+    n = 0
+    for (a0, a1, z0, z1) in (_wall_rects(L, wins) if wins else [(0.0, L, 0.0, H)]):
+        sa, sz = a1 - a0, z1 - z0
+        ca, cz = (a0 + a1) / 2, (z0 + z1) / 2
+        if kind == "far":
+            o = plane(f"wall_far_{n}", sa, sz, (ca, D, cz), rot=(math.radians(90), 0, 0), m=WALL)
+        elif kind == "near":
+            o = plane(f"wall_near_{n}", sa, sz, (ca, 0, cz), rot=(math.radians(90), 0, 0), m=WALL)
+        elif kind == "left":
+            o = plane(f"wall_left_{n}", sz, sa, (0, ca, cz), rot=(0, math.radians(90), 0), m=WALL)
+        else:
+            o = plane(f"wall_right_{n}", sz, sa, (W, ca, cz), rot=(0, math.radians(-90), 0), m=WALL)
+        if kind in hide:
+            o.visible_camera = False
+        n += 1
+
+
+for _k in ("far", "near", "left", "right"):
+    if _k in hide and _k not in _wins_by_wall:
+        continue
+    _build_wall(_k)
+_ceil = plane("ceil", W, D, (W / 2, D / 2, H), rot=(math.pi, 0, 0), m=CEIL)
+if "ceil" in hide:
+    _ceil.visible_camera = False
 
 # ---------- 걸레받이(baseboard) — 그려진 벽 하단에 얇은 띠 ----------
 BB_H, BB_T = 0.085, 0.012  # 높이 8.5cm, 두께
@@ -227,9 +276,23 @@ if "left" not in hide:
 if "right" not in hide:
     box("bb_right", BB_T, D, BB_H, (W - BB_T / 2, D / 2, BB_H / 2), m=TRIM)
 
-# ---------- 컷아웃(비직사각형 방) — 배치금지 구역을 바닥~천장 벽체 박스로 ----------
+# ---------- 컷아웃(비직사각형 방) — 배치금지 구역을 바닥~천장 벽체로 ----------
+# 박스가 아니라 '면 단위'로 세운다: 방 경계와 겹치는 면은 만들지 않는다(그 자리는 외벽·천장이
+# 이미 담당). 박스 시절엔 겹친 바깥면이 숨김 벽 뒤에서 빛을 못 받아 새까만 판으로 보였다.
+_EPSB = 0.03
 for _ci, _c in enumerate(S.get("cutouts", [])):
-    box(f"cut{_ci}", _c["w"], _c["d"], H, (_c["x"], _c["y"], H / 2), m=WALL)
+    _hw, _hd = _c["w"] / 2, _c["d"] / 2
+    _x0, _x1 = _c["x"] - _hw, _c["x"] + _hw
+    _y0, _y1 = _c["y"] - _hd, _c["y"] + _hd
+    if _y0 > _EPSB:      # 앞면(-y)
+        plane(f"cut{_ci}_n", _c["w"], H, (_c["x"], _y0, H / 2), rot=(math.radians(90), 0, 0), m=WALL)
+    if _y1 < D - _EPSB:  # 뒷면(+y)
+        plane(f"cut{_ci}_f", _c["w"], H, (_c["x"], _y1, H / 2), rot=(math.radians(90), 0, 0), m=WALL)
+    if _x0 > _EPSB:      # 왼면(-x)
+        plane(f"cut{_ci}_l", H, _c["d"], (_x0, _c["y"], H / 2), rot=(0, math.radians(90), 0), m=WALL)
+    if _x1 < W - _EPSB:  # 오른면(+x)
+        plane(f"cut{_ci}_r", H, _c["d"], (_x1, _c["y"], H / 2), rot=(0, math.radians(-90), 0), m=WALL)
+    # 윗면은 천장(z=H)과 동일 평면 — 생성하지 않는다(천장이 담당)
 
 # ---------- 개구부(창문·문) — 벽별 임의 위치. 2D 평면의 문/창을 렌더에 반영 ----------
 # 벽: far(y=D)/near(y=0)/left(x=0)/right(x=W). c=벽 따라 중심(far/near=x, left/right=y).
@@ -242,7 +305,8 @@ def build_window(wall, c, w, h, z):
     if wall in ("far", "near"):
         yb = (D - 0.02) if wall == "far" else 0.02
         yf = yb + (-0.02 if wall == "far" else 0.02)   # 프레임/창살은 방 안쪽으로 살짝
-        plane("win_pane", w, h, (c, yb, z), rot=(math.radians(90), 0, 0), m=WM)
+        _pane = plane("win_pane", w, h, (c, yb, z), rot=(math.radians(90), 0, 0), m=WM)
+        _pane.visible_shadow = False   # 유리는 태양을 통과시킨다(발광은 유지)
         box("win_t", w + 2 * FR, 0.06, FR, (c, yf, z + h / 2 + FR / 2), m=TRIM)
         box("win_b", w + 2 * FR, 0.06, FR, (c, yf, z - h / 2 - FR / 2), m=TRIM)
         box("win_l", FR, 0.06, h + 2 * FR, (c - w / 2 - FR / 2, yf, z), m=TRIM)
@@ -252,7 +316,8 @@ def build_window(wall, c, w, h, z):
     else:  # left / right
         xb = 0.02 if wall == "left" else W - 0.02
         xf = xb + (0.02 if wall == "left" else -0.02)
-        plane("win_pane", h, w, (xb, c, z), rot=(0, math.radians(90), 0), m=WM)
+        _pane = plane("win_pane", h, w, (xb, c, z), rot=(0, math.radians(90), 0), m=WM)
+        _pane.visible_shadow = False
         box("win_t", 0.06, w + 2 * FR, FR, (xf, c, z + h / 2 + FR / 2), m=TRIM)
         box("win_b", 0.06, w + 2 * FR, FR, (xf, c, z - h / 2 - FR / 2), m=TRIM)
         box("win_l", 0.06, FR, h + 2 * FR, (xf, c - w / 2 - FR / 2, z), m=TRIM)
@@ -286,8 +351,11 @@ _openings = S.get("openings")
 if _openings:
     for o in _openings:
         wl = o.get("wall")
-        if wl not in ("far", "near", "left", "right") or wl in hide:
-            continue                                    # 없는 벽/컷어웨이로 사라진 벽은 생략
+        if wl not in ("far", "near", "left", "right"):
+            continue
+        if wl in hide and o.get("kind") == "door":
+            continue                                    # 숨김 벽의 '문'만 생략(벽 자체가 안 보이므로).
+        # 창은 숨김 벽에도 그린다 — 벽이 카메라 비가시로 '존재'하므로 유리 발광·구멍이 살아야 한다.
         c = o.get("pos", (W / 2 if wl in ("far", "near") else D / 2))
         if o.get("kind") == "door":
             build_door(wl, c, o.get("width", 0.9))
@@ -320,7 +388,9 @@ if sun:
         alt = min(alt, 35)
     sd = bpy.data.lights.new("sun", 'SUN'); so = bpy.data.objects.new("sun", sd)
     sc.collection.objects.link(so)
-    sd.energy = energy; sd.color = col; sd.angle = math.radians(2.5)  # 부드러운 그림자 경계
+    # 창이 있으면 '진짜 태양(창 구멍 통과)'이 주광 — 세게 + 또렷한 경계. winlight는 보조 필로.
+    sd.energy = energy * (3.2 if _wins else 1.0); sd.color = col
+    sd.angle = math.radians(1.2 if _wins else 2.5)   # 창 투과 빛패치 경계를 또렷하게
     so.rotation_euler = (math.radians(90 - alt), 0, math.radians(az))
     # 창문 키라이트(실내 직사광·그림자 담당) — 벽이 태양을 막으므로 창 안쪽에서 직접 쏜다
     for _wi, _o in enumerate(_wins):
@@ -329,7 +399,7 @@ if sun:
         _wl = bpy.data.lights.new(f"winlight{_wi}", 'AREA'); _wo = bpy.data.objects.new(f"winlight{_wi}", _wl)
         sc.collection.objects.link(_wo)
         _wl.shape = 'RECTANGLE'; _wl.size = _ww; _wl.size_y = _wh
-        _wl.energy = 260 * energy; _wl.color = col   # 실내 키라이트 — 그림자가 창에서 나오도록 환경광 대비 우위
+        _wl.energy = 90 * energy; _wl.color = col    # 보조 필라이트 — 주광(진짜 태양)을 안 죽이는 선에서 음영면을 살림
         _off = 0.07
         if _o["wall"] == "far":
             _wo.location = (_o["pos"], D - _off, _wz); _wo.rotation_euler = (math.radians(90), 0, math.radians(180))
@@ -339,6 +409,15 @@ if sun:
             _wo.location = (_off, _o["pos"], _wz); _wo.rotation_euler = (math.radians(90), 0, math.radians(-90))
         else:
             _wo.location = (W - _off, _o["pos"], _wz); _wo.rotation_euler = (math.radians(90), 0, math.radians(90))
+# 태양 프리셋(낮/아침/노을): 실내 전역 바운스를 흉내내는 약한 천장 필 — 역광면이 새까맣게
+# 무너지는 것 방지(천장·창벽이 빛을 막게 된 뒤 필요해짐). 무드를 해치지 않게 낮은 세기.
+if PRE.get("sun") and any(o.get("kind") == "window" for o in S.get("openings", [])):
+    _fd = bpy.data.lights.new("fill", 'POINT'); _fo = bpy.data.objects.new("fill", _fd)
+    sc.collection.objects.link(_fo)
+    _fd.energy = 120; _fd.color = (1.0, 0.97, 0.92)
+    _fd.shadow_soft_size = 0.9                       # 큰 소프트 반경 — 그림자 없는 앰비언트처럼
+    _fo.location = (W / 2, D / 2, H * 0.55)          # 방 중심 높이 — 수직면(벽체 옆면)도 밝힌다
+
 # 조명 '가구'가 있으면 그게 빛의 주인공 — 천장등은 보조로 줄인다(무드의 핵심).
 LAMPS = [it for it in S["items"] if it.get("lamp")]
 if PRE.get("lamp", 0) > 0:  # 실내 천장등(밤 위주)
@@ -351,18 +430,20 @@ if PRE.get("lamp", 0) > 0:  # 실내 천장등(밤 위주)
 # ---------- 조명 가구 = 실제 광원 ----------
 # 전구를 갓 상단 림 높이(h*0.92)에 둬 위·아래로 빛이 새는 고전적 무드샷 구도.
 # 세기는 프리셋 lamp 계수에 비례(밤 최대) + 낮에도 은은한 최소치 — "조명이 빛의 원천".
-for _li, _lp in enumerate(LAMPS):
-    _bz = float(_lp.get("elev", 0)) + float(_lp.get("h", 1.5)) * 0.92
-    _pl = bpy.data.lights.new(f"bulb{_li}", 'POINT'); _po = bpy.data.objects.new(f"bulb{_li}", _pl)
-    sc.collection.objects.link(_po)
-    _pl.color = (1.0, 0.72, 0.45)                      # ~2700K 웜톤
-    _pl.shadow_soft_size = 0.10                        # 부드러운 그림자
-    _pl.energy = 20 * (0.25 + 1.6 * PRE.get("lamp", 0))   # 밤 37W · 노을 21W · 낮 5W
-    _po.location = (_lp["x"], _lp["y"], _bz)
-    # 눈에 보이는 전구 글로우(작은 발광 구) — 화면에서 조명이 '켜져 있음'이 읽히게
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.045, location=(_lp["x"], _lp["y"], _bz))
-    _bo = bpy.context.active_object
-    _bo.data.materials.append(emission(f"bulbmat{_li}", (1.0, 0.78, 0.50), 4 + 26 * PRE.get("lamp", 0)))
+# 시간대 정책(사용자 지시): 밤/노을 = 조명이 켜져 무드를 만들고, 낮/아침 = 조명 OFF·태양이 주인공.
+if PRE.get("lamp", 0) >= 0.05:
+    for _li, _lp in enumerate(LAMPS):
+        _bz = float(_lp.get("elev", 0)) + float(_lp.get("h", 1.5)) * 0.92
+        _pl = bpy.data.lights.new(f"bulb{_li}", 'POINT'); _po = bpy.data.objects.new(f"bulb{_li}", _pl)
+        sc.collection.objects.link(_po)
+        _pl.color = (1.0, 0.72, 0.45)                  # ~2700K 웜톤
+        _pl.shadow_soft_size = 0.10                    # 부드러운 그림자
+        _pl.energy = 60 * PRE["lamp"]                  # 밤 60W · 노을 30W — 무드의 주광
+        _po.location = (_lp["x"], _lp["y"], _bz)
+        # 눈에 보이는 전구 글로우(작은 발광 구) — 화면에서 조명이 '켜져 있음'이 읽히게
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.045, location=(_lp["x"], _lp["y"], _bz))
+        _bo = bpy.context.active_object
+        _bo.data.materials.append(emission(f"bulbmat{_li}", (1.0, 0.78, 0.50), 6 + 30 * PRE["lamp"]))
 
 
 # ---------- 가구 배치 ----------
