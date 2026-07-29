@@ -7,6 +7,9 @@ const PAD = 16;
 const MAX_H = 470;
 // 컷아웃 구역 이름 — 도면(floorplanSvg)과 같은 어휘를 쓴다. 없으면 '배치금지'로만 보인다.
 const CUT_LABEL = { bath: '욕실', closet: '보일러실', kitchen: '주방', entry: '현관' };
+// ABO 로컬 상품 사진의 배경 제거본(오프라인 생성, /glb/*.cut.png) — 2D에서 3D 에셋처럼 쓴다.
+const cutSrc = (it) => (it.image || '').replace(/\.jpg$/, '.cut.png');
+const hasCut = (it) => /^\.?\/glb\/.+\.jpg$/.test(it.image || '');
 const ZONE_FILL = { bath: '#E7EFF2', kitchen: '#EAE3D8', closet: '#E9E2D6', entry: '#EFE8DE' };
 
 // 구역을 도면 표기법으로 그린다 — 욕실=타일 격자, 주방=카운터(싱크·화구), 현관/보일러실=사선 해칭.
@@ -309,19 +312,22 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                   offsetY={h / 2}
                   rotation={it.rotationDeg || 0}
                   fill={it.color || '#c9bfa8'}
-                  opacity={0.9}
+                  opacity={hasCut(it) ? 0.28 : 0.9}   /* 누끼가 있으면 타일은 옅은 발자국만 — 사진이 주인공 */
                   stroke={stroke}
                   strokeWidth={selectedId === it.id ? 3 : 2}
                   cornerRadius={3}
                 />
                 {(() => {
-                  const im = getImg(it.image);
+                  // ABO 로컬 상품은 배경 제거본(.cut.png)을 우선 — 3D 에셋처럼 형태만 뜬다.
+                  // (외부 네이버 썸네일은 원본 그대로 — 사전 처리 대상이 아님)
+                  const im = (hasCut(it) && getImg(cutSrc(it))) || getImg(it.image);
                   if (!im) return null;
                   const asp = im.naturalWidth / im.naturalHeight || 1;
-                  let iw = w * 0.74, ih = iw / asp;
-                  const maxh = h * 0.74;
+                  const fillK = hasCut(it) ? 0.92 : 0.74;   // 누끼는 여백 없이 크게
+                  let iw = w * fillK, ih = iw / asp;
+                  const maxh = h * fillK;
                   if (ih > maxh) { ih = maxh; iw = ih * asp; }
-                  return <KImage image={im} width={iw} height={ih} offsetX={iw / 2} offsetY={ih / 2} listening={false} opacity={0.95} />;
+                  return <KImage image={im} width={iw} height={ih} offsetX={iw / 2} offsetY={ih / 2} listening={false} />;
                 })()}
                 <Text
                   text={`${it.name}\n${Math.round(it.wM * 100)}×${Math.round(it.dM * 100)} · ${accuracyMeta(it.dimAccuracy).short}`}
