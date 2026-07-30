@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="방꾸요정 — L자 평면도">
+  <!-- 3안 'L자 평면도' — 실측 배치라는 앱의 본질. 실제 원룸이 욕실·현관에 파인 L자라는 것도 담는다.
+       면으로 채우지 않고 선으로 그려 앱의 가벼운 톤을 유지. 가구 한 덩이만 채워 '배치'를 암시. -->
+  <rect width="512" height="512" fill="#FFF8F3"/>
+  <!-- L자 방 윤곽 -->
+  <path d="M118 128h180v104h96v152H118z" fill="none" stroke="#835151" stroke-width="24" stroke-linejoin="round"/>
+  <!-- 놓인 가구(침대) 한 덩이 -->
+  <rect x="152" y="252" width="112" height="118" rx="16" fill="#D9A793"/>
+  <!-- 문 열림 호 — 도면 기호 -->
+  <path d="M298 232v-46a46 46 0 0 1 46 46z" fill="none" stroke="#C9B7A8" stroke-width="16"/>
+</svg>

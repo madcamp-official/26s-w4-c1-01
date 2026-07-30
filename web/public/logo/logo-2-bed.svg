@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="방꾸요정 — 침대 평면">
+  <!-- 2안 '침대(위에서 본)' — 2D 평면도에서 침대를 내려다보는 그 시선 그대로.
+       원룸에서 가장 큰 결정이 침대라 제품의 본질과 맞는다.
+       베개 둘 + 이불 접힘선으로 '침대'임을 못 박는다(선 하나만 있으면 카드처럼 읽힌다). -->
+  <rect width="512" height="512" fill="#FFF3ED"/>
+  <rect x="146" y="106" width="220" height="300" rx="40" fill="#FFFFFF" stroke="#835151" stroke-width="20"/>
+  <!-- 베개 둘 -->
+  <rect x="174" y="140" width="76" height="58" rx="22" fill="#D9A793"/>
+  <rect x="262" y="140" width="76" height="58" rx="22" fill="#D9A793"/>
+  <!-- 이불 접힘선(가슴께) -->
+  <path d="M156 236h200" stroke="#835151" stroke-width="16" stroke-linecap="round"/>
+  <!-- 요정 반짝임 -->
+  <path d="M388 120c5 23 13 31 36 36-23 5-31 13-36 36-5-23-13-31-36-36 23-5 31-13 36-36z" fill="#835151"/>
+</svg>
