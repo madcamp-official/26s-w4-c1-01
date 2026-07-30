@@ -226,9 +226,11 @@ def build_scene(p):
             openings.append({"kind": "window", "wall": rw, "pos": pos, "width": width, "h": 1.0, "z": 1.7})
     out = {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI, "cutouts": cutouts,
            "preset": p.get("preset", "day"),           # 시간대 조명 프리셋(blender가 노출·창색·태양광 결정)
-           "samples": int(p.get("samples", 48 if p.get("pano") else 96)),
-           "rx": int(p.get("rx", 2048 if p.get("pano") else 1400)),
-           "ry": int(p.get("ry", 1024 if p.get("pano") else 1050)),
+           # 파노라마는 화소가 커 시간이 길어진다 — 샘플을 32로(48과 PSNR 53dB, 육안 동일)
+           # 낮춰 클라우드플레어 100초 제한 안에 여유를 둔다.
+           "samples": int(p.get("samples", 32 if p.get("pano") else 96)),
+           "rx": int(p.get("rx", 3072 if p.get("pano") else 1400)),
+           "ry": int(p.get("ry", 1536 if p.get("pano") else 1050)),
            "openings": openings, "camera": cam, "hide": hide, "items": items}
     # 앱/하니스가 명시 오버라이드하면 통과(프리셋 기본값을 덮어씀).
     if p.get("pano"):
@@ -244,7 +246,10 @@ def render(payload):
     if not scene["items"]:
         raise ValueError("no renderable items (glb 없음)")
     with tempfile.TemporaryDirectory() as td:
-        sp, op = os.path.join(td, "scene.json"), os.path.join(td, "out.png")
+        # 파노라마는 JPEG(고해상도라 PNG면 4MB+) · 나머지는 무손실 PNG
+        _jpg = bool(scene.get("pano"))
+        sp = os.path.join(td, "scene.json")
+        op = os.path.join(td, "out.jpg" if _jpg else "out.png")
         json.dump(scene, open(sp, "w"))
         with LOCK:
             r = subprocess.run([BLENDER, "--background", "--python", SCRIPT, "--", sp, op],
@@ -252,7 +257,7 @@ def render(payload):
         if not os.path.exists(op):
             raise RuntimeError((r.stderr or r.stdout).decode(errors="ignore")[-300:])
         data = open(op, "rb").read()
-    return "data:image/png;base64," + base64.b64encode(data).decode()
+    return ("data:image/jpeg;base64," if _jpg else "data:image/png;base64,") + base64.b64encode(data).decode()
 
 
 class H(BaseHTTPRequestHandler):

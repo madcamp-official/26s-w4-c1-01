@@ -4,7 +4,7 @@ scene.json(방 치수 + 배치 아이템 + 카메라 + preset) → 포토리얼 
 usage: blender --background --python blender_render.py -- scene.json out.png
 좌표: x∈[0,W], y∈[0,D](깊이), z=up. 아이템 x,y=바닥 중심, rot=Z축 도(°).
 """
-import bpy, sys, json, math, mathutils
+import bpy, sys, os, json, math, mathutils
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 scene_path, out_path = argv[0], argv[1]
@@ -47,7 +47,14 @@ except Exception:
     pass
 sc.render.resolution_x = S.get("rx", 1280)
 sc.render.resolution_y = S.get("ry", 720)
-sc.render.image_settings.file_format = 'PNG'
+# 출력 형식은 out 파일 확장자로 결정한다. 파노라마는 3072×1536이라 PNG면 4MB가 넘는데,
+# 실사 인테리어는 JPEG로 거의 손실 없이 1/5로 줄어든다 — 폰에서 받는 시간이 화질을 좌우한다.
+_ext = os.path.splitext(out_path)[1].lower()
+if _ext in ('.jpg', '.jpeg'):
+    sc.render.image_settings.file_format = 'JPEG'
+    sc.render.image_settings.quality = 92
+else:
+    sc.render.image_settings.file_format = 'PNG'
 sc.view_settings.view_transform = 'AgX'
 _exp = PRE["exp"]
 if S.get("preset", "day") == "night" and S.get("lampOn") is not False and any(i.get("lamp") for i in S.get("items", [])):
