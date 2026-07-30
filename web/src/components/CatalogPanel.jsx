@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { searchFurniture, recommendSimilar } from '../lib/api.js';
 import { resolveDims, accuracyMeta, CATEGORIES, STYLE_OPTIONS, SIZE_OPTIONS, PRICE_OPTIONS, deriveStyle, deriveSize, derivePriceBand } from '../lib/catalog.js';
+import { bedSizeLabel } from '../lib/oneroom.js';
 
 // 가구 팔레트 — 자연어 검색 + 분위기/사이즈/종류 필터 + 네이버 유사추천 + 클릭으로 배치에 추가.
 export default function CatalogPanel({ onAdd }) {
@@ -103,6 +104,8 @@ export default function CatalogPanel({ onAdd }) {
                 <span className="meta">
                   <span className="nm">
                     {c.name}
+                    {/* 침대는 폭으로 규격을 부른다 — 목록에서 '내 방에 뭐가 들어가나'가 바로 읽히게 */}
+                    {bedSizeLabel(c) && <span className="bedtag">{bedSizeLabel(c)}</span>}
                     {mood && <span className="moodtag">{mood}</span>}
                   </span>
                   <span className="dm">
@@ -110,6 +113,7 @@ export default function CatalogPanel({ onAdd }) {
                     <span className={`badge sm ${acc.tone}`}>{acc.short}</span>
                     <span className="sizetag">{deriveSize(c)}</span>
                     {c.source ? ` · ${c.source}` : ''}
+                    {c.note ? ` · ${c.note}` : ''}
                     {typeof c.price === 'number' && c.price > 0 ? <> · <span className="pr">{c.price.toLocaleString()}원</span></> : null}
                   </span>
                 </span>

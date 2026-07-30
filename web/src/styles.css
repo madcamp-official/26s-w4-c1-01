@@ -654,3 +654,5 @@ img.ava { object-fit: cover; }
 .panoview-stage:active { cursor: grabbing; }
 .panoview-stage canvas { display: block; }
 .angle-pill.wide-pill { flex: 1; justify-content: center; }
+/* 침대 규격 뱃지(싱글/슈퍼싱글/퀸/킹) — 원룸 앱에서 가장 먼저 보고 거르는 정보 */
+.bedtag { margin: 0 7px 0 6px; padding: 1px 7px; border-radius: 100px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 800; vertical-align: 1px; }

@@ -73,6 +73,9 @@ export async function renderScene(room, items, cam3d, preset = 'day', view = nul
     ...(lamp.color ? { lampColor: lamp.color } : {}),
     items: items.filter((it) => it.glb).map((it) => ({
       glb: it.glb, x: it.cx, y: it.cy, rot: (it.rotationDeg || 0) + (it.orient || 0),   // orient=모델 정면 보정각
+      // 선언 치수(m) — 렌더가 GLB를 이 크기로 늘린다. 3D 뷰(Room3D)와 같은 규칙이라
+      // 평면도·3D·사진의 가구 크기가 항상 일치한다(표준규격·네이버 상품에서 특히 중요).
+      w: it.wM, d: it.dM, h: it.hM,
       ...(it.elevM ? { elev: it.elevM } : {}),   // 탁상 조명 등 '가구 위' 배치 높이(m)
       // 조명 가구 = 실제 광원 — 렌더가 전구 위치(h 기준)에 웜톤 라이트를 심는다(분위기 사진의 핵심)
       ...(it.cat === '조명' ? { lamp: true, h: it.hM || 1.5 } : {}),

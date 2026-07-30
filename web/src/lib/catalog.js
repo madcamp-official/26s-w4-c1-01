@@ -4,6 +4,7 @@
 // dimAccuracy: '정형'(IKEA 등 보장) | '추정'(네이버·중고 등).
 import { ABO } from './abo.js';
 import { ABO3D } from './abo3d.js';
+import { ONEROOM } from './oneroom.js';
 
 // 로컬 카탈로그는 ABO(실제 제품 이미지 누끼 + 정형 치수) 우선, 없으면 색상 시드로 폴백.
 const SEED = [
@@ -66,7 +67,9 @@ const withPrice = (list) => list.map((it) => (typeof it.price === 'number' ? it 
 
 // 3D 피벗: 실측 GLB 카탈로그(ABO3D) 우선 → 없으면 누끼 이미지(ABO) → 색상 시드(SEED)
 // (사진→3D 생성은 가구 품질이 폐급이라 폐기 — 아키스케치처럼 큐레이션 실측 카탈로그로.)
-export const CATALOG = withPrice(ABO3D.length ? ABO3D : (ABO.length ? ABO : SEED));
+// 원룸 표준 규격을 앞에 둔다 — ABO는 미국 가구라 침대가 죄다 퀸·킹이고, 원룸 앱에서
+// 목록 첫 화면이 킹 침대로 채워지면 5평 방에 킹을 놓는 배치가 기본이 되어버린다.
+export const CATALOG = withPrice([...ONEROOM, ...(ABO3D.length ? ABO3D : (ABO.length ? ABO : SEED))]);
 export const CATEGORIES = [...new Set(CATALOG.map((c) => c.cat))];
 
 // 카테고리별 표준 치수(cm) — 실제 치수가 미상인 실상품(네이버 등)의 기본값.
@@ -114,8 +117,11 @@ export function deriveStyle(item) {
 // 사이즈 — 발자국 최대 변(cm)으로 소/중/대. 카테고리마다 '큰 가구'의 기준이 다름
 // (침대는 다 커서 전역 90/155 기준으론 전부 대형, 의자는 다 작아서 전부 소형 — 필터가 무력화됨).
 // 그래서 카테고리별로 실측 cm 기준을 따로 둔다. 목록에 없는 카테고리는 전역 기준으로 폴백.
+// 침대만 '폭' 기준 — 한국에서 침대 크기는 폭으로 부르고(싱글100/SS110/퀸150/킹160),
+// 길이는 대개 200 고정이라 최대변으로 재면 싱글도 킹도 다 비슷해져 필터가 무력해진다.
+const SIZE_BY_WIDTH = new Set(['침대']);
 const SIZE_THRESH_BY_CAT = {
-  침대: [200, 235],
+  침대: [115, 150],
   소파: [160, 200],
   테이블: [60, 100],
   책상: [100, 140],
@@ -127,7 +133,7 @@ const SIZE_THRESH_BY_CAT = {
 export const SIZE_OPTIONS = ['소형', '중형', '대형'];
 export function deriveSize(item) {
   const rd = resolveDims(item);
-  const m = Math.max(rd.w, rd.d);
+  const m = SIZE_BY_WIDTH.has(item?.cat) ? rd.w : Math.max(rd.w, rd.d);
   const [lo, hi] = SIZE_THRESH_BY_CAT[item?.cat] || [90, 155];
   return m <= lo ? '소형' : m <= hi ? '중형' : '대형';
 }

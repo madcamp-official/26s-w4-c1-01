@@ -605,7 +605,7 @@ if _LEFF >= 0.05:
 
 
 # ---------- 가구 배치 ----------
-def place(path, x, y, rotdeg, elev=0):
+def place(path, x, y, rotdeg, elev=0, dims=None):
     before = set(bpy.data.objects)
     try:
         bpy.ops.import_scene.gltf(filepath=path)
@@ -632,6 +632,13 @@ def place(path, x, y, rotdeg, elev=0):
     obj = bpy.context.active_object
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
     # glTF 임포터가 rotation_mode='QUATERNION'으로 만들어 rotation_euler가 무시됨 → XYZ로 바꿔야 회전이 먹힘(핵심 버그)
+    # 선언 치수(m)에 맞춰 늘린다 — 앱의 3D 뷰(Room3D)가 이미 같은 방식으로 맞추는데
+    # 렌더만 GLB 원본 크기를 쓰면 평면도·3D와 사진의 가구 크기가 서로 달라진다.
+    # ABO 카탈로그는 선언 치수 = GLB 실측이라 배율 1.0(무변화). 네이버·표준규격 항목에서만 실제로 늘어난다.
+    if dims:
+        _cur = obj.dimensions
+        obj.scale = tuple((d / c if c > 1e-6 and d else 1.0) for d, c in zip(dims, (_cur.x, _cur.y, _cur.z)))
+        bpy.context.view_layer.update()
     obj.rotation_mode = 'XYZ'
     # three.js(Room3D, rot=-θ, Y-up) → Blender(Z-up) 손대칭 없는 변환: 깊이축 뒤집기(D-cy)와 짝 → rot=-θ
     obj.rotation_euler = (0, 0, math.radians(-rotdeg))
@@ -640,7 +647,8 @@ def place(path, x, y, rotdeg, elev=0):
 
 
 for it in S["items"]:
-    _ob = place(it["glb"], it["x"], it["y"], it.get("rot", 0), it.get("elev", 0))
+    _ob = place(it["glb"], it["x"], it["y"], it.get("rot", 0), it.get("elev", 0),
+                dims=it.get("dims"))
     if it.get("lamp") and _ob is not None:
         _ob.visible_shadow = False   # 갓이 전구 빛을 삼키면 색온도 선택이 화면에 안 드러난다
 
