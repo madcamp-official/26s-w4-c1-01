@@ -82,6 +82,7 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
   const planImg = useImageSrc(room.underlay);   // 실측 도면 배경(없으면 null)
   const imgCache = useRef({});
   const [, setImgTick] = useState(0);
+  const [draggingId, setDraggingId] = useState(null);   // 배지 색이 '집는 동안'만 초록이 되게
   // 제품 썸네일 로더(탑다운 타일 위 오버레이). 로드되면 리렌더.
   function getImg(src) {
     if (!src) return null;
@@ -157,40 +158,57 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
   // 가구 라벨 — 사각형 바깥 좌상단에 뜨는 작은 배지. 침대는 강조색, 나머진 코퍼.
   // 위쪽 벽에 붙어 바깥에 놓을 공간이 없으면 사각형 안쪽 상단으로 폴백하고,
   // 앞서 배치한 라벨과 겹치면 순서대로 오른쪽으로 밀어낸다(그리드가 커도 O(n²)로 충분히 가벼움).
+  // 라벨 배지는 '항상 제 가구에 붙어 있어야' 한다 — 겹친다고 옆으로 밀어내면
+  // 라벨이 남의 가구 위에 떠서 무엇의 라벨인지 알 수 없게 된다. 그래서 가구에 맞닿은
+  // 후보 자리(위/아래 바깥, 안쪽 상/하단)만 두고 그중 덜 겹치는 곳을 고른다.
+  const GAP = 3;   // 사각형과 배지 사이 — 딱 붙는 느낌이 나게 최소로
   const labelPlacements = useMemo(() => {
     const placedBoxes = [];   // 캔버스 절대좌표 기준 이미 놓인 라벨들(겹침 판정용)
     return items.map((it) => {
       const fp = effectiveFootprint(it.wM, it.dM, it.rotationDeg || 0);
       const hw = (fp.w * ppm) / 2, hd = (fp.d * ppm) / 2;   // 축정렬 바운딩박스 반폭/반깊이(px)
-      const isHero = it.cat === '침대';
-      const fontSize = isHero ? 8.5 : 8;
-      const bg = isHero ? '#3D5C4F' : '#B5652E';
+      const fontSize = it.cat === '침대' ? 8.5 : 8;
       // 상품명(영문 원문·긴 표기)이 아니라 카테고리로 — 배지는 한 줄 고정폭이라 짧은 이름이 전제.
       const text = `${it.cat || it.name} ${Math.round(it.wM * 100)}×${Math.round(it.dM * 100)}`;
-      // 캔버스에 실제 폰트 측정 없이 근사(칩 라벨과 같은 방식, line 221 참조) — 배지 배경 크기·겹침판정용.
+      // 캔버스에 실제 폰트 측정 없이 근사(칩 라벨과 같은 방식) — 배지 배경 크기·겹침판정용.
       const padX = 6, padY = 2.5;
       const w = text.length * fontSize * 0.92 + padX * 2;
       const h = fontSize * 1.25 + padY * 2;
 
       const cxPx = PAD + toPx(it.cx), cyPx = PAD + toPx(it.cy);
-      const rectTopLocal = -hd;
-      const outsideYLocal = rectTopLocal - 13 - h;   // 사각형 위 13px 바깥
-      const fitsOutside = cyPx + outsideYLocal > PAD + 2;   // 위쪽 벽선에 닿을 만큼 붙으면 폴백
-      let x = -hw + 2;
-      const y = fitsOutside ? outsideYLocal : rectTopLocal + 3;   // 폴백: 사각형 안쪽 상단
+      // 전부 가구 경계에 맞닿은 자리. 순서 = 선호도(위 바깥 > 아래 바깥 > 안쪽).
+      const cands = [
+        { x: -hw + 2, y: -hd - GAP - h },
+        { x: hw - w - 2, y: -hd - GAP - h },
+        { x: -hw + 2, y: hd + GAP },
+        { x: hw - w - 2, y: hd + GAP },
+        { x: -hw - GAP - w, y: -h / 2 },     // 왼쪽 바깥(세로 중앙)
+        { x: hw + GAP, y: -h / 2 },          // 오른쪽 바깥
+        { x: -hw + 2, y: -hd + 2 },          // 안쪽 상단
+        { x: -hw + 2, y: hd - h - 2 },       // 안쪽 하단
+      ];
+      const overlapOf = (gx, gy) => placedBoxes.reduce((sum, p) => {
+        const ox = Math.min(gx + w, p.x + p.w) - Math.max(gx, p.x);
+        const oy = Math.min(gy + h, p.y + p.h) - Math.max(gy, p.y);
+        return sum + (ox > 0 && oy > 0 ? ox * oy : 0);
+      }, 0);
 
-      let gx = cxPx + x, gy = cyPx + y;
-      for (const p of placedBoxes) {
-        if (gx < p.x + p.w + 3 && gx + w + 3 > p.x && gy < p.y + p.h && gy + h > p.y) {
-          x = p.x + p.w + 3 - cxPx;   // 겹치면 그 라벨 오른쪽으로 이어붙임
-          gx = cxPx + x;
-        }
+      let best = null;
+      for (const c of cands) {
+        const gx = cxPx + c.x, gy = cyPx + c.y;
+        // 캔버스 밖으로 나가는 자리는 후보에서 제외(잘려 보인다)
+        if (gx < 2 || gy < 2 || gx + w > stageW - 2 || gy + h > stageH - 2) continue;
+        const ov = overlapOf(gx, gy);
+        if (!best || ov < best.ov) best = { ...c, gx, gy, ov };
+        if (ov === 0) break;      // 안 겹치는 첫 자리면 더 볼 것 없다
       }
-      placedBoxes.push({ x: gx, y: gy, w, h });
+      // 모든 후보가 캔버스를 벗어나는 극단(아주 큰 가구)에서는 안쪽 상단으로.
+      if (!best) best = { x: -hw + 2, y: -hd + 2, gx: cxPx - hw + 2, gy: cyPx - hd + 2 };
+      placedBoxes.push({ x: best.gx, y: best.gy, w, h });
 
-      return { id: it.id, x, y, w, h, text, bg, fontSize, padX, padY };
+      return { id: it.id, x: best.x, y: best.y, w, h, text, fontSize, padX, padY };
     });
-  }, [items, ppm]);
+  }, [items, ppm, stageW, stageH]);
 
   return (
     <div className="stagewrap" ref={wrapRef}>
@@ -338,6 +356,8 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                 x={PAD + toPx(it.cx)}
                 y={PAD + toPx(it.cy)}
                 draggable
+                onDragStart={() => setDraggingId(it.id)}
+                onDragEnd={() => setDraggingId(null)}
                 onDragMove={(e) => moveItem(idx, e.target.x(), e.target.y(), e.target)}
                 onClick={() => setSelectedId(it.id)}
                 onTap={() => setSelectedId(it.id)}
@@ -376,7 +396,9 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                   if (!lp) return null;
                   return (
                     <Group x={lp.x} y={lp.y} listening={false}>
-                      <Rect width={lp.w} height={lp.h} fill={lp.bg} cornerRadius={6} />
+                      {/* 색은 종류가 아니라 '상태'를 말한다 — 집고 있는 동안만 초록(선택 테두리와 같은 계열) */}
+                      <Rect width={lp.w} height={lp.h} cornerRadius={6}
+                        fill={draggingId === it.id ? '#3f6a3a' : '#4A4038'} />
                       <Text text={lp.text} x={lp.padX} y={lp.padY} fontSize={lp.fontSize}
                         fontStyle="700" fill="#fff" wrap="none" />
                     </Group>

@@ -85,9 +85,6 @@ export default function CompositeResult({
         </div>
       </div>
 
-      {!showingBefore && renderImg && (
-        <div className="mockup-badge">🪄 목업이야 · 실제 조명·재질은 조금 다를 수 있어</div>
-      )}
       {!renderImg && (
         <div className="mockup-badge" style={{ background: 'rgba(0,0,0,.5)' }}>렌더 서버 연결 시 실제 사진이 나와요</div>
       )}
