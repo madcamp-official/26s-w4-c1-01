@@ -4,6 +4,7 @@ import { effectiveFootprint } from '../lib/geometry.js';
 const CATCOLOR = {
   침대: '#b8a58a', 소파: '#8fa3b0', 테이블: '#c9bfa8', 협탁: '#c9bfa8',
   책상: '#c9b79a', 의자: '#b0a68c', 수납: '#d0c3a8', 조명: '#cfc4ad', 러그: '#e3d9c8',
+  'TV/콘솔': '#8f765e', 냉장고: '#e8e8e5',
 };
 
 function Mini({ room, items, width = 188 }) {

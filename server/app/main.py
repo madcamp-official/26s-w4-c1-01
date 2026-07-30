@@ -362,8 +362,10 @@ async def layout(req: LayoutReq):
             data, _m = await _gemini_call(
                 {"system_instruction": {"parts": [{"text": _LAYOUT_PROMPT}]},
                  "contents": [{"role": "user", "parts": [{"text": user}]}],
-                 "generationConfig": {"maxOutputTokens": 24576, "temperature": 0.7,
-                                      "responseMimeType": "application/json"}}, timeout=90)
+                 # 자동배치는 로컬 기하 엔진이 최종 검증·후보 보충을 담당한다.
+                 # 긴 자기검산 출력 때문에 90초를 다 쓰지 않도록 생성량과 대기시간을 제한한다.
+                 "generationConfig": {"maxOutputTokens": 4096, "temperature": 0.7,
+                                      "responseMimeType": "application/json"}}, timeout=15)
             text = _gemini_text(data)
         else:
             async with httpx.AsyncClient(timeout=90) as cx:
@@ -478,7 +480,7 @@ _CHAT_SYS = (
     "사용자 요청을 받아, 요청을 '이행(apply)' 또는 '기각(reject)' 판단한다.\n"
     "좌표계: 원점=방 좌상단, +x=오른쪽(너비 W), +y=아래(깊이 D), 단위 cm 정수, rotation∈{0,90,180,270}(시계방향).\n"
     "하드제약(위반하면 apply 금지): ①가구 겹침 금지 ②모든 가구 방 경계 0..W,0..D 내 ③문 스윙 부채꼴·창 앞 침범 금지.\n"
-    "선호: 대형가구는 벽 밀착. TV장은 침대 정면 마주봄. 책상/테이블+의자는 의자가 앞면을 마주봄(테이블은 책상과 동급 — 의자·조명 관계 규칙 동일). 낮은 조명(h<70cm)은 책상/테이블 위, 플로어 스탠드는 침대 헤드 옆.\n"
+    "선호: 대형가구는 벽 밀착. TV장은 침대 헤드→발치 시선축의 맞은편 벽에 두고 앞면을 침대로 향하게 하여, 누운 사람이 목을 돌리지 않고 정면으로 보게 함(중심축 정렬, 수평각 15도 이내). 책상/테이블+의자는 의자가 앞면을 마주봄(테이블은 책상과 동급 — 의자·조명 관계 규칙 동일). 낮은 조명(h<70cm)은 책상/테이블 위, 플로어 스탠드는 침대 헤드 옆.\n"
     "판단: 가능하면 decision=\"apply\"+요청 반영한 '모든 가구의 새 위치' items. 불가능/위험/제약위반이면 decision=\"reject\"+배치 그대로.\n"
     "삭제 요청('침대 빼줘','침대만 남기고 다 빼줘')도 이행이다: decision=\"apply\", 없앨 가구의 id를 remove 배열에 넣고 "
     "items에는 '남는 가구'만 넣는다(전부 삭제면 items는 빈 배열). 위치를 안 바꾸면 items에 현재 좌표 그대로.\n"

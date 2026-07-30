@@ -231,7 +231,7 @@ input[type="number"], input[type="text"], select {
 .chat-option:hover { background: var(--bg2); }
 .chat-option:disabled { opacity: .5; }
 /* 자주 쓰는 문장 칩 — 스크롤로 숨겨지던 마지막 칩 발견성 문제 때문에 스크롤 대신 줄바꿈으로 전부 노출. */
-.chat-chips { display: flex; flex-wrap: nowrap; gap: 6px; padding: 10px 12px 0; overflow-x: auto; }
+.chat-chips { display: flex; flex-wrap: nowrap; gap: 6px; padding: 9px 12px; overflow-x: auto; border-bottom: 1px solid var(--line); }
 .chat-chips::-webkit-scrollbar { display: none; }
 /* 칩 테두리를 accent 톤으로, 배경을 살짝 더 진하게 — 시각적 위계와 눌림 신호 강화(design/UI수정.html "D안"). */
 .chat-chip { flex: none; border: 1px solid var(--accent-2); background: #FBE7D9; color: var(--accent); font-weight: 700; font-size: 12px; padding: 7px 12px; border-radius: var(--r-pill); white-space: nowrap; }
@@ -491,19 +491,19 @@ input[type="number"], input[type="text"], select {
 /* ── 합성 결과 ── */
 .result { background: var(--ink); position: relative; padding: 0; overflow: hidden; }
 .result .canvas { position: absolute; inset: 0; }
-/* contain — 세로 폰에서 가로(16:9) 렌더가 양옆으로 잘리지 않게 전체를 보여줌(어두운 여백은 결과 배경과 융화) */
-.result .canvas img { width: 100%; height: 100%; object-fit: contain; object-position: center 44%; display: block; }
+/* contain — 세로 폰에서 가로(16:9) 렌더 전체를 보이되, 하단 시트에 가리지 않도록 중심을 위로 올린다. */
+.result .canvas img { width: 100%; height: 100%; object-fit: contain; object-position: center 30%; display: block; }
 .hatch-after { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   background: repeating-linear-gradient(45deg, #4a3a2c, #4a3a2c 10px, #3a2c20 10px, #3a2c20 20px); color: rgba(255,255,255,.6); font: 600 12px monospace; }
 .hatch-before { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   background: repeating-linear-gradient(45deg, #E7E3DE, #E7E3DE 10px, #F2EFEA 10px, #F2EFEA 20px); color: var(--muted); font: 600 12px monospace; }
-.result .topbar { position: absolute; top: 52px; left: 20px; right: 20px; padding: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; z-index: 3; }
+.result .topbar { position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 20px; right: 20px; padding: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; z-index: 3; }
 .rt-circle { width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,.4); border: 0; color: #fff; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 .rt-pill { padding: 8px 14px; border-radius: var(--r-pill); background: rgba(0,0,0,.4); color: #fff; font-weight: 700; font-size: 12px; border: 0; white-space: nowrap; }
 /* 저장 버튼을 시간대 아이콘 줄 바로 아래, 같은 오른쪽 정렬로 — 달 아이콘(마지막 시간대) 아래에 위치 */
 .topbar-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .topbar-icons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.mockup-badge { position: absolute; top: 100px; left: 20px; z-index: 3; background: var(--pink); color: #fff; font-weight: 700; font-size: 10.5px; padding: 6px 12px; border-radius: var(--r-pill); white-space: nowrap; box-shadow: 0 4px 12px rgba(240,143,192,.4); }
+.mockup-badge { position: absolute; top: calc(60px + env(safe-area-inset-top)); left: 20px; z-index: 3; background: var(--pink); color: #fff; font-weight: 700; font-size: 10.5px; padding: 6px 12px; border-radius: var(--r-pill); white-space: nowrap; box-shadow: 0 4px 12px rgba(240,143,192,.4); }
 .result-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; background: #fff; border-radius: 28px 28px 0 0; padding: 20px 20px calc(26px + env(safe-area-inset-bottom)); }
 .result-sheet .estimate { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .result-sheet .estimate .k { font-weight: 800; font-size: 16px; color: var(--ink); }

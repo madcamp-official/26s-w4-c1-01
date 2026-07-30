@@ -36,6 +36,11 @@ export default function LayoutChat({ items, onSubmit, onPickOption }) {
   return (
     <div className="chatpanel">
       <div className="chat-head">💬 배치 도우미 <span>문장을 고르거나 입력하면 반영하고 결과를 보여줘요</span></div>
+      <div className="chat-chips" aria-label="추천 문장">
+        {SUGGESTIONS.map((s) => (
+          <button key={s} className="chat-chip" onClick={() => setInput(s)} disabled={busy}>{s}</button>
+        ))}
+      </div>
       <div className="chat-msgs" ref={scrollRef}>
         {msgs.length === 0 && <div className="chat-hint">✨ 자주 쓰는 문장을 눌러 바로 넣어보세요</div>}
         {msgs.map((m, i) => (
@@ -51,11 +56,6 @@ export default function LayoutChat({ items, onSubmit, onPickOption }) {
           </div>
         ))}
         {busy && <div className="chat-msg assistant busy">반영하는 중…</div>}
-      </div>
-      <div className="chat-chips">
-        {SUGGESTIONS.map((s) => (
-          <button key={s} className="chat-chip" onClick={() => setInput(s)} disabled={busy}>{s}</button>
-        ))}
       </div>
       <div className="chat-input">
         <input

@@ -155,7 +155,7 @@ export function deskChairComposed(chair, desk) {
 }
 // ── 앞면 여유공간(front clearance) hard 정책 ──
 // 기능적 '앞면'이 있는 가구는 그 앞이 비어 있어야 쓸 수 있다(서랍 열기·착석·수납 접근).
-export const FRONT_NEED = { '수납': 0.55, '책상': 0.5, '소파': 0.5, '테이블': 0.35 };
+export const FRONT_NEED = { '수납': 0.55, '책상': 0.5, '소파': 0.5, '테이블': 0.35, 'TV/콘솔': 0.55, '냉장고': 0.8 };
 
 // it 앞면의 빈 깊이(m): 앞 방향으로 벽 또는 (앞면 폭과 겹치는) 가장 가까운 장애물까지의 거리.
 // obstacles: AABB 배열(러그 제외). 아이템 몸통과 이미 겹친 것(구도 틈입 의자 등)은 세지 않는다.

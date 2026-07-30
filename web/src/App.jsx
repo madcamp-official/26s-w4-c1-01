@@ -20,9 +20,9 @@ import MarketTab from './components/MarketTab.jsx';
 import MyTab from './components/MyTab.jsx';
 import LayoutPicker from './components/LayoutPicker.jsx';
 
-// 자동 배치: Gemini 유효 후보가 LAYOUT_TARGET개 모일 때까지 재시도(최대 LAYOUT_MAX_TRIES회).
-const LAYOUT_TARGET = 1;
-const LAYOUT_MAX_TRIES = 20;
+// 자동 배치: Gemini는 한 번만 기다리고, 부족한 후보는 로컬 기하 엔진이 즉시 채운다.
+// 외부 API가 느리거나 실패해도 사용자는 항상 겹침 검사를 통과한 후보 3개를 받는다.
+const LAYOUT_OPTION_COUNT = 3;
 const layoutSig = (c) => c.items.map((i) => `${Math.round(i.cx * 100)},${Math.round(i.cy * 100)},${i.rotationDeg}`).join('|');
 const TAB_SCREENS = ['home', 'market', 'mypage'];
 const SAVED_ROOMS_KEY = 'bk-saved-rooms';
@@ -164,17 +164,31 @@ export default function App() {
     try {
       const seen = new Set();
       let opts = [];
-      for (let t = 0; t < LAYOUT_MAX_TRIES && opts.length < LAYOUT_TARGET; t++) {
-        const r = await layoutFurniture(room, items, openings);
-        if (r?.status === 'OK' && Array.isArray(r.candidates)) {
-          for (const c of validateCandidates(r.candidates, room, items, openings)) {
-            const s = layoutSig(c);
-            if (!seen.has(s)) { seen.add(s); opts.push(c); }
-          }
-        } else if (r?.status === 'NOKEY' || r?.status === 'CLIENT') break;
+      const addUnique = (candidates) => {
+        for (const c of candidates || []) {
+          if (opts.length >= LAYOUT_OPTION_COUNT) break;
+          const s = layoutSig(c);
+          if (!seen.has(s)) { seen.add(s); opts.push(c); }
+        }
+      };
+
+      // Gemini는 최대 한 번만 호출한다. api.js의 짧은 타임아웃을 넘기면 ERROR로 돌아와
+      // 아래 로컬 기하 엔진이 즉시 이어받는다(예전처럼 최대 20회×90초 재시도하지 않음).
+      const r = await layoutFurniture(room, items, openings);
+      if (r?.status === 'OK' && Array.isArray(r.candidates)) {
+        addUnique(validateCandidates(r.candidates, room, items, openings));
       }
-      if (opts.length < 3) opts = [...opts, ...generateLayouts(room, items, 3 - opts.length, 400, openings)];
-      if (!opts.length) { alert('가구가 많아 겹치지 않게 배치할 공간이 부족해요. 방을 키우거나 가구를 줄여 주세요.'); return; }
+
+      // Gemini 결과가 0~2개여도 로컬 엔진이 서로 다른 유효 후보를 총 3개까지 채운다.
+      // 첫 시도에서 다양성이 부족한 드문 경우에는 탐색량을 늘려 한 번 더 생성한다.
+      addUnique(generateLayouts(room, items, LAYOUT_OPTION_COUNT, 500, openings));
+      if (opts.length < LAYOUT_OPTION_COUNT) {
+        addUnique(generateLayouts(room, items, LAYOUT_OPTION_COUNT, 1200, openings));
+      }
+      if (opts.length < LAYOUT_OPTION_COUNT) {
+        alert(`겹치지 않는 배치는 ${opts.length}개만 만들 수 있어요. 방을 키우거나 가구를 줄여 주세요.`);
+        return;
+      }
       setLayoutOpts(opts);
     } finally { setLayoutBusy(false); }
   }

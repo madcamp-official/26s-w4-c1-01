@@ -184,7 +184,7 @@ function roleOf(it) {
   // 예전엔 이름을 먼저 봐서 '책상 의자'가 이름의 '책상' 때문에 desk로 분류됐다. 그러면
   // 의자가 하나도 없는 것으로 취급돼 책상-의자 세트(R2)가 통째로 성립하지 않는다.
   // 네이버 상품명에도 '책상 의자', '침대 옆 협탁'처럼 남의 카테고리 단어가 흔히 섞인다.
-  const BY_CAT = { 러그: 'rug', 침대: 'bed', 소파: 'sofa', 책상: 'desk', 수납: 'storage', 조명: 'lamp', 의자: 'chair' };
+  const BY_CAT = { 러그: 'rug', 침대: 'bed', 소파: 'sofa', 책상: 'desk', 수납: 'storage', 조명: 'lamp', 의자: 'chair', 'TV/콘솔': 'tv', 냉장고: 'storage' };
   if (BY_CAT[it.cat]) return BY_CAT[it.cat];
   if (it.cat === '테이블') return (it.wM < 0.6 && it.dM < 0.6) ? 'side' : 'table';
   // 카테고리가 없는 항목(검색 결과 등)만 이름으로 추정한다.

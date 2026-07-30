@@ -1,4 +1,4 @@
-// ABO 3D 가구 카탈로그 — GLB 실측 모델 184종 (CC BY-NC 4.0, Amazon Berkeley Objects)
+// ABO 3D 가구 카탈로그 — GLB 모델 186종 (CC BY-NC 4.0, Amazon Berkeley Objects)
 // glb: 텍스처 1024+webp 압축본 · w/d/h: GLB extent(cm, 실척) · image: small 썸네일
 export const ABO3D = [
   { id: 'abo3d-B075QDV397', name: 'Rivet Nova Modern King Bed Frame wit', cat: '침대', w: 202, d: 215, h: 117, color: '#c9c2b6', glb: '/glb/B075QDV397.glb', image: '/glb/B075QDV397.jpg', source: 'ABO', dimAccuracy: '정형' },
@@ -185,4 +185,7 @@ export const ABO3D = [
   { id: 'abo3d-B075QFF9FY', name: 'Stone & Beam Chanton Upholstered Tufted King Sleigh ', cat: '침대', w: 161, d: 249, h: 127, color: '#c9c2b6', glb: '/glb/B075QFF9FY.glb', image: '/glb/B075QFF9FY.jpg', source: 'ABO', dimAccuracy: '정형' },
   { id: 'abo3d-B075QG3JWL', name: 'Rivet Kyler Mid-Century Upholstered Tufted Queen Bed', cat: '침대', w: 153, d: 164, h: 93, color: '#c9c2b6', glb: '/glb/B075QG3JWL.glb', image: '/glb/B075QG3JWL.jpg', source: 'ABO', dimAccuracy: '정형' },
   { id: 'abo3d-B075QL8KBL', name: 'Stone & Beam Vintage Ari Arced Metal Steel Queen Bed', cat: '침대', w: 166, d: 220, h: 128, color: '#c9c2b6', glb: '/glb/B075QL8KBL.glb', image: '/glb/B075QL8KBL.jpg', source: 'ABO', dimAccuracy: '정형' },
+  { id: 'abo3d-B072ZMT5SD', name: 'Rivet King Street TV Media Console', cat: 'TV/콘솔', w: 150, d: 40, h: 40, color: '#8f765e', glb: '/glb/B072ZMT5SD.glb', image: '/glb/B072ZMT5SD.jpg', source: 'ABO', dimAccuracy: '정형' },
+  // ABO에는 냉장고 본체 3D가 없어, 형태가 가장 가까운 공식 ABO 2-door cabinet을 1인용 냉장고 규격으로 스케일한 정직한 프록시.
+  { id: 'abo3d-B079TYF1GK', name: 'Compact Refrigerator (ABO cabinet proxy)', cat: '냉장고', w: 60, d: 65, h: 170, color: '#e8e8e5', glb: '/glb/B079TYF1GK.glb', image: '/glb/B079TYF1GK.jpg', source: 'ABO 프록시', dimAccuracy: '추정(AI)', proxyNote: 'ABO 2-door cabinet model scaled to refrigerator dimensions' },
 ];
