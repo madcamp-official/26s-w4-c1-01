@@ -15,6 +15,7 @@ import HomeTab from './components/HomeTab.jsx';
 import RoomInput from './components/RoomInput.jsx';
 import PlannerScreen from './components/PlannerScreen.jsx';
 import CompositeResult from './components/CompositeResult.jsx';
+import PanoViewer from './components/PanoViewer.jsx';
 import MarketTab from './components/MarketTab.jsx';
 import MyTab from './components/MyTab.jsx';
 import LayoutPicker from './components/LayoutPicker.jsx';
@@ -56,6 +57,10 @@ export default function App() {
   const [dimBusy, setDimBusy] = useState(false);
 
   const [renderImg, setRenderImg] = useState(null);
+  const [panoImg, setPanoImg] = useState(null);       // 360° 둘러보기 파노라마(한 번 구우면 계속 씀)
+  const [panoBusy, setPanoBusy] = useState(false);
+  const [panoOpen, setPanoOpen] = useState(false);
+  const panoKey = useRef(null);                        // 어떤 배치·시간대로 구운 파노라마인지
   const [renderBusy, setRenderBusy] = useState(false);
   const [renderPreset, setRenderPreset] = useState('day');
   const [renderView, setRenderView] = useState('wide');   // 'wide' | 'cozy' | 'wide2'(반대편 와이드) — 서버 프레이밍
@@ -181,6 +186,24 @@ export default function App() {
       if (p) { pendingRender.current = null; setTimeout(() => doRenderItems(p.its, p.preset, p.viewMode), 0); }
     }
   }
+  // 360° 둘러보기 — 배치·시간대가 그대로면 이미 구운 파노라마를 다시 쓴다(서버 재호출 없음).
+  async function openPano() {
+    if (!room || panoBusy) return;
+    const key = `${renderPreset}|${items.map((i) => `${i.glb}${Math.round(i.cx * 100)},${Math.round(i.cy * 100)},${i.rotationDeg || 0}`).join('|')}`;
+    if (panoImg && panoKey.current === key) { setPanoOpen(true); return; }
+    setPanoBusy(true);
+    try {
+      const r = await renderScene(room, items, null, renderPreset, null, openings, lampRef.current, true);
+      if (r?.status === 'OK' && r.image) {
+        panoKey.current = key;
+        setPanoImg(r.image);
+        setPanoOpen(true);
+      } else {
+        alert('둘러보기 사진을 만들지 못했어 — 잠시 뒤 다시 시도해줘');
+      }
+    } finally { setPanoBusy(false); }
+  }
+
   // 시간대·각도를 함께 확정해 현재 배치로 렌더 — 전부 서버 프레이밍(wide/cozy/wide2).
   // trigger는 로딩 문구 구분용(무엇이 바뀌어서 다시 찍는지) — 최초 렌더 등 구분 불필요할 땐 생략.
   function renderWith(preset, viewMode, trigger = null) {
@@ -428,6 +451,10 @@ export default function App() {
         />
       )}
 
+      {panoOpen && panoImg && (
+        <PanoViewer src={panoImg} caption="방 안에서 둘러보기" onClose={() => setPanoOpen(false)} />
+      )}
+
       {screen === 'result' && (
         <CompositeResult
           renderImg={renderImg} renderBusy={renderBusy} renderTrigger={renderTrigger} showBefore={showBefore}
@@ -436,6 +463,7 @@ export default function App() {
           view={renderView} onView={(v) => renderWith(renderPreset, v, 'view')}
           onBack={() => setScreen('planner')} onRerender={() => setScreen('planner')} onFindSimilar={findSimilar}
           onShare={shareToCommunity} onSave={saveRoom}
+          onPano={openPano} panoBusy={panoBusy}
           hasLamp={items.some((it) => it.cat === '조명' && it.glb)}
           lampOn={lampOn} onLampToggle={cycleLamp} lampColor={lampColor} onLampColor={pickLampColor}
         />

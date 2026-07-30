@@ -59,7 +59,7 @@ export async function relightImage(dataUrl, strength = 0.3) {
 
 // 포토리얼 렌더 — 현재 3D 배치 → camp-3 Blender 사진. 반환: {status:'OK'|'CLIENT'|'ERROR', image}.
 // glb 있는 아이템만 보낸다(치수·위치는 미터·room 좌표 그대로 → 서버가 blender 좌표로 사용).
-export async function renderScene(room, items, cam3d, preset = 'day', view = null, openings = [], lamp = {}) {
+export async function renderScene(room, items, cam3d, preset = 'day', view = null, openings = [], lamp = {}, pano = false) {
   const W = room.widthM, D = room.depthM;
   const payload = {
     room: { w: W, d: D, h: 2.6 },
@@ -78,7 +78,10 @@ export async function renderScene(room, items, cam3d, preset = 'day', view = nul
       ...(it.cat === '조명' ? { lamp: true, h: it.hM || 1.5 } : {}),
     })),
   };
-  if (view) {
+  if (pano) {
+    // 360° 둘러보기 — 서버가 방 안 눈높이의 설 자리를 골라 등장방형 한 장을 굽는다(카메라·앵글 무시).
+    payload.pano = true;
+  } else if (view) {
     // 자동 다각도('wide'|'cozy') — 카메라 대신 서버가 프레이밍을 결정.
     payload.view = view;
   } else if (cam3d?.pos && cam3d?.target) {

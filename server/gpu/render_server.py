@@ -111,6 +111,43 @@ def auto_camera(view, W, D, H, cutouts=None):
     return cam, [yside, xside, "ceil"]
 
 
+def _clearance(gx, gy, W, D, rects):
+    """점에서 가장 가까운 장애물(외벽 또는 부속실 벽체)까지 거리. 안에 있으면 0."""
+    d = min(gx, W - gx, gy, D - gy)
+    for (a, b, c, e) in rects:
+        if a <= gx <= b and c <= gy <= e:
+            return 0.0
+        dx = max(a - gx, 0.0, gx - b)
+        dy = max(c - gy, 0.0, gy - e)
+        d = min(d, math.hypot(dx, dy))
+    return d
+
+
+def pano_spot(W, D, cutouts, items):
+    """파노라마에서 '서 있을 자리' — 벽·부속실에서 충분히 떨어지고 가구와도 겹치지 않는 점.
+    빈 공간의 한가운데를 그냥 쓰면 침대 한복판에 서서 매트리스만 보이고,
+    가구에서 멀기만 따지면 벽에 코를 박은 구석이 뽑힌다. 둘 다 본다."""
+    x0, x1, y0, y1 = living_bbox(W, D, cutouts)
+    rects = [(c["x"] - c["w"] / 2, c["x"] + c["w"] / 2, c["y"] - c["d"] / 2, c["y"] + c["d"] / 2)
+             for c in (cutouts or [])]
+    pts = [(it["x"], it["y"]) for it in (items or [])]
+    best, bestscore = ((x0 + x1) / 2, (y0 + y1) / 2), -1.0
+    step = 0.15
+    gy = y0 + step
+    while gy < y1:
+        gx = x0 + step
+        while gx < x1:
+            clear = _clearance(gx, gy, W, D, rects)
+            if clear >= 0.35:                       # 벽에 붙어 서지 않는다
+                far_item = min((math.hypot(gx - px, gy - py) for px, py in pts), default=1.5)
+                score = min(clear, 1.3) + 0.6 * min(far_item, 1.5)
+                if score > bestscore:
+                    best, bestscore = (gx, gy), score
+            gx += step
+        gy += step
+    return best, ((x0 + x1) / 2, (y0 + y1) / 2)
+
+
 def build_scene(p):
     room = p.get("room", {})
     W = float(room.get("w", 3.6)); D = float(room.get("d", 5.0)); H = float(room.get("h", 2.6))
@@ -139,7 +176,24 @@ def build_scene(p):
     #  1) view("wide"/"cozy") 지정 → 자동 다각도(카메라 무시)  2) 사용자 3D 시점(camera)  3) 기본 = wide 자동
     view = p.get("view")
     cam = p.get("camera")
-    if cam and not view:
+    if p.get("pano"):
+        # 360° 둘러보기: 방 안 눈높이에 서서 사방을 한 장에 담는다. 벽은 blender가 전부 세운다.
+        (sx, sy), (cxr, cyr) = pano_spot(W, D, cutouts, items)
+        # 첫 화면이 향할 곳 = 가구가 모여 있는 쪽. 방의 기하중심을 보면 좁은 방일수록
+        # 맨 벽만 잡힌다(가구는 대개 벽에 붙어 있으니 중심에는 아무것도 없다).
+        if items:
+            tx = sum(i["x"] for i in items) / len(items)
+            ty = sum(i["y"] for i in items) / len(items)
+            if math.hypot(tx - sx, ty - sy) < 0.8:      # 내가 선 자리와 겹치면 가장 먼 가구를 본다
+                far = max(items, key=lambda i: math.hypot(i["x"] - sx, i["y"] - sy))
+                tx, ty = far["x"], far["y"]
+        else:
+            tx, ty = cxr, cyr
+        if math.hypot(tx - sx, ty - sy) < 0.5:
+            tx, ty = (sx + (1.0 if sx < W / 2 else -1.0), sy)
+        cam = {"pos": [sx, sy, min(1.55, H - 0.35)], "target": [tx, ty, 1.0]}
+        hide = []
+    elif cam and not view:
         # 사용자의 3D 시점 그대로. 카메라 쪽 두 벽을 생략(그 벽이 방을 가리므로).
         cxc, cyc = float(cam["pos"][0]), float(cam["pos"][1])
         hide = p.get("hide") or [
@@ -169,10 +223,14 @@ def build_scene(p):
             openings.append({"kind": "window", "wall": rw, "pos": pos, "width": width, "h": 1.0, "z": 1.7})
     out = {"room": {"w": W, "d": D, "h": H}, "hdri": HDRI, "cutouts": cutouts,
            "preset": p.get("preset", "day"),           # 시간대 조명 프리셋(blender가 노출·창색·태양광 결정)
-           "samples": int(p.get("samples", 96)), "rx": int(p.get("rx", 1400)), "ry": int(p.get("ry", 1050)),
+           "samples": int(p.get("samples", 48 if p.get("pano") else 96)),
+           "rx": int(p.get("rx", 2048 if p.get("pano") else 1400)),
+           "ry": int(p.get("ry", 1024 if p.get("pano") else 1050)),
            "openings": openings, "camera": cam, "hide": hide, "items": items}
     # 앱/하니스가 명시 오버라이드하면 통과(프리셋 기본값을 덮어씀).
-    for k in ("hdri_strength", "exposure", "rug", "lampOn", "lampColor"):
+    if p.get("pano"):
+        out["pano"] = True
+    for k in ("hdri_strength", "exposure", "rug", "lampOn", "lampColor", "panoExp"):
         if k in p:
             out[k] = p[k]
     return out

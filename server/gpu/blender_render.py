@@ -30,6 +30,9 @@ PRESETS = {
 }
 PRE = PRESETS.get(S.get("preset", "day"), PRESETS["day"])
 
+# 파노라마(360°) 모드 — 노출·벽 처리·카메라가 달라진다
+PANO = bool(S.get("pano"))
+
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
 
@@ -49,6 +52,10 @@ sc.view_settings.view_transform = 'AgX'
 _exp = PRE["exp"]
 if S.get("preset", "day") == "night" and S.get("lampOn") is not False and any(i.get("lamp") for i in S.get("items", [])):
     _exp -= 0.22   # 조명만 켠 밤 — 어둠 유지(빛 웅덩이 대비 강화)
+if PANO:
+    # 컷어웨이 렌더는 숨긴 벽(창 없는 쪽)을 아예 안 세워 빛이 새어나간다. 파노라마는 사방이
+    # 다 막혀 바운스가 갇히므로 같은 프리셋이라도 훨씬 밝아진다 → 노출을 내려 톤을 맞춘다.
+    _exp -= float(S.get("panoExp", 0.9))
 sc.view_settings.exposure = S.get("exposure", _exp)
 sc.render.film_transparent = False
 
@@ -213,7 +220,6 @@ HANDLE = mat("handle", (0.62, 0.60, 0.55), rough=0.35, metal=0.9)  # 문 손잡�
 # visible_camera=False — 카메라엔 안 보여도 빛은 막는다 → 빛은 오직 창 구멍으로만 들어온다.
 # 파노라마(360°) 모드: 방 안에서 사방을 둘러보는 한 장. 벽을 하나도 숨기지 않는다 —
 # 컷어웨이는 '밖에서 들여다보는' 구도용이고, 안에서 돌아보려면 벽이 다 있어야 한다.
-PANO = bool(S.get("pano"))
 hide = set() if PANO else set(S.get("hide", []))
 
 # ---------- 바닥 = '실제 방'만 ----------

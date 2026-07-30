@@ -644,3 +644,13 @@ img.ava { object-fit: cover; }
 /* 방 치수와 견적을 한 줄에 나란히 두면 2열 그리드 폭에서 치수가 줄바꿈된다 → 위아래로 쌓는다 */
 .savedcard .cap { display: flex; flex-direction: column; gap: 1px; }
 .savedcard .cap-sub { font-weight: 700; font-size: 11px; color: var(--accent); white-space: nowrap; }
+
+/* ── 360° 둘러보기 뷰어 ── */
+.panoview { position: absolute; inset: 0; z-index: 45; background: #12100e; display: flex; flex-direction: column; }
+.panoview-bar { display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; color: #fff; }
+.panoview-bar .rt-circle { background: rgba(255,255,255,.16); color: #fff; }
+/* touch-action:none — 드래그가 페이지 스크롤로 새지 않게 */
+.panoview-stage { flex: 1; min-height: 0; touch-action: none; cursor: grab; }
+.panoview-stage:active { cursor: grabbing; }
+.panoview-stage canvas { display: block; }
+.angle-pill.wide-pill { flex: 1; justify-content: center; }

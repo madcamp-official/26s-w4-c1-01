@@ -11,7 +11,7 @@ const LAMP_COLORS = [['#FFB873', '웜'], ['#DDEBFF', '쿨']];
 export default function CompositeResult({
   renderImg, renderBusy, renderTrigger, showBefore, onToggle, photo, estimate, estimateIsEst,
   timePreset, onTime, view, onView, onBack, onRerender, onFindSimilar, onShare, onSave,
-  hasLamp, lampOn, onLampToggle, lampColor, onLampColor,
+  hasLamp, lampOn, onLampToggle, lampColor, onLampColor, onPano, panoBusy,
 }) {
   const [zoom, setZoom] = useState(false);   // 결과 사진 확대 보기
   const [shareState, setShareState] = useState('idle');   // idle | busy | done | error
@@ -99,6 +99,14 @@ export default function CompositeResult({
           ))}
           <span className="angle-hint">각도</span>
         </div>
+        {/* 둘러보기 = 360° 파노라마 한 장. 처음 한 번만 굽고(약 30초) 그 뒤로는 즉시 열린다. */}
+        {renderImg && onPano && (
+          <div className="angle-row">
+            <button className="angle-pill wide-pill" disabled={panoBusy || renderBusy} onClick={onPano}>
+              {panoBusy ? '둘러볼 사진 만드는 중… (약 30초)' : '🔄 방 안에서 둘러보기'}
+            </button>
+          </div>
+        )}
         {hasLamp && (
           <div className="angle-row">
             <button className={`angle-pill ${lampOn !== null ? 'on' : ''}`} disabled={renderBusy} onClick={onLampToggle}>

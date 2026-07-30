@@ -319,6 +319,10 @@ class RenderReq(BaseModel):
     lampOn: Optional[bool] = None   # 조명 수동 토글(null=프리셋 정책: 밤/노을 ON)
     lampColor: Optional[str] = None # 조명 색(hex) — 웜/아이보리/쿨
     view: Optional[str] = None      # 카메라 앵글(wide/cozy) — 없으면 camera/기본 프레이밍
+    pano: Optional[bool] = None     # 360° 둘러보기 한 장(등장방형). 선언 안 하면 Pydantic이 버린다
+    panoExp: Optional[float] = None # 파노라마 노출 보정(기본 0.7 내림)
+    rx: Optional[int] = None        # 해상도 오버라이드
+    ry: Optional[int] = None
 
 
 @app.post("/api/render")
