@@ -231,7 +231,8 @@ input[type="number"], input[type="text"], select {
 .chat-option:hover { background: var(--bg2); }
 .chat-option:disabled { opacity: .5; }
 /* 자주 쓰는 문장 칩 — 스크롤로 숨겨지던 마지막 칩 발견성 문제 때문에 스크롤 대신 줄바꿈으로 전부 노출. */
-.chat-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 0; }
+.chat-chips { display: flex; flex-wrap: nowrap; gap: 6px; padding: 10px 12px 0; overflow-x: auto; }
+.chat-chips::-webkit-scrollbar { display: none; }
 /* 칩 테두리를 accent 톤으로, 배경을 살짝 더 진하게 — 시각적 위계와 눌림 신호 강화(design/UI수정.html "D안"). */
 .chat-chip { flex: none; border: 1px solid var(--accent-2); background: #FBE7D9; color: var(--accent); font-weight: 700; font-size: 12px; padding: 7px 12px; border-radius: var(--r-pill); white-space: nowrap; }
 .chat-chip:hover { border-color: var(--accent); background: #F8DCC8; }
@@ -512,12 +513,12 @@ input[type="number"], input[type="text"], select {
 .rerender-veil span { font-weight: 700; font-size: 13px; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.5); }
 .rt-circle.busy { pointer-events: auto; filter: saturate(.6); }
 
-.angle-row { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+.angle-row { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
 .angle-pill { border: 0; padding: 7px 13px; border-radius: var(--r-pill); background: var(--bg2); color: var(--muted); font-weight: 700; font-size: 12px; white-space: nowrap; }
 .angle-pill.on { background: var(--ink); color: #fff; }
 .angle-pill:disabled { opacity: .5; }
 .angle-hint { margin-left: auto; font-size: 11px; color: var(--muted3); white-space: nowrap; }
-.result-sheet .acts { display: flex; gap: 10px; }
+.acts { display: flex; gap: 10px; }
 .sheet-btn { flex: 1; border: 0; text-align: center; padding: 14px; border-radius: 16px; font-weight: 700; font-size: 14px; }
 .sheet-btn.sub { background: var(--bg2); color: var(--ink); }
 .sheet-btn.main { background: var(--accent); color: #fff; }
@@ -664,7 +665,6 @@ img.ava { object-fit: cover; }
 .panoview-stage { flex: 1; min-height: 0; touch-action: none; cursor: grab; }
 .panoview-stage:active { cursor: grabbing; }
 .panoview-stage canvas { display: block; }
-.angle-pill.wide-pill { flex: 1; justify-content: center; }
 /* 침대 규격 뱃지(싱글/슈퍼싱글/퀸/킹) — 원룸 앱에서 가장 먼저 보고 거르는 정보 */
 .bedtag { margin: 0 7px 0 6px; padding: 1px 7px; border-radius: 100px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 800; vertical-align: 1px; }
 .catitem .nm-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

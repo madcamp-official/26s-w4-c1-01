@@ -94,16 +94,15 @@ export default function CompositeResult({
           {VIEWS.map(([v, label]) => (
             <button key={v} className={`angle-pill ${view === v ? 'on' : ''}`} disabled={renderBusy} onClick={() => onView(v)}>{label}</button>
           ))}
+          {/* 둘러보기 = 360° 파노라마 한 장. 처음 한 번만 굽고(약 30초) 그 뒤로는 즉시 열린다.
+              별도 줄로 두면 시트가 높아져 사진이 더 가려지므로 각도 pill과 한 줄에 붙인다. */}
+          {renderImg && onPano && (
+            <button className="angle-pill" disabled={panoBusy || renderBusy} onClick={onPano} title="방 안에서 둘러보기">
+              {panoBusy ? '🔄 만드는 중…' : '🔄 둘러보기'}
+            </button>
+          )}
           <span className="angle-hint">각도</span>
         </div>
-        {/* 둘러보기 = 360° 파노라마 한 장. 처음 한 번만 굽고(약 30초) 그 뒤로는 즉시 열린다. */}
-        {renderImg && onPano && (
-          <div className="angle-row">
-            <button className="angle-pill wide-pill" disabled={panoBusy || renderBusy} onClick={onPano}>
-              {panoBusy ? '둘러볼 사진 만드는 중… (약 30초)' : '🔄 방 안에서 둘러보기'}
-            </button>
-          </div>
-        )}
         {hasLamp && (
           <div className="angle-row">
             <button className={`angle-pill ${lampOn !== null ? 'on' : ''}`} disabled={renderBusy} onClick={onLampToggle}>

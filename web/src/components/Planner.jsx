@@ -29,7 +29,11 @@ function drawZone(kctx, kind, x, y, w, h, ppm, dim, chipHalf = 0) {
     for (let gx = x + step; gx < x + w; gx += step) { ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx, y + h); ctx.stroke(); }
     for (let gy = y + step; gy < y + h; gy += step) { ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); ctx.stroke(); }
   } else if (kind === 'kitchen') {
-    // 카운터 상판 라인(안쪽 인셋) — 싱크 사각형은 어수선해서 뺐다. 화구 2구만, 라벨 칩과 안 겹칠 때.
+    // 카운터 상판(안쪽 인셋) — 기본 구역색(ZONE_FILL.kitchen)이 바닥·격자선과 너무 가까운 톤이라
+    // 테두리만 그리면 '안 채워진 빈 칸'처럼 보인다. 상판 안쪽을 한 톤 더 진하게 채워 대비를 준다.
+    // 싱크 사각형은 어수선해서 뺐다. 화구 2구만, 라벨 칩과 안 겹칠 때.
+    ctx.fillStyle = '#DDD1BC';
+    ctx.fillRect(x + 4.5, y + 4.5, w - 9, h - 9);
     ctx.strokeStyle = '#C7BCAB';
     ctx.strokeRect(x + 4.5, y + 4.5, w - 9, h - 9);
     const horiz = w >= h, T = horiz ? h : w;
@@ -206,7 +210,7 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
       if (!best) best = { x: -hw + 2, y: -hd + 2, gx: cxPx - hw + 2, gy: cyPx - hd + 2 };
       placedBoxes.push({ x: best.gx, y: best.gy, w, h });
 
-      return { id: it.id, x: best.x, y: best.y, w, h, text, fontSize, padX, padY };
+      return { id: it.id, x: best.x, y: best.y, w, h, text, fontSize };
     });
   }, [items, ppm, stageW, stageH]);
 
@@ -399,8 +403,8 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                       {/* 색은 종류가 아니라 '상태'를 말한다 — 집고 있는 동안만 초록(선택 테두리와 같은 계열) */}
                       <Rect width={lp.w} height={lp.h} cornerRadius={6}
                         fill={draggingId === it.id ? '#3f6a3a' : '#4A4038'} />
-                      <Text text={lp.text} x={lp.padX} y={lp.padY} fontSize={lp.fontSize}
-                        fontStyle="700" fill="#fff" wrap="none" />
+                      <Text text={lp.text} width={lp.w} height={lp.h} fontSize={lp.fontSize}
+                        align="center" verticalAlign="middle" fontStyle="700" fill="#fff" wrap="none" />
                     </Group>
                   );
                 })()}

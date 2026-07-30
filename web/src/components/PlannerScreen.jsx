@@ -61,7 +61,7 @@ export default function PlannerScreen({
       )}
 
       <div className="statrow">
-        {val.ok ? <span className="badge ok">맞음 문제없음</span> : <span className="badge warn">겹침/방밖 있음</span>}
+        {val.ok ? <span className="badge ok">잘 배치됨</span> : <span className="badge warn">겹침/방밖 있음</span>}
         {val.blockOpen && <span className="badge warn">문/창 가림</span>}
         <span className="chip">남은 바닥 {Math.round(val.freeRatio * 100)}%</span>
         <span className="chip">치수 정형·입력 {solid} · 추정 {items.length - solid}</span>

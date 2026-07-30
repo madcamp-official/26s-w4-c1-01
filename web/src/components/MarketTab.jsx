@@ -92,8 +92,10 @@ export default function MarketTab({ recommendItem, onConsumeRecommend, onBuyClic
         return (pa - pb) * dir;
       });
     }
+    // 찜한 상품을 맨 위로 — 안정 정렬이라 가격순 등 기존 순서는 그 안에서 그대로 유지된다.
+    list = [...list].sort((a, b) => Number(wished.has(b.id)) - Number(wished.has(a.id)));
     return list;
-  }, [remote, cat, styleWanted, sizeOnly, sort]);
+  }, [remote, cat, styleWanted, sizeOnly, sort, wished]);
 
   const source = remote?.source;
   const chip = (active, count) => `fpill${active ? ' on' : ''}`;

@@ -16,6 +16,9 @@ export default function MyTab({ taste, savedRooms, onDeleteRoom, onOpenRoom, use
   const [view, setView] = useState(null);   // {src, caption, action} — 저장 배치·좋아요 글 사진 확대
   const [wishOpen, setWishOpen] = useState(false);
   const [wishlist, setWishlist] = useState(getWishlist);
+  // 삭제할 배치 id — window.confirm은 WebView(APK)에서 안 뜨거나 자동 취소될 수 있어(진짜 원인),
+  // 앱 안 바텀시트로 직접 확인받는다.
+  const [confirmDelId, setConfirmDelId] = useState(null);
 
   function unwish(id) {
     removeWish(id);
@@ -86,7 +89,7 @@ export default function MyTab({ taste, savedRooms, onDeleteRoom, onOpenRoom, use
                       title={src ? '크게 보기' : '저장된 사진이 없어요'}>
                       {!src && <span className="shot-none">사진 없음</span>}
                       <button type="button" className="savedcard-del" title="삭제"
-                        onClick={(e) => { e.stopPropagation(); if (window.confirm('이 배치를 삭제할까요?')) onDeleteRoom?.(r.id); }}>🗑</button>
+                        onClick={(e) => { e.stopPropagation(); setConfirmDelId(r.id); }}>🗑</button>
                     </div>
                     <div className="cap">
                       {cap}
@@ -169,6 +172,20 @@ export default function MyTab({ taste, savedRooms, onDeleteRoom, onOpenRoom, use
             : <button onClick={onLogout}>로그인 하러 가기 <span className="arr">›</span></button>}
         </div>
       </div>
+
+      {confirmDelId && (
+        <div className="sheet-back" onClick={() => setConfirmDelId(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-grab" />
+            <div className="stitle">이 배치를 삭제할까요?</div>
+            <p className="mockup-note">삭제하면 되돌릴 수 없어요.</p>
+            <div className="acts">
+              <button className="sheet-btn sub" onClick={() => setConfirmDelId(null)}>취소</button>
+              <button className="sheet-btn main" onClick={() => { onDeleteRoom?.(confirmDelId); setConfirmDelId(null); }}>삭제</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
