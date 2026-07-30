@@ -69,7 +69,7 @@ function repairCandidate(items, room, openings = []) {
         const dk = deskP.it;
         const crot = (dk.rotationDeg + 180) % 360;
         const f = FRONT_VEC[dk.rotationDeg];
-        const gap = it.dM <= 0.62 ? -0.25 : 0.03;
+        const gap = chairGap(dk, it);
         const off = Math.max(0.05, dk.dM / 2 + it.dM / 2 + gap);
         const chx = dk.cx + f[0] * off, chy = dk.cy + f[1] * off;
         const cb = boxAt(it, chx, chy, crot);
@@ -180,13 +180,21 @@ function shuffle(arr) {
 
 function roleOf(it) {
   const n = `${it.name || ''} ${it.cat || ''}`;
-  if (it.cat === '러그' || /러그|카펫/.test(n)) return 'rug';
-  if (it.cat === '침대' || /침대|매트리스|베드/.test(n)) return 'bed';
-  if (it.cat === '소파' || /소파/.test(n)) return 'sofa';
-  if (it.cat === '책상' || /책상|데스크/.test(n)) return 'desk';
-  if (it.cat === '수납' || /수납|서랍|책장|선반|옷장|장롱|드레서|캐비닛/.test(n)) return 'storage';
-  if (it.cat === '조명' || /조명|스탠드|램프/.test(n)) return 'lamp';
-  if (it.cat === '의자' || /의자|체어|스툴|오토만/.test(n)) return 'chair';
+  // 카테고리가 명시돼 있으면 그게 정답 — 이름 키워드보다 우선한다.
+  // 예전엔 이름을 먼저 봐서 '책상 의자'가 이름의 '책상' 때문에 desk로 분류됐다. 그러면
+  // 의자가 하나도 없는 것으로 취급돼 책상-의자 세트(R2)가 통째로 성립하지 않는다.
+  // 네이버 상품명에도 '책상 의자', '침대 옆 협탁'처럼 남의 카테고리 단어가 흔히 섞인다.
+  const BY_CAT = { 러그: 'rug', 침대: 'bed', 소파: 'sofa', 책상: 'desk', 수납: 'storage', 조명: 'lamp', 의자: 'chair' };
+  if (BY_CAT[it.cat]) return BY_CAT[it.cat];
+  if (it.cat === '테이블') return (it.wM < 0.6 && it.dM < 0.6) ? 'side' : 'table';
+  // 카테고리가 없는 항목(검색 결과 등)만 이름으로 추정한다.
+  if (/러그|카펫/.test(n)) return 'rug';
+  if (/침대|매트리스|베드/.test(n)) return 'bed';
+  if (/소파/.test(n)) return 'sofa';
+  if (/책상|데스크/.test(n)) return 'desk';
+  if (/수납|서랍|책장|선반|옷장|장롱|드레서|캐비닛/.test(n)) return 'storage';
+  if (/조명|스탠드|램프/.test(n)) return 'lamp';
+  if (/의자|체어|스툴|오토만/.test(n)) return 'chair';
   if (it.wM < 0.6 && it.dM < 0.6) return 'side';
   return 'table';
 }
@@ -377,6 +385,16 @@ function placeTVFacingBed(tv, bed, bedWall, placed, W, D, openings, segs, cuts) 
   }
   return false;
 }
+// 의자가 책상 밑으로 들어가는 깊이(m) — 의자·책상 깊이에 비례하고 상한 20cm.
+// 예전엔 25cm 고정이라 얕은 의자일수록 더 파묻혔다: 스툴(40cm)은 63%, 데스크체어(50cm)는 50%가
+// 책상 안에 들어가 평면도에서 '책상 안에 의자가 박힌' 그림이 됐다. 이제 어떤 의자든 약 35%만 틈입한다.
+// 책상 깊이의 45%도 넘지 않는다 — 서랍 달린 얕은 책상(50cm)에 25cm를 밀어넣을 수는 없다.
+// 깊은 암체어(>62cm)는 애초에 안 들어가고 3cm 띄운다.
+function chairGap(desk, chair) {
+  if (!chair || chair.dM > 0.62) return 0.03;
+  return -Math.min(0.20, chair.dM * 0.35, (desk?.dM || 0.5) * 0.45);
+}
+
 // R2: 책상을 벽에, 의자를 책상 앞면 앞에 마주보게(세트). 의자까지 놓여야 성공.
 function placeDeskChair(desk, chair, placed, W, D, openings, segs) {
   for (const wall of shuffle(['top', 'bottom', 'left', 'right'])) {
@@ -388,8 +406,7 @@ function placeDeskChair(desk, chair, placed, W, D, openings, segs) {
       if (!chair) { desk.cx = c.cx; desk.cy = c.cy; desk.rotationDeg = c.rot; placed.push(deskBox); return { wall, chair: false }; }
       const crot = (c.rot + 180) % 360;                 // 의자 앞면이 책상 향함
       const f = FRONT_VEC[c.rot];                        // 책상 앞면 방향
-      // 틈입 깊이는 의자 크기에 적응: 얇은 데스크체어(≤62cm)만 ~25cm 틈입, 암체어 등 깊은 의자는 3cm 간격.
-      const gap = chair.dM <= 0.62 ? -0.25 : 0.03;
+      const gap = chairGap(desk, chair);            // 틈입 깊이(의자·책상 깊이에 비례)
       const off = Math.max(0.05, desk.dM / 2 + chair.dM / 2 + gap);
       const chx = c.cx + f[0] * off, chy = c.cy + f[1] * off;
       const chairBox = boxAt(chair, chx, chy, crot);

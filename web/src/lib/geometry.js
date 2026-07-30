@@ -141,7 +141,17 @@ export function deskChairComposed(chair, desk) {
   const dx = chair.cx - desk.cx, dy = chair.cy - desk.cy;
   if (dx * fd[0] + dy * fd[1] <= 0) return false;                 // 의자가 책상 '앞면 쪽'에 있어야(뒤/옆 금지)
   const perp = Math.abs(dx * fd[1] - dy * fd[0]);                 // 앞면과 수직 오프셋(정렬도)
-  return perp <= Math.max(desk.wM || 0, chair.wM || 0) / 2 + 0.05; // 중심축 정렬
+  if (perp > Math.max(desk.wM || 0, chair.wM || 0) / 2 + 0.05) return false;   // 중심축 정렬
+  // 틈입 깊이 상한 — '책상 밑에 반쯤 들어간' 데까지가 구도다. 그보다 깊으면 겹쳐 박힌 것.
+  // 상한이 없던 시절엔 의자 중심이 책상 중심보다 1cm만 앞서도 통과해서, 얕은 데스크체어가
+  // 책상 안에 통째로 들어간 배치가 '자연스러운 구도'로 허용됐다.
+  const fdp = effectiveFootprint(desk.wM, desk.dM, desk.rotationDeg);
+  const fcp = effectiveFootprint(chair.wM, chair.dM, chair.rotationDeg);
+  const along = Math.abs(dx * fd[0] + dy * fd[1]);                // 앞면 방향 중심 간 거리
+  const deskHalf = (fd[0] ? fdp.w : fdp.d) / 2;                   // 앞면 축 방향 반깊이
+  const chairHalf = (fd[0] ? fcp.w : fcp.d) / 2;
+  const tuck = deskHalf + chairHalf - along;                      // 책상 안으로 들어간 깊이
+  return tuck <= chairHalf * 1.2;   // 의자 깊이의 60%까지만 틈입 — 최소 40%는 책상 밖으로 나와야 '의자'로 보인다
 }
 // ── 앞면 여유공간(front clearance) hard 정책 ──
 // 기능적 '앞면'이 있는 가구는 그 앞이 비어 있어야 쓸 수 있다(서랍 열기·착석·수납 접근).
