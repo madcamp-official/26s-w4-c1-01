@@ -70,9 +70,11 @@ input[type="number"], input[type="text"], select {
 .catitem:hover { border-color: var(--accent); }
 .swatch { width: 26px; height: 26px; border-radius: 5px; flex: none; border: 1px solid rgba(0,0,0,.08); object-fit: cover; background: #efeae0; }
 .selthumb { width: 30px; height: 30px; border-radius: 5px; object-fit: cover; border: 1px solid var(--line); }
-.catitem .meta { min-width: 0; }
-.catitem .nm { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.catitem .dm { font-size: 11px; color: var(--muted); }
+/* 이름 줄과 치수 줄을 분리 — 한 줄로 흘리면 영어 상품명+규격 뱃지에 밀려 치수가 잘린다 */
+.catitem .meta { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.catitem .nm { font-size: 13px; display: flex; align-items: center; gap: 0; min-width: 0; }
+.catitem .nm > :first-child, .catitem .nm { overflow: hidden; }
+.catitem .dm { font-size: 11px; color: var(--muted); line-height: 1.45; }
 
 .stagewrap { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
 .stagewrap .konvajs-content { margin: 0 auto; }
@@ -656,3 +658,5 @@ img.ava { object-fit: cover; }
 .angle-pill.wide-pill { flex: 1; justify-content: center; }
 /* 침대 규격 뱃지(싱글/슈퍼싱글/퀸/킹) — 원룸 앱에서 가장 먼저 보고 거르는 정보 */
 .bedtag { margin: 0 7px 0 6px; padding: 1px 7px; border-radius: 100px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 800; vertical-align: 1px; }
+.catitem .nm-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.catitem .nm .bedtag, .catitem .nm .moodtag { flex: none; }

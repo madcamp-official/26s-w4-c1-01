@@ -103,7 +103,7 @@ export default function CatalogPanel({ onAdd }) {
                 )}
                 <span className="meta">
                   <span className="nm">
-                    {c.name}
+                    <span className="nm-t">{c.name}</span>
                     {/* 침대는 폭으로 규격을 부른다 — 목록에서 '내 방에 뭐가 들어가나'가 바로 읽히게 */}
                     {bedSizeLabel(c) && <span className="bedtag">{bedSizeLabel(c)}</span>}
                     {mood && <span className="moodtag">{mood}</span>}
