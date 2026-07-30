@@ -514,10 +514,15 @@ input[type="number"], input[type="text"], select {
 
 /* ── 마켓 탭 ── */
 .market { background: #fff; }   /* position:relative 없음 → 바텀시트가 .phone에 스코프되어 탭바까지 덮음(플래너 드로어와 동일) */
-.market .body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: var(--top-pad) 18px 0; display: flex; flex-direction: column; }
+.market .body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 18px; display: flex; flex-direction: column; }
 /* 카테고리·검색창·필터칩을 한 블록으로 묶어 스크롤해도 상단에 통째로 고정.
    (카테고리 세그먼트에만 sticky를 걸면 검색창·필터칩은 그냥 콘텐츠처럼 스크롤되어 사라짐 — 버그 재발 방지 주석) */
-.market-head { position: sticky; top: 0; background: #fff; z-index: 2; flex-shrink: 0; }
+/* sticky는 부모의 '콘텐츠 박스' 안에 갇힌다 — .market .body에 padding-top이 있으면 헤더가 그 아래에
+   붙어버려, 화면 맨 위 padding 높이만큼 띠가 열리고 그리로 스크롤되는 상품 사진이 비친다.
+   (실기기 캡처로 확인: padding 20px → 헤더 top이 0이 아니라 20에 고정)
+   그래서 상단 여백은 컨테이너가 아니라 이 헤더가 직접 갖고, 좌우는 음수 마진으로 풀블리드. */
+.market-head { position: sticky; top: 0; background: #fff; z-index: 2; flex-shrink: 0;
+  margin: 0 -18px; padding: var(--top-pad) 18px 0; }
 /* flex-shrink:0 필수: overflow-x:auto인 flex 자식은 브라우저가 overflow-y도 auto로 강제하면서
    min-height가 auto→0으로 계산돼, 세로 flex 부모(.market .body)가 내용 넘칠 때 이 줄을 찌그러뜨려 버림. */
 .catseg { display: flex; flex-shrink: 0; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding: 6px 0 8px; }
