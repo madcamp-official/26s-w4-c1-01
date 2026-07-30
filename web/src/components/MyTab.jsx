@@ -7,13 +7,13 @@ const PROVIDER_LABEL = { kakao: '카카오', google: 'Google' };
 const CAT_BADGE = { flex: '🎀 자랑', tip: '💡 꿀팁', question: '❓ 질문' };
 
 // 마이 탭 — 프로필(소셜 로그인 연동) + 취향 태그 + 저장한 배치 + 좋아요/찜 + 계정 리스트.
-export default function MyTab({ taste, savedRooms, onDeleteRoom, user, onEditTaste, onLogout }) {
+export default function MyTab({ taste, savedRooms, onDeleteRoom, onOpenRoom, user, onEditTaste, onLogout }) {
   const rooms = savedRooms || [];
   const tags = [...(taste?.moods || [])];
   if (taste?.budget) tags.push(`예산 ${taste.budget}`);
   if (taste?.pet) tags.push('반려동물 🐾');
 
-  const [view, setView] = useState(null);   // {src, caption} — 저장 배치·좋아요 글 사진 확대
+  const [view, setView] = useState(null);   // {src, caption, action} — 저장 배치·좋아요 글 사진 확대
   const [wishOpen, setWishOpen] = useState(false);
   const [wishlist, setWishlist] = useState(getWishlist);
 
@@ -44,7 +44,7 @@ export default function MyTab({ taste, savedRooms, onDeleteRoom, user, onEditTas
 
   return (
     <div className="mypage">
-      {view && <ImageViewer src={view.src} caption={view.caption} onClose={() => setView(null)} />}
+      {view && <ImageViewer src={view.src} caption={view.caption} action={view.action} onClose={() => setView(null)} />}
       <div className="body">
         <div className="profile">
           {user?.avatar
@@ -78,7 +78,11 @@ export default function MyTab({ taste, savedRooms, onDeleteRoom, user, onEditTas
                 return (
                   <div key={r.id || i} className="savedcard">
                     <div className="shot" style={src ? { backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
-                      onClick={() => src && setView({ src, caption: cap })}
+                      onClick={() => src && setView({
+                        src, caption: cap,
+                        // 저장된 배치는 방·가구·문창이 통째로 남아 있다 — 그대로 편집으로 되돌아갈 수 있다.
+                        action: onOpenRoom && r.room ? { label: '이 배치로 배치하러 가기', onClick: () => onOpenRoom(r) } : null,
+                      })}
                       title={src ? '크게 보기' : '저장된 사진이 없어요'}>
                       {!src && <span className="shot-none">사진 없음</span>}
                       <button type="button" className="savedcard-del" title="삭제"

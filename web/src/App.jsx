@@ -92,6 +92,17 @@ export default function App() {
     setItems((p) => [...p, it]);
     setSelectedId(it.id);
   }
+  // 가구 담기 목록은 토글 — 같은 상품을 다시 누르면 방금 담은 것을 도로 뺀다.
+  // (담기만 되면 잘못 누른 걸 되돌리려고 평면도에서 찾아 지워야 했다)
+  // 같은 상품을 여러 개 담았으면 '마지막에 담은 하나'만 뺀다 — 직전 클릭의 취소가 되게.
+  function toggleFurniture(cat) {
+    if (!room) return;
+    const same = items.filter((it) => it.catId === cat.id);
+    if (!same.length) { addFurniture(cat); return; }
+    const lastId = same[same.length - 1].id;
+    setItems((p) => p.filter((it) => it.id !== lastId));
+    setSelectedId((cur) => (cur === lastId ? null : cur));
+  }
   // 배치 도우미의 "추천" 카드에서 하나를 골랐을 때 — 이미 검증된 특정 카탈로그 아이템이라 그대로 addFurniture로.
   function pickRecommended(id) {
     const catItem = CATALOG.find((c) => c.id === id);
@@ -396,6 +407,19 @@ export default function App() {
     }
   }
 
+  // 저장된 배치로 되돌아가기 — 방·문창·가구가 통째로 남아 있어 그대로 편집을 이어갈 수 있다.
+  // 렌더 사진도 같이 살려둔다(결과 화면으로 넘어갔을 때 빈 화면부터 다시 굽지 않게).
+  function openSavedRoom(r) {
+    if (!r?.room) return;
+    setRoom(r.room);
+    setOpenings(r.openings || []);
+    setItems(r.items || []);
+    setRenderImg(r.image || r.renderImg || null);
+    setSelectedId(null);
+    setPanoImg(null); panoKey.current = null;   // 다른 배치의 파노라마를 그대로 쓰면 안 된다
+    setScreen('planner');
+  }
+
   // 로그인 상태면 서버 배치함을 정본으로 쓴다(로컬 저장분은 로그인 전 기록이라 뒤에 붙인다).
   async function reloadRooms() {
     if (!user) { setSavedRooms(loadSavedRooms()); return; }
@@ -458,7 +482,7 @@ export default function App() {
           openings={openings} setOpenings={setOpenings} val={val} layoutBusy={layoutBusy}
           onAutoLayout={openAutoLayout} moveItem={moveItem} rotateItem={rotateItem}
           onDelete={deleteSel} onRotateSel={rotateSel} onSetDim={setSelDim} onAutoFillDims={autoFillDims}
-          dimBusy={dimBusy} addFurniture={addFurniture} cam3d={cam3d}
+          dimBusy={dimBusy} addFurniture={addFurniture} toggleFurniture={toggleFurniture} cam3d={cam3d}
           onChatSubmit={onChatSubmit} onPickChatOption={pickRecommended}
           onBack={() => setScreen('roominput')} onFinish={finishPlanner}
         />
@@ -487,7 +511,7 @@ export default function App() {
       )}
 
       {screen === 'mypage' && (
-        <MyTab taste={taste} savedRooms={savedRooms} onDeleteRoom={deleteSavedRoom} user={user} onEditTaste={() => setScreen('onboarding')}
+        <MyTab taste={taste} savedRooms={savedRooms} onOpenRoom={openSavedRoom} onDeleteRoom={deleteSavedRoom} user={user} onEditTaste={() => setScreen('onboarding')}
           onLogout={() => { logout(); setUser(null); setScreen('login'); }} />
       )}
 

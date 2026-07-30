@@ -645,7 +645,7 @@ img.ava { object-fit: cover; }
 /* touch-action:none — 브라우저 기본 핀치/스크롤을 끄고 우리 핸들러가 배율을 잡는다 */
 .imgview-stage { flex: 1; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
 .imgview-stage img { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center center; will-change: transform; user-select: none; }
-.imgview-hint { text-align: center; color: #B9A99C; font-size: 11.5px; padding: 8px 0 calc(12px + env(safe-area-inset-bottom)); }
+.imgview-hint { text-align: center; color: #B9A99C; font-size: 11.5px; padding: 4px 0 2px; }
 /* 클릭 가능한 저장 이미지 — 눌리는 느낌을 준다. 삭제 버튼은 별개 클릭 영역(stopPropagation)이라 확대를 안 켬. */
 .savedcard .shot { cursor: pointer; transition: transform .12s ease; }
 .savedcard .shot:active { transform: scale(.97); }
@@ -669,3 +669,10 @@ img.ava { object-fit: cover; }
 .bedtag { margin: 0 7px 0 6px; padding: 1px 7px; border-radius: 100px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 800; vertical-align: 1px; }
 .catitem .nm-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .catitem .nm .bedtag, .catitem .nm .moodtag { flex: none; }
+/* 확대 뷰어 하단 — 액션 버튼이 있을 때만 뜬다(저장 배치 → 편집으로 되돌아가기) */
+.imgview-foot { padding: 0 16px calc(10px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 6px; }
+.imgview-act { width: 100%; border: 0; border-radius: var(--r-btn); background: var(--accent); color: #fff;
+  font-weight: 800; font-size: 15px; padding: 14px 16px; }
+.imgview-act:active { opacity: .85; }
+/* 담긴 상품 — 목록에서 상태가 바로 보이게(다시 누르면 빠진다) */
+.catrow.on .catitem { border-color: var(--accent); background: var(--bg2); }

@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 // 확대 배율이 1일 때는 드래그를 가로채지 않아 뒤 화면 스크롤을 방해하지 않는다.
 const MAX = 4, MIN = 1;
 
-export default function ImageViewer({ src, alt = '', caption, onClose }) {
+// action: {label, onClick} — 사진을 열어둔 채로 이어서 할 일이 있을 때만 준다(예: 저장 배치 → 편집으로).
+export default function ImageViewer({ src, alt = '', caption, action, onClose }) {
   const [k, setK] = useState(1);                 // 배율
   const [t, setT] = useState({ x: 0, y: 0 });    // 이동(px)
   const box = useRef(null);
@@ -91,8 +92,11 @@ export default function ImageViewer({ src, alt = '', caption, onClose }) {
           style={{ transform: `translate(${t.x}px, ${t.y}px) scale(${k})` }}
         />
       </div>
-      <div className="imgview-hint" onClick={(e) => e.stopPropagation()}>
-        두 손가락으로 확대 · 더블탭으로 원복
+      <div className="imgview-foot" onClick={(e) => e.stopPropagation()}>
+        {action && (
+          <button className="imgview-act" onClick={action.onClick}>{action.label}</button>
+        )}
+        <div className="imgview-hint">두 손가락으로 확대 · 더블탭으로 원복</div>
       </div>
     </div>
   );

@@ -10,7 +10,7 @@ import ViewErrorBoundary from './ViewErrorBoundary.jsx';
 export default function PlannerScreen({
   room, items, setItems, selectedId, setSelectedId, openings, setOpenings,
   val, layoutBusy, onAutoLayout, moveItem, rotateItem, onDelete, onRotateSel,
-  onSetDim, onAutoFillDims, dimBusy, addFurniture, cam3d, onChatSubmit, onPickChatOption, onBack, onFinish,
+  onSetDim, onAutoFillDims, dimBusy, addFurniture, toggleFurniture, cam3d, onChatSubmit, onPickChatOption, onBack, onFinish,
 }) {
   const [view3d, setView3d] = useState(false);
   const [drawer, setDrawer] = useState(false);
@@ -79,7 +79,7 @@ export default function PlannerScreen({
             <div className="sheet-grab" />
             <div className="stitle">가구 담기 🛋️</div>
             <div style={{ overflow: 'auto', minHeight: 0 }}>
-              <CatalogPanel onAdd={(cat) => { addFurniture(cat); }} placedItems={items} />
+              <CatalogPanel onAdd={(cat) => { (toggleFurniture || addFurniture)(cat); }} placedItems={items} />
             </div>
             <button className="cta" onClick={() => setDrawer(false)}>완료</button>
           </div>

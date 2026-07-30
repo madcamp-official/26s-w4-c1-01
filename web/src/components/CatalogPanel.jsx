@@ -97,8 +97,9 @@ export default function CatalogPanel({ onAdd, placedItems }) {
           const mood = deriveStyle(c);
           const placed = placedIds.has(c.id);
           return (
-            <div key={c.id} className="catrow">
-              <button className="catitem" onClick={() => onAdd(c)} title="방에 추가">
+            <div key={c.id} className={`catrow${placed ? ' on' : ''}`}>
+              {/* 토글 — 담긴 상품을 다시 누르면 방금 담은 하나를 뺀다 */}
+              <button className="catitem" onClick={() => onAdd(c)} title={placed ? '방에서 빼기' : '방에 추가'}>
                 {c.image ? (
                   <img className="swatch" src={c.image} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                 ) : (
@@ -118,7 +119,7 @@ export default function CatalogPanel({ onAdd, placedItems }) {
                     {c.source ? ` · ${c.source}` : ''}
                     {c.note ? ` · ${c.note}` : ''}
                     {typeof c.price === 'number' && c.price > 0 ? <> · <span className="pr">{c.price.toLocaleString()}원</span></> : null}
-                    {placed && <span className="placedcheck" title="이미 담음">✓</span>}
+                    {placed && <span className="placedcheck" title="담김 — 다시 누르면 빠져요">✓</span>}
                   </span>
                 </span>
               </button>
