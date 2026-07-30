@@ -3,7 +3,7 @@ import { consumeAuthHash, currentUser, logout } from './lib/auth.js';
 import { toPlacedItem, resolveDims, CATALOG, deriveStyle } from './lib/catalog.js';
 import { validateLayout, findFreeSpot, snapRotation, clampCenterFree } from './lib/geometry.js';
 import { generateLayouts, validateCandidates } from './lib/autolayout.js';
-import { fetchDims, layoutFurniture, renderScene, chatLayout, postCommunity, saveRoomServer, fetchRooms } from './lib/api.js';
+import { fetchDims, layoutFurniture, renderScene, chatLayout, postCommunity, saveRoomServer, fetchRooms, deleteRoom } from './lib/api.js';
 import { parseCommand, parseRecommendCommand, hasPlaceHint } from './lib/chatcmd.js';
 import { MOOD_TO_STYLE } from './lib/appdata.js';
 
@@ -403,6 +403,19 @@ export default function App() {
     if (r?.status === 'OK') setSavedRooms([...r.rooms, ...loadSavedRooms()]);
   }
   useEffect(() => { reloadRooms(); }, [user]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 로컬 저장분(local:true)은 localStorage에서, 서버 저장분은 서버에서 지운다.
+  async function deleteSavedRoom(id) {
+    const target = savedRooms.find((r) => r.id === id);
+    if (target?.local) {
+      const next = loadSavedRooms().filter((r) => r.id !== id);
+      localStorage.setItem(SAVED_ROOMS_KEY, JSON.stringify(next));
+      setSavedRooms((prev) => prev.filter((r) => r.id !== id));
+      return;
+    }
+    const r = await deleteRoom(id);
+    if (r?.status === 'OK') setSavedRooms((prev) => prev.filter((r2) => r2.id !== id));
+  }
   function navTab(t) {
     setScreen(t);
   }
@@ -474,7 +487,7 @@ export default function App() {
       )}
 
       {screen === 'mypage' && (
-        <MyTab taste={taste} savedRooms={savedRooms} user={user} onEditTaste={() => setScreen('onboarding')}
+        <MyTab taste={taste} savedRooms={savedRooms} onDeleteRoom={deleteSavedRoom} user={user} onEditTaste={() => setScreen('onboarding')}
           onLogout={() => { logout(); setUser(null); setScreen('login'); }} />
       )}
 

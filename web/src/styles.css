@@ -71,10 +71,11 @@ input[type="number"], input[type="text"], select {
 .swatch { width: 26px; height: 26px; border-radius: 5px; flex: none; border: 1px solid rgba(0,0,0,.08); object-fit: cover; background: #efeae0; }
 .selthumb { width: 30px; height: 30px; border-radius: 5px; object-fit: cover; border: 1px solid var(--line); }
 /* 이름 줄과 치수 줄을 분리 — 한 줄로 흘리면 영어 상품명+규격 뱃지에 밀려 치수가 잘린다 */
-.catitem .meta { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.catitem .meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
 .catitem .nm { font-size: 13px; display: flex; align-items: center; gap: 0; min-width: 0; }
 .catitem .nm > :first-child, .catitem .nm { overflow: hidden; }
 .catitem .dm { font-size: 11px; color: var(--muted); line-height: 1.45; }
+.sizetag { font-size: 10px; color: var(--muted); border: 1px solid var(--line); padding: 0 5px; border-radius: 4px; margin-left: 5px; }
 
 .stagewrap { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
 .stagewrap .konvajs-content { margin: 0 auto; }
@@ -93,7 +94,10 @@ input[type="number"], input[type="text"], select {
 .selbar { display: flex; gap: 6px; margin-top: 8px; }
 .dimedit { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
 .dimedit input { width: 52px; padding: 4px 6px; font-size: 13px; }
-.catitem .pr { font-size: 11px; color: var(--accent); font-weight: 600; }
+.catitem .pr { font-size: 12.5px; color: var(--accent); font-weight: 800; }
+/* "이미 담음" 체크 — 상품 정보 칸(가격 옆)에 표시. 방에 이 상품이 하나라도 있으면 뜸, 탭은 막지 않고 계속 추가됨. */
+.placedcheck { width: 15px; height: 15px; border-radius: 4px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent); color: #fff; font: 700 10px sans-serif; vertical-align: middle; margin-left: 4px; }
 .mockup-note { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
 
 .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
@@ -196,16 +200,20 @@ input[type="number"], input[type="text"], select {
 .fchip.clear { color: var(--muted); border-style: dashed; }
 .fcount { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 42px; }
 .moodtag { font-size: 10px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); padding: 1px 6px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
-.sizetag { font-size: 10px; color: var(--muted); border: 1px solid var(--line); padding: 0 5px; border-radius: 4px; margin-left: 5px; }
 
 /* 유사추천 버튼/행 */
 .catrow { display: flex; align-items: stretch; gap: 6px; }
 .catrow .catitem { flex: 1; min-width: 0; }
-.recbtn { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-  width: 46px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--muted);
-  font-size: 15px; cursor: pointer; text-decoration: none; }
-.recbtn span { font-size: 9px; }
-.recbtn:hover { border-color: var(--accent); color: var(--accent); }
+/* 정보 열과 검색 열 사이 구분선(3열) — 본문과 액션을 시각적으로 분리. */
+.catdiv { flex: none; align-self: center; width: 1px; height: 44px; background: #F0EAE2; }
+/* 검색 열(4열) — 돋보기 원형 버튼 + "비슷" 라벨 + 실측/추정 뱃지, 세로 스택 중앙정렬. */
+.recbtn { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  width: 54px; border: 0; background: none; padding: 4px 0; cursor: pointer; }
+.recbtn-ico { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.recbtn-lbl { font-size: 8.5px; font-weight: 700; color: var(--muted2); }
+.recbtn .badge.sm { margin-left: 0; }
+.recbtn:hover .recbtn-ico { filter: brightness(1.08); }
 .catlist.rec { max-height: 60vh; overflow-y: auto; }
 
 /* 대화형 배치 도우미 */
@@ -583,8 +591,11 @@ input[type="number"], input[type="text"], select {
 .tagchip { padding: 9px 14px; border-radius: var(--r-pill); background: #F2E3DC; color: var(--accent); font-weight: 700; font-size: 12px; white-space: nowrap; }
 .savedgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .savedcard { border-radius: 16px; overflow: hidden; background: #fff; box-shadow: var(--shd-card); text-align: left; border: 0; padding: 0; }
-.savedcard .shot { aspect-ratio: 4/3; background: var(--muted-surface); display: block; }
+.savedcard .shot { position: relative; aspect-ratio: 4/3; background: var(--muted-surface); display: block; }
 .savedcard .cap { padding: 8px 10px; font-weight: 700; font-size: 12px; color: var(--ink); }
+/* 배치함 카드 삭제 — 썸네일 우상단, 찜 하트(.wish-btn)와 같은 톤. */
+.savedcard-del { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%; border: 0;
+  background: rgba(255,255,255,.9); color: var(--bad); font-size: 13px; display: flex; align-items: center; justify-content: center; z-index: 1; }
 .listcard { background: #fff; border-radius: 16px; box-shadow: var(--shd-card); overflow: hidden; }
 .listcard button { display: flex; width: 100%; align-items: center; justify-content: space-between; border: 0; background: none; padding: 15px 16px; font-size: 13.5px; color: var(--ink); border-bottom: 1px solid var(--line); }
 .listcard button:last-child { border-bottom: 0; }
@@ -635,12 +646,10 @@ img.ava { object-fit: cover; }
 .imgview-stage { flex: 1; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
 .imgview-stage img { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center center; will-change: transform; user-select: none; }
 .imgview-hint { text-align: center; color: #B9A99C; font-size: 11.5px; padding: 8px 0 calc(12px + env(safe-area-inset-bottom)); }
-/* 클릭 가능한 저장 이미지 — 눌리는 느낌을 준다 */
-.savedcard { cursor: pointer; transition: transform .12s ease; }
-.savedcard:active { transform: scale(.97); }
+/* 클릭 가능한 저장 이미지 — 눌리는 느낌을 준다. 삭제 버튼은 별개 클릭 영역(stopPropagation)이라 확대를 안 켬. */
+.savedcard .shot { cursor: pointer; transition: transform .12s ease; }
+.savedcard .shot:active { transform: scale(.97); }
 .feedcard-photo { cursor: zoom-in; }
-/* 배치함 카드 — 버튼으로 바뀌어 클릭 가능(사진 없으면 안내) */
-.savedcard { width: 100%; font: inherit; }
 .savedcard .shot { position: relative; display: flex; align-items: center; justify-content: center; }
 .savedcard .shot-none { font-size: 11px; color: var(--muted3); }
 /* 방 치수와 견적을 한 줄에 나란히 두면 2열 그리드 폭에서 치수가 줄바꿈된다 → 위아래로 쌓는다 */

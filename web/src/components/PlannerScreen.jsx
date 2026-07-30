@@ -79,7 +79,7 @@ export default function PlannerScreen({
             <div className="sheet-grab" />
             <div className="stitle">가구 담기 🛋️</div>
             <div style={{ overflow: 'auto', minHeight: 0 }}>
-              <CatalogPanel onAdd={(cat) => { addFurniture(cat); }} />
+              <CatalogPanel onAdd={(cat) => { addFurniture(cat); }} placedItems={items} />
             </div>
             <button className="cta" onClick={() => setDrawer(false)}>완료</button>
           </div>

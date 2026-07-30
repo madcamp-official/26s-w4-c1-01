@@ -4,7 +4,9 @@ import { resolveDims, accuracyMeta, CATEGORIES, STYLE_OPTIONS, SIZE_OPTIONS, PRI
 import { bedSizeLabel } from '../lib/oneroom.js';
 
 // 가구 팔레트 — 자연어 검색 + 분위기/사이즈/종류 필터 + 네이버 유사추천 + 클릭으로 배치에 추가.
-export default function CatalogPanel({ onAdd }) {
+export default function CatalogPanel({ onAdd, placedItems }) {
+  // 이미 방에 담은 상품 id — 카드 썸네일에 체크 표시용(탭하면 계속 추가는 되고, 표시만 해줌).
+  const placedIds = useMemo(() => new Set((placedItems || []).map((it) => it.catId).filter(Boolean)), [placedItems]);
   const [q, setQ] = useState('');
   const [items, setItems] = useState([]);
   const [source, setSource] = useState(null); // 'naver' | 'catalog' | 'local'
@@ -93,6 +95,7 @@ export default function CatalogPanel({ onAdd }) {
           const acc = accuracyMeta(known ? c.dimAccuracy : '추정(기본)');
           const dimText = known ? `${c.w}×${c.d}${c.h ? `×${c.h}` : ''}cm` : `≈${rd.w}×${rd.d}cm`;
           const mood = deriveStyle(c);
+          const placed = placedIds.has(c.id);
           return (
             <div key={c.id} className="catrow">
               <button className="catitem" onClick={() => onAdd(c)} title="방에 추가">
@@ -115,10 +118,15 @@ export default function CatalogPanel({ onAdd }) {
                     {c.source ? ` · ${c.source}` : ''}
                     {c.note ? ` · ${c.note}` : ''}
                     {typeof c.price === 'number' && c.price > 0 ? <> · <span className="pr">{c.price.toLocaleString()}원</span></> : null}
+                    {placed && <span className="placedcheck" title="이미 담음">✓</span>}
                   </span>
                 </span>
               </button>
-              <button className="recbtn" title="네이버에서 비슷한 상품 추천" onClick={() => openRec(c)}>🔎<span>비슷</span></button>
+              <span className="catdiv" />
+              <button className="recbtn" title="네이버에서 비슷한 상품 추천" onClick={() => openRec(c)}>
+                <span className="recbtn-ico">🔎</span>
+                <span className="recbtn-lbl">비슷</span>
+              </button>
             </div>
           );
         })}

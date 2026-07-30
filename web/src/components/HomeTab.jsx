@@ -1,10 +1,11 @@
 // 배치(홈) 탭 — 새 방 배치 시작 + 이어서 진행 카드 + 방꾸 도장 + 통계.
 // "방꾸 이야기"(커뮤니티)는 별도 탭바 아이템 없이 이 안에서 세그먼트 전환으로만 존재(design/커뮤니티.html 1c안).
-// 피드는 서버(SQLite)에서 불러오되, 서버 미연동/빈 DB일 땐 목업으로 폴백(정직 원칙: fallback은 MVP).
+// 피드는 서버(SQLite)에서만 불러온다 — 목업으로 폴백하면 진짜 첫 글처럼 보여서 정직 원칙에 어긋남(연결 실패/빈 글은 각각 정직하게 표시).
 import { useState, useEffect } from 'react';
 import ImageViewer from './ImageViewer.jsx';
-import { COMMUNITY_CATS, COMMUNITY_POSTS } from '../lib/appdata.js';
-import { fetchCommunityFeed, updateCommunityPost, deleteCommunityPost, likeCommunityPost } from '../lib/api.js';
+import { COMMUNITY_CATS } from '../lib/appdata.js';
+import { fetchCommunityFeed, postCommunity, updateCommunityPost, deleteCommunityPost, likeCommunityPost } from '../lib/api.js';
+const WRITE_CATS = COMMUNITY_CATS.filter((c) => c.key !== 'all');
 
 const STAMP_STEPS = [
   { key: 'taste', label: '취향입력' },
@@ -18,11 +19,16 @@ const CAT_BADGE = { flex: '🎀 자랑', tip: '💡 꿀팁', question: '❓ 질�
 export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
   const [tab, setTab] = useState('mine');   // 'mine' | 'community'
   const [cat, setCat] = useState('all');
-  const [serverPosts, setServerPosts] = useState(null);   // null=아직 없음/실패 → 목업 폴백. []=서버 응답했지만 글 없음 → 이때도 목업으로 데모 채움.
+  // source: null(로딩 전) | 'server'(정상 조회, 글 0개여도 진짜) | 'local'(서버 연결 실패)
+  const [feed, setFeed] = useState({ source: null, posts: [] });
   const [feedBusy, setFeedBusy] = useState(false);
   const [view, setView] = useState(null);   // {src, caption} — 피드 사진 확대 보기
   const [editingId, setEditingId] = useState(null);   // 인라인 수정 중인 글 id
   const [editTitle, setEditTitle] = useState('');
+  const [writeOpen, setWriteOpen] = useState(false);
+  const [writeCat, setWriteCat] = useState('flex');
+  const [writeTitle, setWriteTitle] = useState('');
+  const [writeBusy, setWriteBusy] = useState(false);
 
   useEffect(() => {
     if (tab !== 'community') return;
@@ -30,15 +36,14 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
     setFeedBusy(true);
     fetchCommunityFeed(cat).then((r) => {
       if (!alive) return;
-      setServerPosts(r.posts);
+      setFeed({ source: r.source, posts: r.posts || [] });
       setFeedBusy(false);
     });
     return () => { alive = false; };
   }, [tab, cat]);
 
-  const mockPosts = cat === 'all' ? COMMUNITY_POSTS : COMMUNITY_POSTS.filter((p) => p.cat === cat);
-  const isServerFeed = !!(serverPosts && serverPosts.length);   // 목업 데모 글엔 실제 좋아요 서버 id가 없어 좋아요 버튼을 안 보임
-  const posts = isServerFeed ? serverPosts : mockPosts;
+  const posts = feed.posts;
+  const isServerFeed = feed.source === 'server';
 
   function startEdit(p) { setEditingId(p.id); setEditTitle(p.title); }
   function cancelEdit() { setEditingId(null); setEditTitle(''); }
@@ -47,20 +52,35 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
     if (!title) return;
     const r = await updateCommunityPost(id, { title });
     if (r?.status === 'OK') {
-      setServerPosts((prev) => (prev || []).map((x) => (x.id === id ? { ...x, title } : x)));
+      setFeed((prev) => ({ ...prev, posts: prev.posts.map((x) => (x.id === id ? { ...x, title } : x)) }));
       setEditingId(null);
     }
   }
   async function handleDelete(id) {
     if (!window.confirm('이 글을 삭제할까요?')) return;
     const r = await deleteCommunityPost(id);
-    if (r?.status === 'OK') setServerPosts((prev) => (prev || []).filter((x) => x.id !== id));
+    if (r?.status === 'OK') setFeed((prev) => ({ ...prev, posts: prev.posts.filter((x) => x.id !== id) }));
   }
   async function handleLike(p) {
     const r = await likeCommunityPost(p.id);
     if (r?.status === 'NOAUTH') { alert('로그인하면 좋아요할 수 있어요'); return; }
     if (r?.status === 'OK') {
-      setServerPosts((prev) => (prev || []).map((x) => (x.id === p.id ? { ...x, liked: r.liked, likes: r.likes } : x)));
+      setFeed((prev) => ({ ...prev, posts: prev.posts.map((x) => (x.id === p.id ? { ...x, liked: r.liked, likes: r.likes } : x)) }));
+    }
+  }
+  function openWrite() { setWriteCat(cat === 'all' ? 'flex' : cat); setWriteTitle(''); setWriteOpen(true); }
+  async function submitWrite() {
+    const title = writeTitle.trim();
+    if (!title || writeBusy) return;
+    setWriteBusy(true);
+    const r = await postCommunity({ cat: writeCat, title });
+    setWriteBusy(false);
+    if (r?.status === 'OK' && r.post) {
+      setWriteOpen(false);
+      if (cat !== 'all' && cat !== writeCat) setCat(writeCat);   // 필터가 안 맞으면 방금 쓴 글이 보이는 탭으로 이동
+      else setFeed((prev) => ({ source: 'server', posts: [r.post, ...prev.posts] }));
+    } else {
+      alert(`글 등록에 실패했어. 다시 시도해줘${r?.reason ? ` (${r.reason})` : ''}`);
     }
   }
 
@@ -115,14 +135,21 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
           </>
         ) : (
           <>
-            <div className="feed-cats">
-              {COMMUNITY_CATS.map((c) => (
-                <button key={c.key} className={`fpill ${cat === c.key ? 'on' : ''}`} onClick={() => setCat(c.key)}>{c.label}</button>
-              ))}
+            <div className="feed-cats" style={{ justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+                {COMMUNITY_CATS.map((c) => (
+                  <button key={c.key} className={`fpill ${cat === c.key ? 'on' : ''}`} onClick={() => setCat(c.key)}>{c.label}</button>
+                ))}
+              </div>
+              <button className="tlink" style={{ flexShrink: 0, fontWeight: 700 }} onClick={openWrite}>+ 글쓰기</button>
             </div>
 
             {feedBusy && !posts.length ? (
               <div className="empty"><div className="spinner sm" /><p>불러오는 중…</p></div>
+            ) : feed.source === 'local' ? (
+              <div className="empty"><span className="emoji">📡</span><p>커뮤니티 서버에 연결할 수 없어. 잠시 후 다시 시도해줘.</p></div>
+            ) : !posts.length ? (
+              <div className="empty"><span className="emoji">🧡</span><p>아직 글이 없어. 첫 글을 써볼까?</p></div>
             ) : posts.map((p) => {
               const badge = p.badge || CAT_BADGE[p.cat];
               return (
@@ -177,6 +204,26 @@ export default function HomeTab({ stamps, stats, draft, onStart, onResume }) {
           </>
         )}
       </div>
+
+      {writeOpen && (
+        <div className="sheet-back" onClick={() => setWriteOpen(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-grab" />
+            <div className="stitle">방꾸 이야기 글쓰기</div>
+            <div className="feed-cats">
+              {WRITE_CATS.map((c) => (
+                <button key={c.key} className={`fpill ${writeCat === c.key ? 'on' : ''}`} onClick={() => setWriteCat(c.key)}>{c.label}</button>
+              ))}
+            </div>
+            <textarea className="feed-edit-input" style={{ minHeight: 90, resize: 'vertical', width: '100%', fontFamily: 'inherit' }}
+              placeholder="자랑하고 싶은 방꾸, 알려주고 싶은 꿀팁, 궁금한 걸 적어봐" value={writeTitle}
+              onChange={(e) => setWriteTitle(e.target.value)} autoFocus />
+            <button className="cta" disabled={!writeTitle.trim() || writeBusy} onClick={submitWrite}>
+              {writeBusy ? '올리는 중…' : '게시하기'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ const PROVIDER_LABEL = { kakao: '카카오', google: 'Google' };
 const CAT_BADGE = { flex: '🎀 자랑', tip: '💡 꿀팁', question: '❓ 질문' };
 
 // 마이 탭 — 프로필(소셜 로그인 연동) + 취향 태그 + 저장한 배치 + 좋아요/찜 + 계정 리스트.
-export default function MyTab({ taste, savedRooms, user, onEditTaste, onLogout }) {
+export default function MyTab({ taste, savedRooms, onDeleteRoom, user, onEditTaste, onLogout }) {
   const rooms = savedRooms || [];
   const tags = [...(taste?.moods || [])];
   if (taste?.budget) tags.push(`예산 ${taste.budget}`);
@@ -76,17 +76,19 @@ export default function MyTab({ taste, savedRooms, user, onEditTaste, onLogout }
                 const src = r.image || r.renderImg || null;
                 const cap = r.roomLabel || `내 방꾸 #${rooms.length - i}`;
                 return (
-                  <button key={r.id || i} type="button" className="savedcard"
-                    onClick={() => src && setView({ src, caption: cap })}
-                    title={src ? '크게 보기' : '저장된 사진이 없어요'}>
-                    <div className="shot" style={src ? { backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+                  <div key={r.id || i} className="savedcard">
+                    <div className="shot" style={src ? { backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                      onClick={() => src && setView({ src, caption: cap })}
+                      title={src ? '크게 보기' : '저장된 사진이 없어요'}>
                       {!src && <span className="shot-none">사진 없음</span>}
+                      <button type="button" className="savedcard-del" title="삭제"
+                        onClick={(e) => { e.stopPropagation(); if (window.confirm('이 배치를 삭제할까요?')) onDeleteRoom?.(r.id); }}>🗑</button>
                     </div>
                     <div className="cap">
                       {cap}
                       {r.estimate > 0 && <span className="cap-sub">{r.estimateIsEst ? '약 ' : ''}{r.estimate.toLocaleString()}원</span>}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

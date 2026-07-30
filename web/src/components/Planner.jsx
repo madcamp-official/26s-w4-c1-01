@@ -154,6 +154,44 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
   for (let m = 0.5; m < room.widthM; m += 0.5) grid.push(['v', m]);
   for (let m = 0.5; m < room.depthM; m += 0.5) grid.push(['h', m]);
 
+  // 가구 라벨 — 사각형 바깥 좌상단에 뜨는 작은 배지. 침대는 강조색, 나머진 코퍼.
+  // 위쪽 벽에 붙어 바깥에 놓을 공간이 없으면 사각형 안쪽 상단으로 폴백하고,
+  // 앞서 배치한 라벨과 겹치면 순서대로 오른쪽으로 밀어낸다(그리드가 커도 O(n²)로 충분히 가벼움).
+  const labelPlacements = useMemo(() => {
+    const placedBoxes = [];   // 캔버스 절대좌표 기준 이미 놓인 라벨들(겹침 판정용)
+    return items.map((it) => {
+      const fp = effectiveFootprint(it.wM, it.dM, it.rotationDeg || 0);
+      const hw = (fp.w * ppm) / 2, hd = (fp.d * ppm) / 2;   // 축정렬 바운딩박스 반폭/반깊이(px)
+      const isHero = it.cat === '침대';
+      const fontSize = isHero ? 8.5 : 8;
+      const bg = isHero ? '#3D5C4F' : '#B5652E';
+      // 상품명(영문 원문·긴 표기)이 아니라 카테고리로 — 배지는 한 줄 고정폭이라 짧은 이름이 전제.
+      const text = `${it.cat || it.name} ${Math.round(it.wM * 100)}×${Math.round(it.dM * 100)}`;
+      // 캔버스에 실제 폰트 측정 없이 근사(칩 라벨과 같은 방식, line 221 참조) — 배지 배경 크기·겹침판정용.
+      const padX = 6, padY = 2.5;
+      const w = text.length * fontSize * 0.92 + padX * 2;
+      const h = fontSize * 1.25 + padY * 2;
+
+      const cxPx = PAD + toPx(it.cx), cyPx = PAD + toPx(it.cy);
+      const rectTopLocal = -hd;
+      const outsideYLocal = rectTopLocal - 13 - h;   // 사각형 위 13px 바깥
+      const fitsOutside = cyPx + outsideYLocal > PAD + 2;   // 위쪽 벽선에 닿을 만큼 붙으면 폴백
+      let x = -hw + 2;
+      const y = fitsOutside ? outsideYLocal : rectTopLocal + 3;   // 폴백: 사각형 안쪽 상단
+
+      let gx = cxPx + x, gy = cyPx + y;
+      for (const p of placedBoxes) {
+        if (gx < p.x + p.w + 3 && gx + w + 3 > p.x && gy < p.y + p.h && gy + h > p.y) {
+          x = p.x + p.w + 3 - cxPx;   // 겹치면 그 라벨 오른쪽으로 이어붙임
+          gx = cxPx + x;
+        }
+      }
+      placedBoxes.push({ x: gx, y: gy, w, h });
+
+      return { id: it.id, x, y, w, h, text, bg, fontSize, padX, padY };
+    });
+  }, [items, ppm]);
+
   return (
     <div className="stagewrap" ref={wrapRef}>
       <Stage width={stageW} height={stageH} onMouseDown={(e) => { if (e.target === e.target.getStage()) setSelectedId(null); }}
@@ -329,34 +367,21 @@ export default function Planner({ room, items, setItems, selectedId, setSelected
                   if (ih > maxh) { ih = maxh; iw = ih * asp; }
                   return <KImage image={im} width={iw} height={ih} offsetX={iw / 2} offsetY={ih / 2} listening={false} />;
                 })()}
-                {/* 라벨은 카테고리 한 단어만 — 상품 원문명("Rivet Nova Modern King Bed Frame wit")과
-                    치수·신뢰도까지 얹으면 타일이 글자로 뒤덮인다. 치수는 선택 시 하단바가, 신뢰도는
-                    좌상단 점이 이미 알려준다. 흰 테두리를 둘러 가구 사진 위에서도 읽히게. */}
-                {(() => {
-                  const label = it.cat || (it.name || '').split(/[ ,(]/)[0].slice(0, 8);
-                  if (!label) return null;
-                  const tw = Math.max(fp.w, 0.4) * ppm;
-                  const fs = Math.min(12, Math.max(8.5, tw / 4.4));
-                  return (
-                    <Text
-                      text={label}
-                      fontSize={fs}
-                      fontStyle="bold"
-                      fill="#2B2118"
-                      stroke="#fff"
-                      strokeWidth={3}
-                      fillAfterStrokeEnabled
-                      lineJoin="round"
-                      align="center"
-                      width={tw}
-                      offsetX={tw / 2}
-                      offsetY={fs / 2}
-                      listening={false}
-                    />
-                  );
-                })()}
                 {/* 치수 신뢰도 점 (좌상단) */}
                 <Circle x={-w / 2 + 6} y={-h / 2 + 6} radius={4} fill={accuracyMeta(it.dimAccuracy).hex} listening={false} />
+                {(() => {
+                  // 이름+치수 배지 — 사각형 바깥 좌상단(공간 없으면 안쪽 상단 폴백, labelPlacements에서 계산).
+                  // 그룹째 드래그되므로 라벨도 가구를 자동으로 따라간다. 장식 요소라 클릭은 사각형이 받는다.
+                  const lp = labelPlacements[idx];
+                  if (!lp) return null;
+                  return (
+                    <Group x={lp.x} y={lp.y} listening={false}>
+                      <Rect width={lp.w} height={lp.h} fill={lp.bg} cornerRadius={6} />
+                      <Text text={lp.text} x={lp.padX} y={lp.padY} fontSize={lp.fontSize}
+                        fontStyle="700" fill="#fff" wrap="none" />
+                    </Group>
+                  );
+                })()}
               </Group>
             );
           })}
