@@ -5,6 +5,7 @@ import OpeningsBar from './OpeningsBar.jsx';
 import LayoutChat from './LayoutChat.jsx';
 import CatalogPanel from './CatalogPanel.jsx';
 import ViewErrorBoundary from './ViewErrorBoundary.jsx';
+import Logo from './Logo.jsx';
 
 // 배치 플래너 화면 — ywlee chrome + 기존 기능 컴포넌트(2D/3D/문창/자동배치/채팅/가구담기) 조립.
 export default function PlannerScreen({
@@ -23,7 +24,7 @@ export default function PlannerScreen({
     <div className="vscreen planner-screen">
       <button className="backbtn" onClick={onBack}>← 뒤로</button>
       <div className="planner-head">
-        <b>🧚 방꾸요정</b>
+        <b className="planner-brand"><Logo size={28} />방꾸요정</b>
         <span className="spacer" />
         <button className="iconbtn" onClick={onAutoLayout} disabled={!items.length || layoutBusy}>
           {layoutBusy ? '🤖 배치 중…' : '✨ 자동배치'}

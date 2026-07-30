@@ -6,7 +6,7 @@
 # 그다음 VS Code PORTS 탭에서 5173 열기. 코드 고치면: ./run.sh 다시(리빌드) → 브라우저 하드 새로고침.
 cd "$(dirname "$0")"
 KEY="${CAMP3_KEY:-$HOME/.ssh/camp3.pem}"
-[ -f "$KEY" ] || KEY="camp3_share_20260725.pem"
+[ -f "$KEY" ] || KEY="server/camp3_share_20260725.pem"
 CAMP3="root@172.10.5.71"
 up(){ python3 -c "import socket,sys;s=socket.socket();s.settimeout(0.4);sys.exit(0 if s.connect_ex(('127.0.0.1',$1))==0 else 1)"; }
 tun(){ # $1=port $2=라벨 — camp-3로 SSH 터널(멱등)
