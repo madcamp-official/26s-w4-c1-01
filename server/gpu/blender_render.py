@@ -211,7 +211,10 @@ HANDLE = mat("handle", (0.62, 0.60, 0.55), rough=0.35, metal=0.9)  # 문 손잡�
 # hide: 카메라 쪽 벽/천장 컷어웨이. 예전엔 아예 안 만들어서 태양·HDRI가 그 뚫린 면으로
 # 쏟아졌다(햇빛이 엉뚱한 방향에서 들어오는 원인). 이제 전부 '얇은 박스'로 세우되 숨김 면은
 # visible_camera=False — 카메라엔 안 보여도 빛은 막는다 → 빛은 오직 창 구멍으로만 들어온다.
-hide = set(S.get("hide", []))
+# 파노라마(360°) 모드: 방 안에서 사방을 둘러보는 한 장. 벽을 하나도 숨기지 않는다 —
+# 컷어웨이는 '밖에서 들여다보는' 구도용이고, 안에서 돌아보려면 벽이 다 있어야 한다.
+PANO = bool(S.get("pano"))
+hide = set() if PANO else set(S.get("hide", []))
 
 # ---------- 바닥 = '실제 방'만 ----------
 # 욕실·주방·현관·보일러실(컷아웃)은 우리가 꾸미는 공간이 아니다 → 바닥에서 아예 파낸다.
@@ -637,6 +640,13 @@ for it in S["items"]:
 
 # ---------- 카메라 ----------
 cam_d = bpy.data.cameras.new("cam"); cam = bpy.data.objects.new("cam", cam_d)
+if PANO:
+    cam_d.type = 'PANO'
+    for _tgt in (cam_d, getattr(cam_d, 'cycles', None)):   # 4.x는 카메라 데이터, 구버전은 cycles 하위
+        try:
+            _tgt.panorama_type = 'EQUIRECTANGULAR'
+        except Exception:  # noqa: BLE001
+            pass
 sc.collection.objects.link(cam); sc.camera = cam
 cd = S.get("camera", {})
 cam.location = cd.get("pos", [W / 2, 0.15, 1.5])
@@ -644,10 +654,14 @@ cam_d.lens = cd.get("lens", 28)
 tgt = cd.get("target", [W / 2, D * 0.62, 0.55])
 d = mathutils.Vector(tgt) - mathutils.Vector(cam.location)
 cam.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler()
+if PANO:
+    # 등장방형 파노라마는 카메라를 '똑바로 세워'야 한다(+Z가 위, 수평선이 이미지 중앙).
+    # yaw만 target 방향으로 돌려 파노라마의 정중앙이 방 안쪽을 보게 한다.
+    cam.rotation_euler = (math.radians(90), 0, math.atan2(d.y, d.x) - math.radians(90))
 
 # fit: 방 지오메트리(보이는 코너들)에 맞춰 타이트 프레이밍 — 잉여 배경 최소화, 방이 프레임을 채움.
 # 컷어웨이로 숨는 near/left 벽의 '천장 코너'는 제외(빈 공간까지 여백으로 잡지 않게).
-if cd.get("fit"):
+if cd.get("fit") and not PANO:
     # 프레이밍 기준은 건물 외곽이 아니라 '실제 방'(부속실 제외) — 욕실·현관까지 넣으면 방이 작게 나온다.
     _hx = LX0 if "left" in hide else LX1      # 컷어웨이된 코너 = 빈 공간이라 여백으로 잡지 않는다
     _hy = LY0 if "near" in hide else LY1
