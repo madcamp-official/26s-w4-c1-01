@@ -363,9 +363,9 @@ async def layout(req: LayoutReq):
                 {"system_instruction": {"parts": [{"text": _LAYOUT_PROMPT}]},
                  "contents": [{"role": "user", "parts": [{"text": user}]}],
                  # 자동배치는 로컬 기하 엔진이 최종 검증·후보 보충을 담당한다.
-                 # 긴 자기검산 출력 때문에 90초를 다 쓰지 않도록 생성량과 대기시간을 제한한다.
+                 # 로컬 기하 보충 전에 Gemini가 후보를 완성할 시간을 최대 30초까지 준다.
                  "generationConfig": {"maxOutputTokens": 4096, "temperature": 0.7,
-                                      "responseMimeType": "application/json"}}, timeout=15)
+                                      "responseMimeType": "application/json"}}, timeout=30)
             text = _gemini_text(data)
         else:
             async with httpx.AsyncClient(timeout=90) as cx:

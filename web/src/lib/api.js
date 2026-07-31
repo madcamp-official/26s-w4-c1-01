@@ -130,8 +130,8 @@ export async function layoutFurniture(room, items, openings = []) {
   try {
     const res = await fetch(`${API_BASE}/api/layout`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      // Gemini는 보조 제안자다. 20초 안에 못 오면 App의 로컬 기하 엔진이 후보 3개를 채운다.
-      body: JSON.stringify(payload), signal: timeout(20000),
+      // Gemini는 최대 30초 기다리고, 네트워크 여유까지 35초가 지나면 로컬 기하 엔진이 후보를 채운다.
+      body: JSON.stringify(payload), signal: timeout(35000),
     });
     if (!res.ok) return { status: 'ERROR', reason: `http ${res.status}` };
     return await res.json();

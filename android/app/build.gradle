@@ -11,8 +11,8 @@ android {
         applicationId "org.madcamp.bangkku"
         minSdk 26
         targetSdk 34
-        versionCode 2
-        versionName "1.1"
+        versionCode 3
+        versionName "1.2"
         // 앱이 로드할 배포 URL — 터널 개통 후 도메인 확정되면 여기만 바꾸면 됨
         buildConfigField "String", "APP_URL", '"https://bangkku-fairy.madcamp-kaist.org"'
     }

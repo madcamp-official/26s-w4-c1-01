@@ -241,7 +241,7 @@ def gemini_layout(payload):
         "contents": [{"role": "user", "parts": [{"text": _layout_user_msg(payload)}]}],
         "generationConfig": {"maxOutputTokens": 24576, "temperature": 0.7, "responseMimeType": "application/json"},
     }).encode()
-    data = gemini_call(json.loads(body.decode()), timeout=90)
+    data = gemini_call(json.loads(body.decode()), timeout=30)
     cand = (data.get("candidates") or [{}])[0]
     text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
     return parse_layout_json(text)
