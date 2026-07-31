@@ -211,7 +211,7 @@ test('validateLayout: 구도 겹침은 통과, 나쁜 겹침은 플래그', () =
 
 test('로컬 R1: TV장이 침대 반대편 벽에서 정면 마주봄·정렬', () => {
   const room = { widthM: 3.2, depthM: 4.0 };
-  const items = [mk('bed', '침대', 1.5, 2.0), mk('tv', 'TV/콘솔', 1.2, 0.4, '미디어 콘솔')];
+  const items = [mk('bed', '침대', 1.5, 2.0), mk('tv', '수납', 1.2, 0.4, '미디어 콘솔')];
   const c = generateLayouts(room, items, 3, 800)[0];
   const bed = c.items.find((x) => x.id === 'bed'), tv = c.items.find((x) => x.id === 'tv');
   assert.ok(facing(bed.rotationDeg, tv.rotationDeg), 'TV 앞면이 침대 앞면 정반대');

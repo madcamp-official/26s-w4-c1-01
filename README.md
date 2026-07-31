@@ -3,7 +3,7 @@
 **방꾸요정**은 가구를 사기 전에 "이게 내 방에 들어갈까"를 실치수로 확인하는 앱입니다.
 방 도면이나 치수를 넣으면 실제 상품 치수의 3D 가구를 겹치지 않게 자동 배치하고, 그 방을 포토리얼 사진으로 렌더해 보여준 뒤, 네이버쇼핑 실상품으로 연결합니다.
 
-📱 **https://bangkku-fairy.madcamp-kaist.org** · 안드로이드 APK 제공([android/README.md](android/README.md)) · 3D 가구 203종
+📱 **https://bangkku-fairy.madcamp-kaist.org** · 안드로이드 APK 제공([android/README.md](android/README.md)) · 실측 3D 가구 201종
 
 
 ## 목차
